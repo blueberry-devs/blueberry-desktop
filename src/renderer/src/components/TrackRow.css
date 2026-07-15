@@ -1,0 +1,178 @@
+.track-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: background 0.12s ease;
+  cursor: pointer;
+}
+
+.track-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.track-row--current .track-row__title {
+  color: #ffdb4d;
+}
+
+.track-row__cover {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #2a2a2a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.track-row__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.track-row__badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  z-index: 1;
+}
+
+.track-row__play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.track-row:hover .track-row__play-overlay,
+.track-row--current .track-row__play-overlay {
+  opacity: 1;
+}
+
+.track-row__spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.track-row__meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.track-row__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-row__artists-wrap {
+  position: relative;
+  margin-top: 2px;
+}
+
+.track-row__artists {
+  display: block;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-row__artists--link {
+  cursor: pointer;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.track-row__artists--link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.track-row__artist-picker {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 160px;
+  background: var(--surface-2, rgba(24, 24, 26, 0.97));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+}
+
+.track-row__artist-picker-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  transition: background 0.12s ease;
+}
+
+.track-row__artist-picker-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.track-row__duration {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+  min-width: 32px;
+  text-align: right;
+}
+
+.track-row__like-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.35);
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.track-row:hover .track-row__like-btn,
+.track-row__like-btn--active {
+  opacity: 1;
+}
+
+.track-row__like-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.track-row__like-btn--active {
+  color: #ff3d71;
+}

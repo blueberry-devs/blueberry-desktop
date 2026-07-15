@@ -1,0 +1,125 @@
+.add-to-playlist {
+  position: relative;
+}
+
+.add-to-playlist__trigger {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.track-row:hover .add-to-playlist__trigger,
+.add-to-playlist:has(.add-to-playlist__menu) .add-to-playlist__trigger {
+  opacity: 1;
+}
+
+.add-to-playlist__trigger:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.add-to-playlist__menu {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  z-index: 30;
+  width: 220px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #1c1c1f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  animation: fadeIn 0.12s ease both;
+}
+
+.add-to-playlist__empty {
+  padding: 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.add-to-playlist__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #fff;
+  text-align: left;
+}
+
+.add-to-playlist__item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.add-to-playlist__item-cover {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background-color: #333;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+}
+
+.add-to-playlist__item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-to-playlist__check {
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.add-to-playlist__new {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffdb4d;
+  text-align: left;
+}
+
+.add-to-playlist__new:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.add-to-playlist__create-row {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.add-to-playlist__input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: #fff;
+  font-size: 12px;
+  outline: none;
+}
+
+.add-to-playlist__create-confirm {
+  padding: 0 10px;
+  border-radius: 6px;
+  background: #ffdb4d;
+  color: #000;
+  font-size: 12px;
+  font-weight: 700;
+}

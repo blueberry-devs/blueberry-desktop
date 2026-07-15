@@ -1,0 +1,7 @@
+yandex-music
+fastapi
+uvicorn[standard]
+requests
+yt-dlp
+python-dotenv
+pyinstaller

@@ -1,0 +1,71 @@
+{
+  "name": "blueberry-desktop",
+  "version": "1.0.0",
+  "description": "Яндекс Музыка",
+  "main": "./out/main/index.js",
+  "author": "example.com",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "postinstall": "electron-builder install-app-deps",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.web.json",
+    "build:server": "scripts\\build-server.bat",
+    "dist:win": "npm run build:server && npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:all": "npm run build && electron-builder -mwl"
+  },
+  "dependencies": {
+    "@types/three": "^0.185.1",
+    "hls.js": "^1.6.16",
+    "motion": "^12.42.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.185.1"
+  },
+  "build": {
+    "appId": "com.yandex.music.clone",
+    "productName": "Яндекс Музыка",
+    "icon": "resources/icon.png",
+    "extraResources": [
+      {
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*",
+          "!**/__pycache__",
+          "!**/.venv"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "resources/icon.ico",
+      "extraResources": [
+        {
+          "from": "build/packed-server",
+          "to": "server"
+        }
+      ]
+    },
+    "linux": {
+      "icon": "resources/icon.png"
+    },
+    "mac": {
+      "icon": "resources/icon.png"
+    }
+  },
+  "devDependencies": {
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/tsconfig": "^1.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "electron": "^32.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}
