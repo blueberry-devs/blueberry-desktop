@@ -1,0 +1,68 @@
+.mood-list {
+  position: relative;
+  z-index: 5;
+  width: var(--mood-list-width);
+  min-width: 220px;
+  flex-shrink: 0;
+  height: 100%;
+  margin-left: clamp(-70px, -6vw, -30px);
+  padding: 4px 0 0 clamp(90px, 11vw, 140px);
+  overflow: visible;
+  pointer-events: none;
+}
+
+.mood-list .animated-list-container,
+.mood-list .animated-list {
+  pointer-events: auto;
+}
+
+.mood-list .animated-list {
+  /* The wheel curve (MoodList.tsx) recedes rows up to WHEEL_RADIUS*(1-cos
+     MAX_ANGLE) (~163px) to the right via transform. Overflow-y:auto on this
+     element forces overflow-x to compute as 'auto' too per spec (can't opt
+     out with overflow-x:visible while overflow-y isn't visible) — so
+     without this padding, receded rows get silently clipped instead of
+     curling into view. */
+  padding-left: 20px;
+  padding-right: 190px;
+}
+
+.mood-list__row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 84px;
+  padding: 0 10px;
+  border-radius: 10px;
+  transition: background 0.12s ease;
+  will-change: transform;
+}
+
+.mood-list__label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.mood-icon {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mood-icon--red {
+  color: #e8394f;
+}
+
+.mood-icon--blue {
+  color: #4a6ee0;
+}
+
+.mood-icon--purple {
+  color: #8a5cf6;
+}
