@@ -111,7 +111,14 @@ def search_soundcloud(text: str):
     return results
 
 
-# --- YouTube (via yt-dlp, no API key required) ---------------------------
+# --- YouTube (via pytubefix + yt-dlp fallback) ---------------------------
+
+try:
+    from pytubefix import YouTube, Search as PytubeSearch
+    _has_pytubefix = True
+except ImportError:
+    _has_pytubefix = False
+    print('[yt] pytubefix not installed, falling back to yt-dlp', flush=True)
 
 YTDLP_SEARCH_OPTS = {
     'quiet': True,
@@ -130,7 +137,36 @@ YTDLP_STREAM_OPTS = {
 }
 
 
-def yt_search(query: str, limit: int = 8) -> list:
+def _yt_serialize(video_id: str, title: str, channel: str, thumbnail: Optional[str], duration: Optional[float]) -> dict:
+    return {
+        'id': f'youtube:{video_id}',
+        'source': 'youtube',
+        'title': title or 'Unknown',
+        'artists': [channel or 'YouTube'],
+        'cover': thumbnail,
+        'duration': round(duration) if duration else None,
+    }
+
+
+def _yt_search_pytube(query: str, limit: int = 8) -> list:
+    try:
+        results = PytubeSearch(query).results
+    except Exception:
+        return []
+    out = []
+    for v in results[:limit]:
+        try:
+            video_id = v.video_id
+            thumbnail = v.thumbnail_url
+            # pytubefix Search results may not have duration
+            duration = getattr(v, 'length', None)
+            out.append(_yt_serialize(video_id, v.title, v.author, thumbnail, duration))
+        except Exception:
+            continue
+    return out
+
+
+def _yt_search_ytdlp(query: str, limit: int = 8) -> list:
     cache_key = f'{query.lower()}\x00{limit}'
     if cache_key in _yt_search_cache:
         return _yt_search_cache[cache_key]
@@ -140,32 +176,51 @@ def yt_search(query: str, limit: int = 8) -> list:
     except Exception:
         return []
     entries = (info or {}).get('entries') or []
-    results = []
-    for e in entries:
-        if not e or not e.get('id'):
-            continue
-        duration = e.get('duration')
-        results.append(
-            {
-                'id': f'youtube:{e["id"]}',
-                'source': 'youtube',
-                'title': e.get('title') or 'Unknown',
-                'artists': [e.get('uploader') or e.get('channel') or 'YouTube'],
-                'cover': e.get('thumbnails', [{}])[-1].get('url') if e.get('thumbnails') else e.get('thumbnail'),
-                'duration': round(duration) if duration else None,
-            }
-        )
+    results = [_yt_serialize(
+        e['id'],
+        e.get('title'),
+        e.get('uploader') or e.get('channel'),
+        (e.get('thumbnails') or [{}])[-1].get('url') if e.get('thumbnails') else e.get('thumbnail'),
+        e.get('duration'),
+    ) for e in entries if e and e.get('id')]
     _yt_search_cache[cache_key] = results
     return results
 
 
-def yt_resolve_stream(video_id: str) -> Optional[str]:
+def yt_search(query: str, limit: int = 8) -> list:
+    if _has_pytubefix:
+        results = _yt_search_pytube(query, limit)
+        if results:
+            return results
+    return _yt_search_ytdlp(query, limit)
+
+
+def _yt_resolve_stream_pytube(video_id: str) -> Optional[str]:
+    try:
+        yt = YouTube(f'https://www.youtube.com/watch?v={video_id}')
+        stream = yt.streams.get_audio_only()
+        if stream:
+            return stream.url
+    except Exception:
+        return None
+    return None
+
+
+def _yt_resolve_stream_ytdlp(video_id: str) -> Optional[str]:
     try:
         with yt_dlp.YoutubeDL(YTDLP_STREAM_OPTS) as ydl:
             info = ydl.extract_info(f'https://www.youtube.com/watch?v={video_id}', download=False)
+        return (info or {}).get('url')
     except Exception:
         return None
-    return (info or {}).get('url')
+
+
+def yt_resolve_stream(video_id: str) -> Optional[str]:
+    if _has_pytubefix:
+        url = _yt_resolve_stream_pytube(video_id)
+        if url:
+            return url
+    return _yt_resolve_stream_ytdlp(video_id)
 
 
 # --- SoundCloud playback -----------------------------------------------
