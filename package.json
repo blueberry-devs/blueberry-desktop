@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Яндекс Музыка",
   "main": "./out/main/index.js",
-  "author": "example.com",
+  "author": "torusov",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
