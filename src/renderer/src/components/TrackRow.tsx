@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { motion } from 'motion/react'
 import { usePlayer } from '../player/PlayerContext'
 import { TrackResult } from '../api/yandexMusic'
 import { toggleLike, useIsLiked } from '../store/likes'
@@ -61,16 +63,25 @@ function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
   const handleContextMenu = useCallback((e: React.MouseEvent): void => {
     e.preventDefault()
     e.stopPropagation()
-    setCtxMenu({ x: e.clientX, y: e.clientY })
+    const menuWidth = 200
+    const menuHeight = 220
+    const pad = 8
+    let x = e.clientX
+    let y = e.clientY
+    if (x + menuWidth + pad > window.innerWidth) x = window.innerWidth - menuWidth - pad
+    if (y + menuHeight + pad > window.innerHeight) y = window.innerHeight - menuHeight - pad
+    setCtxMenu({ x, y })
   }, [])
 
   const handlePlayNext = useCallback((): void => {
     if (queueIndex >= 0) {
       const insertAt = queueIndex + 1
       currentQueue.splice(insertAt, 0, track)
+    } else {
+      play(track)
     }
     setCtxMenu(null)
-  }, [currentQueue, queueIndex, track])
+  }, [currentQueue, queueIndex, track, play])
 
   const handleAddToQueueEnd = useCallback((): void => {
     currentQueue.push(track)
@@ -97,8 +108,6 @@ function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
     navigator.clipboard.writeText(`${track.artists.join(', ')} — ${track.title}`).catch(() => {})
     setCtxMenu(null)
   }, [track])
-
-  const ctxStyle = ctxMenu ? { position: 'fixed' as const, left: ctxMenu.x, top: ctxMenu.y, zIndex: 9999 } : undefined
 
   return (
     <>
@@ -179,8 +188,17 @@ function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
         </div>
       </div>
 
-      {ctxMenu && (
-        <div ref={ctxRef} className="track-row__ctx" style={ctxStyle} onClick={(e) => e.stopPropagation()}>
+      {ctxMenu && createPortal(
+        <motion.div
+          ref={ctxRef}
+          className="track-row__ctx"
+          style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 9999 }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.12, ease: 'easeOut' }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <button className="track-row__ctx-item" onClick={handlePlayNext}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <path d="M2 12V4l8 4-8 4Z" fill="currentColor" />
@@ -213,7 +231,8 @@ function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
             </svg>
             Копировать
           </button>
-        </div>
+        </motion.div>,
+        document.body
       )}
     </>
   )
