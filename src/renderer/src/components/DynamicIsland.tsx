@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, HeartIcon, Mic2Icon } from './icons'
 import { usePlayer } from '../player/PlayerContext'
@@ -13,7 +13,7 @@ function formatTime(sec?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-function DynamicIsland({ className = '' }: { className?: string }): JSX.Element | null {
+function DynamicIsland({ className = '', onExpand }: { className?: string; onExpand?: () => void }): JSX.Element | null {
   const {
     currentTrack,
     isPlaying,
@@ -31,38 +31,70 @@ function DynamicIsland({ className = '' }: { className?: string }): JSX.Element 
 
   if (!currentTrack) return null
 
+  const [isScrubbing, setIsScrubbing] = useState(false)
+  const trackRef = useRef<HTMLDivElement>(null)
+
+  const calcSeek = useCallback((clientX: number): void => {
+    if (!trackRef.current || !duration) return
+    const rect = trackRef.current.getBoundingClientRect()
+    const x = clientX - rect.left
+    const pct = Math.max(0, Math.min(1, x / rect.width))
+    seekTo(pct * duration)
+  }, [duration, seekTo])
+
+  const handleProgressMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>): void => {
+    e.stopPropagation()
+    if (!duration) return
+    trackRef.current = e.currentTarget
+    setIsScrubbing(true)
+    calcSeek(e.clientX)
+  }, [duration, calcSeek])
+
+  useEffect(() => {
+    if (!isScrubbing) return
+    const onMove = (e: MouseEvent): void => calcSeek(e.clientX)
+    const onUp = (): void => setIsScrubbing(false)
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [isScrubbing, calcSeek])
+
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>): void => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    seekTo(((e.clientX - rect.left) / rect.width) * duration)
+  const handlePillClick = (): void => {
+    if (!isHovered) return
+    onExpand?.()
   }
 
   return (
-    <div
-      className={`dyn-island ${className}`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <motion.div
-        className="dyn-island__pill"
-        animate={{ width: isHovered ? 320 : 260 }}
-        transition={{ type: 'spring', bounce: 0.3, duration: 0.35 }}
+      <div
+        className={`dyn-island ${className}`}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => { if (!isScrubbing) setIsHovered(false) }}
       >
-        {isHovered && (
-          <div className="dyn-island__progress">
-            <div className="dyn-island__time">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
+        <motion.div
+          className="dyn-island__pill"
+          animate={{ width: isHovered || isScrubbing ? 320 : 260 }}
+        transition={{ type: 'spring', bounce: 0.3, duration: 0.35 }}
+        onClick={handlePillClick}
+      >
+        {(isHovered || isScrubbing) && (
+          <div className={`dyn-island__progress${isScrubbing ? ' dyn-island__progress--scrubbing' : ''}`} onClick={(e) => e.stopPropagation()}>
+              <div className="dyn-island__time">
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+              <div className="dyn-island__progress-track" onMouseDown={handleProgressMouseDown}>
+                <div className="dyn-island__progress-fill" style={{ width: `${progress}%` }} />
+              </div>
             </div>
-            <div className="dyn-island__progress-track" onClick={handleProgressClick}>
-              <div className="dyn-island__progress-fill" style={{ width: `${progress}%` }} />
-            </div>
-          </div>
         )}
 
         <div className="dyn-island__row">
-          <div className="dyn-island__cover">
+          <div className="dyn-island__cover" onClick={(e) => e.stopPropagation()}>
             {currentTrack.cover ? (
               <img src={currentTrack.cover} alt="" />
             ) : (
@@ -80,7 +112,7 @@ function DynamicIsland({ className = '' }: { className?: string }): JSX.Element 
             </div>
           </div>
 
-          <div className="dyn-island__controls">
+          <div className="dyn-island__controls" onClick={(e) => e.stopPropagation()}>
             <button className="dyn-island__ctrl-btn" onClick={previous} aria-label="prev">
               <SkipBackIcon />
             </button>
@@ -97,8 +129,8 @@ function DynamicIsland({ className = '' }: { className?: string }): JSX.Element 
             </button>
           </div>
 
-          {isHovered && (
-            <div className="dyn-island__extras">
+          {(isHovered || isScrubbing) && (
+            <div className="dyn-island__extras" onClick={(e) => e.stopPropagation()}>
               <button
                 className="dyn-island__icon-btn"
                 onClick={openLyrics}

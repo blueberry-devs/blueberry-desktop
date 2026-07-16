@@ -19,6 +19,7 @@ uniform float u_audioLow;
 uniform float u_audioMid;
 uniform float u_audioHigh;
 uniform float u_playing;
+uniform vec3 u_coverColor;
 
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -123,14 +124,18 @@ void main() {
 
   // --- Domain warp ---
   vec2 warpedUv = uv * 1.2;
-  float warpAmount = 0.3 + u_audioLow * 0.5;
+  float warpAmount = 0.3 + u_audioLow * 1.5;
   warpedUv += warpAmount * (vec2(
     fbm(warpedUv + t * 0.3),
     fbm(warpedUv + vec2(5.2, 1.3) + t * 0.2)
   ) - 0.5);
 
   float noiseDistort = snoise(vec3(warpedUv * 2.0, t * 0.5));
-  warpedUv += noiseDistort * 0.15 * (1.0 + u_audioMid * 2.0);
+  warpedUv += noiseDistort * 0.15 * (1.0 + u_audioMid * 4.0);
+
+  // --- Pulse scale on bass ---
+  float pulse = 1.0 + u_audioLow * 0.25;
+  uv *= pulse;
 
   // ===================== PLAYING STATE =====================
   float audioEnergy = u_audioLow + u_audioMid + u_audioHigh;
@@ -165,7 +170,15 @@ void main() {
   pOutlineCol = mix(pOutlineCol, pOutlineCol * 1.3, pCycle * 0.2);
 
   vec3 playCol = mix(pOutlineCol, pFill, pOutline);
-  playCol *= 1.0 + audioEnergy * 0.4;
+  playCol *= 1.0 + audioEnergy * 1.2;
+
+  // --- Mix in cover color based on audio energy ---
+  float coverMix = smoothstep(0.1, 0.8, audioEnergy) * 0.55;
+  playCol = mix(playCol, u_coverColor, coverMix);
+
+  // --- Bass flash: white burst on strong bass hits ---
+  float bassFlash = smoothstep(0.6, 1.5, u_audioLow) * 0.35;
+  playCol += bassFlash;
 
   // ===================== IDLE STATE =====================
   float edgeMask = 1.0 - smoothstep(0.0, 0.6, singularityPattern);
@@ -201,10 +214,11 @@ const BAND_COUNT = 8
 interface PlasmaWaveProps {
   playing?: boolean
   getFrequencyBands?: (bandCount: number) => Float32Array
+  coverColor?: [number, number, number]
   className?: string
 }
 
-function PlasmaWave({ playing = false, getFrequencyBands, className = '' }: PlasmaWaveProps): JSX.Element {
+function PlasmaWave({ playing = false, getFrequencyBands, coverColor = [0.35, 0.65, 1.0], className = '' }: PlasmaWaveProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const playingRef = useRef(playing)
   const getFrequencyBandsRef = useRef(getFrequencyBands)
@@ -212,6 +226,11 @@ function PlasmaWave({ playing = false, getFrequencyBands, className = '' }: Plas
   useEffect(() => {
     playingRef.current = playing
   }, [playing])
+
+  const coverColorRef = useRef(coverColor)
+  useEffect(() => {
+    coverColorRef.current = coverColor
+  }, [coverColor])
 
   useEffect(() => {
     getFrequencyBandsRef.current = getFrequencyBands
@@ -240,7 +259,8 @@ function PlasmaWave({ playing = false, getFrequencyBands, className = '' }: Plas
       u_audioLow: { value: 0 },
       u_audioMid: { value: 0 },
       u_audioHigh: { value: 0 },
-      u_playing: { value: 0 }
+      u_playing: { value: 0 },
+      u_coverColor: { value: new THREE.Vector3(0.35, 0.65, 1.0) }
     }
 
     const material = new THREE.ShaderMaterial({
@@ -293,12 +313,12 @@ function PlasmaWave({ playing = false, getFrequencyBands, className = '' }: Plas
         const mid = (bands[3] + bands[4] + bands[5]) / 3
         const high = (bands[6] + bands[7]) / 2
 
-        // Smooth with exponential moving average
-        const attack = 0.3
-        const decay = 0.08
-        audioLow += ((low * 8) - audioLow) * (low > audioLow ? attack : decay)
-        audioMid += ((mid * 8) - audioMid) * (mid > audioMid ? attack : decay)
-        audioHigh += ((high * 8) - audioHigh) * (high > audioHigh ? attack : decay)
+        // Smooth with exponential moving average — aggressive attack, gentle decay
+        const attack = 0.6
+        const decay = 0.12
+        audioLow += ((low * 12) - audioLow) * (low > audioLow ? attack : decay)
+        audioMid += ((mid * 10) - audioMid) * (mid > audioMid ? attack : decay)
+        audioHigh += ((high * 10) - audioHigh) * (high > audioHigh ? attack : decay)
       } else {
         // Idle: gentle ambient pulse
         const pulse = Math.sin(uniforms.u_time.value * 0.8) * 0.5 + 0.5
@@ -310,6 +330,10 @@ function PlasmaWave({ playing = false, getFrequencyBands, className = '' }: Plas
       uniforms.u_audioLow.value = audioLow
       uniforms.u_audioMid.value = audioMid
       uniforms.u_audioHigh.value = audioHigh
+
+      // Smooth cover color transition
+      const cc = coverColorRef.current
+      uniforms.u_coverColor.value.lerp({ x: cc[0], y: cc[1], z: cc[2] } as THREE.Vector3, dt * 2)
 
       renderer.render(scene, camera)
     }

@@ -140,9 +140,13 @@
   height: 42px;
   background: rgba(18, 18, 18, 0.9);
   border-radius: 21px;
-  cursor: pointer;
+  cursor: ew-resize;
   overflow: hidden;
   transition: background 0.2s ease;
+}
+
+.now-playing__island--dragging {
+  cursor: ew-resize;
 }
 
 .now-playing__island--hover {
