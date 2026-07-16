@@ -87,4 +87,4 @@ The renderer communicates with the Python sidecar over `localhost:8787`. In prod
 
 ## License
 
-MIT
+GPL v3
