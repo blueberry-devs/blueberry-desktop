@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { usePlayer } from '../player/PlayerContext'
 import { useWaveFeed } from '../player/useWaveFeed'
 import { toggleLike, useIsLiked } from '../store/likes'
@@ -71,13 +71,33 @@ function NowPlayingPanel(): JSX.Element {
     if (waveTrack) play(waveTrack)
   }
 
-  const handleBarClick = (e: React.MouseEvent<HTMLDivElement>): void => {
+  const [isDragging, setIsDragging] = useState(false)
+
+  const calcSeek = useCallback((clientX: number): void => {
     if (!barRef.current || !duration) return
     const rect = barRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left
+    const x = clientX - rect.left
     const pct = Math.max(0, Math.min(1, x / rect.width))
     seekTo(pct * duration)
-  }
+  }, [duration, seekTo])
+
+  const handleBarMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>): void => {
+    if (!barRef.current || !duration) return
+    setIsDragging(true)
+    calcSeek(e.clientX)
+  }, [duration, calcSeek])
+
+  useEffect(() => {
+    if (!isDragging) return
+    const onMove = (e: MouseEvent): void => calcSeek(e.clientX)
+    const onUp = (): void => setIsDragging(false)
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [isDragging, calcSeek])
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
@@ -134,9 +154,9 @@ function NowPlayingPanel(): JSX.Element {
           </button>
 
           <div
-            className={`now-playing__island${hoveringBar ? ' now-playing__island--hover' : ''}`}
+            className={`now-playing__island${hoveringBar || isDragging ? ' now-playing__island--hover' : ''}${isDragging ? ' now-playing__island--dragging' : ''}`}
             ref={barRef}
-            onClick={handleBarClick}
+            onMouseDown={handleBarMouseDown}
             onMouseEnter={() => setHoveringBar(true)}
             onMouseLeave={() => setHoveringBar(false)}
           >

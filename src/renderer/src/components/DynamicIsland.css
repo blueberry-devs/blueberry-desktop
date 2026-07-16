@@ -50,7 +50,7 @@
   height: 3px;
   border-radius: 2px;
   background: var(--border);
-  cursor: pointer;
+  cursor: ew-resize;
   position: relative;
   overflow: hidden;
 }
