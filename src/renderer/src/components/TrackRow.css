@@ -176,3 +176,37 @@
 .track-row__like-btn--active {
   color: #ff3d71;
 }
+
+.track-row__ctx {
+  min-width: 200px;
+  background: rgba(30, 30, 32, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+}
+
+.track-row__ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  transition: background 0.1s ease;
+}
+
+.track-row__ctx-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.track-row__ctx-sep {
+  height: 1px;
+  margin: 4px 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
