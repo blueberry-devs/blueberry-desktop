@@ -1,5 +1,6 @@
+import { useState, useRef } from 'react'
 import { usePlayer } from '../player/PlayerContext'
-import { Playlist } from '../store/playlists'
+import { Playlist, moveTrackInPlaylist } from '../store/playlists'
 import { requestArtistSearch } from '../store/searchQuery'
 import TrackRow from './TrackRow'
 import './PlaylistDetailView.css'
@@ -11,6 +12,34 @@ interface Props {
 
 function PlaylistDetailView({ playlist, onBack }: Props): JSX.Element {
   const { playQueue } = usePlayer()
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const dragIndexRef = useRef<number | null>(null)
+
+  const handleDragStart = (i: number) => (): void => {
+    dragIndexRef.current = i
+  }
+
+  const handleDragOver = (i: number) => (e: React.DragEvent): void => {
+    e.preventDefault()
+    setDragOverIndex(i)
+  }
+
+  const handleDragLeave = (): void => {
+    setDragOverIndex(null)
+  }
+
+  const handleDrop = (toIndex: number) => (): void => {
+    const fromIndex = dragIndexRef.current
+    dragIndexRef.current = null
+    setDragOverIndex(null)
+    if (fromIndex === null || fromIndex === toIndex) return
+    moveTrackInPlaylist(playlist.id, fromIndex, toIndex)
+  }
+
+  const handleDragEnd = (): void => {
+    dragIndexRef.current = null
+    setDragOverIndex(null)
+  }
 
   return (
     <div className="playlist-detail view-enter">
@@ -51,7 +80,18 @@ function PlaylistDetailView({ playlist, onBack }: Props): JSX.Element {
           </div>
         ) : (
           playlist.tracks.map((t, i) => (
-            <TrackRow key={t.id} track={t} queue={playlist.tracks} index={i} onArtistClick={requestArtistSearch} />
+            <div
+              key={t.id}
+              draggable
+              onDragStart={handleDragStart(i)}
+              onDragOver={handleDragOver(i)}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop(i)}
+              onDragEnd={handleDragEnd}
+              style={{ opacity: dragOverIndex === i ? 0.5 : 1, transition: 'opacity 0.15s' }}
+            >
+              <TrackRow track={t} queue={playlist.tracks} index={i} onArtistClick={requestArtistSearch} />
+            </div>
           ))
         )}
       </div>

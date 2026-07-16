@@ -22,6 +22,7 @@
   overflow: hidden;
   pointer-events: auto;
   min-width: 220px;
+  cursor: pointer;
 }
 
 :root[data-theme='light'] .dyn-island__pill {
@@ -49,7 +50,7 @@
   height: 3px;
   border-radius: 2px;
   background: var(--border);
-  cursor: pointer;
+  cursor: ew-resize;
   position: relative;
   overflow: hidden;
 }

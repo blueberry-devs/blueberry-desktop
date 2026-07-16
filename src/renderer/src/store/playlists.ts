@@ -85,6 +85,18 @@ export function removeTrackFromPlaylist(id: string, trackId: string): void {
   emit()
 }
 
+export function moveTrackInPlaylist(id: string, fromIndex: number, toIndex: number): void {
+  if (fromIndex === toIndex) return
+  cache = cache.map((p) => {
+    if (p.id !== id) return p
+    const tracks = [...p.tracks]
+    const [moved] = tracks.splice(fromIndex, 1)
+    tracks.splice(toIndex, 0, moved)
+    return { ...p, tracks }
+  })
+  emit()
+}
+
 export function usePlaylists(): Playlist[] {
   return useSyncExternalStore(subscribe, getPlaylists)
 }
