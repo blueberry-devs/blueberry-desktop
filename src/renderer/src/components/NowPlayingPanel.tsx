@@ -172,15 +172,6 @@ function NowPlayingPanel(): JSX.Element {
             </div>
           </div>
 
-          <button
-            className={`now-playing__side-btn${liked ? ' now-playing__side-btn--liked' : ''}`}
-            onClick={() => displayTrack && toggleLike(displayTrack)}
-            disabled={!hasTrack}
-            title={liked ? 'Не нравится' : 'Мне нравится'}
-          >
-            <img className="now-playing__heart-icon" src={liked ? heartIcon : heartSlashIcon} alt="" />
-          </button>
-
           <div className="now-playing__menu-wrap" ref={menuRef}>
             <button
               className="now-playing__side-btn"

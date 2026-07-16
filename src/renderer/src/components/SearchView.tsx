@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { motion } from 'motion/react'
 import { searchTracksMulti, TrackResult } from '../api/yandexMusic'
 import { usePlayer } from '../player/PlayerContext'
 import { useHistory } from '../store/history'
@@ -174,6 +176,32 @@ function SearchView(): JSX.Element {
 
   const searchFor = (q: string): void => setQuery(q)
 
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; track: TrackResult } | null>(null)
+
+  useEffect(() => {
+    if (!ctxMenu) return
+    const close = (): void => setCtxMenu(null)
+    document.addEventListener('mousedown', close)
+    document.addEventListener('scroll', close, true)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('scroll', close, true)
+    }
+  }, [ctxMenu])
+
+  const handleCtxMenu = useCallback((e: React.MouseEvent, track: TrackResult): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    const menuWidth = 200
+    const menuHeight = 220
+    const pad = 8
+    let x = e.clientX
+    let y = e.clientY
+    if (x + menuWidth + pad > window.innerWidth) x = window.innerWidth - menuWidth - pad
+    if (y + menuHeight + pad > window.innerHeight) y = window.innerHeight - menuHeight - pad
+    setCtxMenu({ x, y, track })
+  }, [])
+
   if (viewingArtist) {
     return <ArtistView name={viewingArtist} onBack={() => setViewingArtist(null)} />
   }
@@ -310,6 +338,7 @@ function SearchView(): JSX.Element {
                   <button
                     className="search-view__hero-track"
                     onClick={() => playQueue(results, 0)}
+                    onContextMenu={(e) => handleCtxMenu(e, topTrack)}
                   >
                     <span className="search-view__hero-cover">
                       {topTrack.cover ? <img src={topTrack.cover} alt="" /> : null}
@@ -409,6 +438,46 @@ function SearchView(): JSX.Element {
         </>
       )}
     </div>
+
+    {ctxMenu && createPortal(
+      <motion.div
+        className="track-row__ctx"
+        style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 9999 }}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.12, ease: 'easeOut' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button className="track-row__ctx-item" onClick={() => {
+          const t = ctxMenu.track
+          if (results.length > 0) {
+            const idx = results.indexOf(t)
+            if (idx >= 0) playQueue(results, idx)
+          }
+          setCtxMenu(null)
+        }}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M2 12V4l8 4-8 4Z" fill="currentColor" />
+            <rect x="12" y="3" width="2" height="10" fill="currentColor" />
+          </svg>
+          Воспроизвести
+        </button>
+        <div className="track-row__ctx-sep" />
+        <button className="track-row__ctx-item" onClick={() => {
+          const t = ctxMenu.track
+          navigator.clipboard.writeText(`${t.artists.join(', ')} — ${t.title}`).catch(() => {})
+          setCtxMenu(null)
+        }}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <rect x="4" y="2" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
+            <path d="M12 4V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h1" stroke="currentColor" strokeWidth="1.4" fill="none" />
+          </svg>
+          Копировать
+        </button>
+      </motion.div>,
+      document.body
+    )}
   )
 }
 
