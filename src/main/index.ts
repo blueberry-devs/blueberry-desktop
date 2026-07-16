@@ -146,6 +146,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     frame: false,
+    title: 'Яндекс Музыка',
     backgroundColor: '#000000',
     // .ico carries multiple embedded resolutions — crisper taskbar/alt-tab
     // icon on Windows than a single PNG.
@@ -323,6 +324,7 @@ ipcMain.handle('store-set', (_event, key: string, data: string): Promise<void> =
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.yandex.music.clone')
+  app.name = 'Яндекс Музыка'
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
