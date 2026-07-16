@@ -147,7 +147,7 @@ function SearchView(): JSX.Element {
         .then(setResults)
         .catch(() => setError('Не удалось подключиться к серверу'))
         .finally(() => setLoading(false))
-    }, 350)
+    }, 600)
     return () => clearTimeout(debounceTimer)
   }, [query])
 
