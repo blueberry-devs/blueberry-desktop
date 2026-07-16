@@ -3,7 +3,7 @@ import { usePlayer } from '../player/PlayerContext'
 import { useWaveFeed } from '../player/useWaveFeed'
 import { toggleLike, useIsLiked } from '../store/likes'
 import { usePlaylists, addTrackToPlaylist } from '../store/playlists'
-import { Volume2Icon, Mic2Icon } from './icons'
+import { Volume2Icon, Mic2Icon, Maximize2Icon } from './icons'
 import heartIcon from '../assets/heart.png'
 import heartSlashIcon from '../assets/heart-slash.png'
 import ServiceBadge from './ServiceBadge'
@@ -135,7 +135,7 @@ function NowPlayingPanel(): JSX.Element {
             title="Громкость"
             onClick={() => setShowVolume((v) => !v)}
           >
-            <Volume2Icon />
+            <Volume2Icon size={22} />
           </button>
           {showVolume && (
             <div className="now-playing__vol-popup" ref={volRef}>
@@ -171,6 +171,15 @@ function NowPlayingPanel(): JSX.Element {
               )}
             </div>
           </div>
+
+          <button
+            className="now-playing__side-btn"
+            onClick={() => currentTrack && openLyrics()}
+            disabled={!currentTrack}
+            title="Развернуть"
+          >
+            <Maximize2Icon size={21} />
+          </button>
 
           <div className="now-playing__menu-wrap" ref={menuRef}>
             <button
@@ -240,7 +249,7 @@ function NowPlayingPanel(): JSX.Element {
                   className="now-playing__dropdown-item"
                   onClick={() => {
                     setShowMenu(false)
-                    openLyrics()
+                    openLyrics('lyrics')
                   }}
                 >
                   <Mic2Icon size={16} />

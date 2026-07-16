@@ -50,6 +50,18 @@ function NavIcon({ type }: { type: string }): JSX.Element {
           />
         </svg>
       )
+    case 'settings':
+      return (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path
+            d="M7.6 2.6h2.8l.4 1.9c.5.15.95.36 1.37.63l1.83-.7 1.98 2.42-1.16 1.6c.1.5.1 1 0 1.5l1.16 1.6-1.98 2.42-1.83-.7c-.42.27-.87.48-1.37.63l-.4 1.9H7.6l-.4-1.9a5.3 5.3 0 0 1-1.37-.63l-1.83.7-1.98-2.42 1.16-1.6a4.9 4.9 0 0 1 0-1.5L1.02 6.85 3 4.43l1.83.7c.42-.27.87-.48 1.37-.63l.4-1.9Z"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinejoin="round"
+          />
+          <circle cx="9" cy="9" r="2.3" stroke="currentColor" strokeWidth="1.3" />
+        </svg>
+      )
     default:
       return <span />
   }
@@ -88,6 +100,17 @@ function Sidebar({ activeTab, onSelectTab }: Props): JSX.Element {
           </button>
         ))}
       </nav>
+
+      <button
+        onClick={() => onSelectTab('settings')}
+        className={`sidebar__nav-item sidebar__nav-item--settings${activeTab === 'settings' ? ' sidebar__nav-item--active' : ''}`}
+        title={collapsed ? 'Настройки' : undefined}
+      >
+        <span className="sidebar__nav-icon">
+          <NavIcon type="settings" />
+        </span>
+        <span className="sidebar__nav-label">Настройки</span>
+      </button>
 
       <button
         className="sidebar__collapse-btn"

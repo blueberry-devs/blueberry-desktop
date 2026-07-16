@@ -23,7 +23,13 @@ const api = {
   cacheGetLyrics: (trackId: string) => ipcRenderer.invoke('cache-get-lyrics', trackId),
   cacheSetLyrics: (trackId: string, entry: CacheEntry) => ipcRenderer.invoke('cache-set-lyrics', trackId, entry),
   storeGet: (key: string) => ipcRenderer.invoke('store-get', key),
-  storeSet: (key: string, data: string) => ipcRenderer.invoke('store-set', key, data)
+  storeSet: (key: string, data: string) => ipcRenderer.invoke('store-set', key, data),
+  onSidecarReady: (cb: () => void) => {
+    const handler = (): void => cb()
+    ipcRenderer.on('sidecar:ready', handler)
+    return () => ipcRenderer.removeListener('sidecar:ready', handler)
+  },
+  getAppVersion: () => ipcRenderer.invoke('get-app-version')
 }
 
 if (process.contextIsolated) {

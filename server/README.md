@@ -31,11 +31,28 @@
  
  ```
  pip install pyinstaller
- python -m PyInstaller --noconfirm --onefile --name music-server --distpath ../build/packed-server main.py
+ python -m PyInstaller --noconfirm --onefile --name music-server --distpath ../build/packed-server ^
+   --collect-data certifi --collect-all yandex_music --collect-all yt_dlp --collect-all pytubefix main.py
  ```
+ 
+ (See [scripts/build-server.bat](../scripts/build-server.bat) for the exact
+ command — the `--collect-*` flags matter: without them the frozen exe is
+ missing certifi's CA bundle and fails TLS verification on every HTTPS call,
+ even though the same code works fine via `python -m uvicorn`.)
  
  The output `music-server.exe` is a self-contained binary. It is automatically
  built by `npm run dist:win` and bundled into the Electron installer.
+ 
+ ## Yandex geo-block (451)
+ 
+ Yandex's catalog (search/charts) is only served to Russian IPs — anonymous
+ requests from elsewhere get a hard `451 Unavailable For Legal Reasons` on
+ every call, `chart()` included. This is enforced by Yandex itself; there's no
+ header or client-side fix for it. `/api/search` and `/api/trends` catch this
+ and return an empty list rather than a 500, so it degrades instead of
+ crashing the UI — but if you actually need charts to work from outside
+ Russia, set `YANDEX_PROXY_URL` in `.env` to an HTTP/SOCKS proxy with a
+ Russian exit IP; the `yandex-music` client routes through it natively.
  
  ## SoundCloud
  

@@ -1,5 +1,18 @@
 import os
+import sys
 from typing import Optional
+
+import certifi
+
+# When frozen by PyInstaller, requests/urllib3 (and anything else reading
+# these standard env vars) can fail to locate a CA bundle even though
+# certifi's cacert.pem is bundled as data (see --collect-data certifi in
+# scripts/build-server.bat) — pin them explicitly so HTTPS calls don't
+# silently fail TLS verification in the packaged exe while working fine in
+# a normal dev Python install.
+if getattr(sys, 'frozen', False):
+    os.environ.setdefault('SSL_CERT_FILE', certifi.where())
+    os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
 
 import requests
 import yt_dlp
@@ -7,6 +20,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from yandex_music import Client
+from yandex_music.exceptions import YandexMusicError
+from yandex_music.utils.request import Request as YandexRequest
 
 load_dotenv()
 
@@ -20,8 +35,16 @@ app.add_middleware(
 )
 
 # No authorization at all — anonymous Yandex client for search/charts only.
+#
+# Yandex geo-restricts its catalog: anonymous requests from outside Russia
+# get a hard 451 "Unavailable For Legal Reasons" on every call, chart()
+# included — enforced server-side by Yandex, no client-side header/cert fix
+# works around it. If you're hitting that, set YANDEX_PROXY_URL (see
+# .env.example) to an HTTP/SOCKS proxy with a Russian exit IP; the
+# yandex-music library routes through one natively.
+_YANDEX_PROXY_URL = os.environ.get('YANDEX_PROXY_URL') or None
 try:
-    _client = Client().init()
+    _client = Client(request=YandexRequest(proxy_url=_YANDEX_PROXY_URL)).init()
 except Exception:
     _client = None
 
@@ -62,6 +85,7 @@ def serialize_track(t):
         'artists': [a.name for a in t.artists],
         'cover': cover_url(t.cover_uri),
         'duration': round((t.duration_ms or 0) / 1000),
+        'explicit': bool(getattr(t, 'explicit', False)),
     }
 
 
@@ -74,7 +98,14 @@ def status():
 def search(text: str):
     if _client is None:
         raise HTTPException(status_code=503, detail='Yandex Music client unavailable (no network?)')
-    result = _client.search(text, type_='track')
+    try:
+        result = _client.search(text, type_='track')
+    except YandexMusicError as exc:
+        # Most commonly a 451 geo-block (see _client comment above) — surface
+        # empty results instead of a raw 500 so the UI can just show nothing
+        # found rather than an error screen.
+        print(f'[yandex] search failed: {exc}')
+        return []
     tracks = result.tracks.results if result.tracks else []
     return [serialize_track(t) for t in tracks[:30]]
 
@@ -83,7 +114,11 @@ def search(text: str):
 def trends():
     if _client is None:
         raise HTTPException(status_code=503, detail='Yandex Music client unavailable (no network?)')
-    chart = _client.chart()
+    try:
+        chart = _client.chart()
+    except YandexMusicError as exc:
+        print(f'[yandex] chart failed: {exc}')
+        return []
     tracks = chart.chart.tracks if chart and chart.chart else []
     return [serialize_track(ct.track) for ct in tracks[:30]]
 
@@ -93,8 +128,14 @@ def search_youtube(text: str):
     return yt_search(text, limit=20)
 
 
+_sc_search_cache: dict = {}
+
+
 @app.get('/api/search/soundcloud')
 def search_soundcloud(text: str):
+    cache_key = text.lower()
+    if cache_key in _sc_search_cache:
+        return _sc_search_cache[cache_key]
     try:
         data = sc_get(f'{SOUNDCLOUD_API}/search/tracks', {'q': text, 'limit': 30})
     except requests.RequestException:
@@ -113,8 +154,10 @@ def search_soundcloud(text: str):
                 'cover': sc_upsize(t.get('artwork_url')),
                 'artistCover': sc_upsize(user.get('avatar_url')),
                 'duration': round((t.get('duration') or 0) / 1000) if t.get('duration') else None,
+                'explicit': bool((t.get('publisher_metadata') or {}).get('explicit')),
             }
         )
+    _sc_search_cache[cache_key] = results
     return results
 
 
@@ -144,7 +187,14 @@ YTDLP_STREAM_OPTS = {
 }
 
 
-def _yt_serialize(video_id: str, title: str, channel: str, thumbnail: Optional[str], duration: Optional[float]) -> dict:
+def _yt_serialize(
+    video_id: str,
+    title: str,
+    channel: str,
+    thumbnail: Optional[str],
+    duration: Optional[float],
+    explicit: bool = False,
+) -> dict:
     return {
         'id': f'youtube:{video_id}',
         'source': 'youtube',
@@ -152,6 +202,7 @@ def _yt_serialize(video_id: str, title: str, channel: str, thumbnail: Optional[s
         'artists': [channel or 'YouTube'],
         'cover': thumbnail,
         'duration': round(duration) if duration else None,
+        'explicit': explicit,
     }
 
 
@@ -167,7 +218,10 @@ def _yt_search_pytube(query: str, limit: int = 8) -> list:
             thumbnail = v.thumbnail_url
             # pytubefix Search results may not have duration
             duration = getattr(v, 'length', None)
-            out.append(_yt_serialize(video_id, v.title, v.author, thumbnail, duration))
+            # pytubefix doesn't expose an explicit/age-restriction flag on
+            # search results — best effort only, not a reliable signal.
+            explicit = bool(getattr(v, 'age_restricted', False))
+            out.append(_yt_serialize(video_id, v.title, v.author, thumbnail, duration, explicit))
         except Exception:
             continue
     return out
@@ -183,23 +237,37 @@ def _yt_search_ytdlp(query: str, limit: int = 8) -> list:
     except Exception:
         return []
     entries = (info or {}).get('entries') or []
+    # yt-dlp's flat search entries only carry age_limit when set — 18 is
+    # yt-dlp's own convention for age-restricted content, the closest
+    # available signal to "explicit" for YouTube.
     results = [_yt_serialize(
         e['id'],
         e.get('title'),
         e.get('uploader') or e.get('channel'),
         (e.get('thumbnails') or [{}])[-1].get('url') if e.get('thumbnails') else e.get('thumbnail'),
         e.get('duration'),
+        (e.get('age_limit') or 0) >= 18,
     ) for e in entries if e and e.get('id')]
     _yt_search_cache[cache_key] = results
     return results
 
 
 def yt_search(query: str, limit: int = 8) -> list:
+    # "Моя волна" reuses the same handful of genre/artist queries constantly
+    # (genre picks, refills, rotating through liked artists) — caching here
+    # means only the first hit for a given query pays pytube/yt-dlp's
+    # network latency, everything after is instant.
+    cache_key = f'{query.lower()}\x00{limit}'
+    if cache_key in _yt_search_cache:
+        return _yt_search_cache[cache_key]
     if _has_pytubefix:
         results = _yt_search_pytube(query, limit)
-        if results:
-            return results
-    return _yt_search_ytdlp(query, limit)
+        if not results:
+            results = _yt_search_ytdlp(query, limit)
+    else:
+        results = _yt_search_ytdlp(query, limit)
+    _yt_search_cache[cache_key] = results
+    return results
 
 
 def _yt_resolve_stream_pytube(video_id: str) -> Optional[str]:
@@ -228,6 +296,56 @@ def yt_resolve_stream(video_id: str) -> Optional[str]:
         if url:
             return url
     return _yt_resolve_stream_ytdlp(video_id)
+
+
+# --- Background video clip (fullscreen player) --------------------------
+# Capped at 480p and video-only (no audio track) — this plays muted behind
+# the UI purely as visual background while the real audio comes from the
+# track's own stream, so there's no reason to fetch anything heavier.
+YTDLP_CLIP_SEARCH_OPTS = {
+    'quiet': True,
+    'no_warnings': True,
+    'extract_flat': True,
+    'skip_download': True,
+    'default_search': 'ytsearch1',
+    'noplaylist': True,
+}
+
+YTDLP_CLIP_STREAM_OPTS = {
+    'quiet': True,
+    'no_warnings': True,
+    'skip_download': True,
+    'format': 'best[height<=480][acodec=none]/best[height<=480]/worst',
+    'noplaylist': True,
+}
+
+_clip_cache: dict = {}
+
+
+@app.get('/api/video/clip')
+def video_clip(title: str, artist: str = ''):
+    cache_key = f'{artist.lower()}\x00{title.lower()}'
+    if cache_key in _clip_cache:
+        return {'url': _clip_cache[cache_key]}
+
+    query = f'{artist} {title} official video'.strip()
+    try:
+        with yt_dlp.YoutubeDL(YTDLP_CLIP_SEARCH_OPTS) as ydl:
+            search_info = ydl.extract_info(query, download=False)
+        entries = (search_info or {}).get('entries') or []
+        video_id = entries[0]['id'] if entries else None
+        if not video_id:
+            _clip_cache[cache_key] = None
+            return {'url': None}
+
+        with yt_dlp.YoutubeDL(YTDLP_CLIP_STREAM_OPTS) as ydl:
+            info = ydl.extract_info(f'https://www.youtube.com/watch?v={video_id}', download=False)
+        url = (info or {}).get('url')
+    except Exception:
+        url = None
+
+    _clip_cache[cache_key] = url
+    return {'url': url}
 
 
 # --- SoundCloud playback -----------------------------------------------

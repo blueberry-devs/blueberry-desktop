@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion } from 'motion/react'
-import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, HeartIcon, Mic2Icon } from './icons'
+import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, HeartIcon, Maximize2Icon } from './icons'
 import { usePlayer } from '../player/PlayerContext'
 import { toggleLike, useIsLiked } from '../store/likes'
 import ServiceBadge from './ServiceBadge'
@@ -32,7 +32,7 @@ function DynamicIsland({ className = '', onExpand }: { className?: string; onExp
   if (!currentTrack) return null
 
   const [isScrubbing, setIsScrubbing] = useState(false)
-  const trackRef = useRef<HTMLDivElement>(null)
+  const trackRef = useRef<HTMLDivElement | null>(null)
 
   const calcSeek = useCallback((clientX: number): void => {
     if (!trackRef.current || !duration) return
@@ -133,11 +133,11 @@ function DynamicIsland({ className = '', onExpand }: { className?: string; onExp
             <div className="dyn-island__extras" onClick={(e) => e.stopPropagation()}>
               <button
                 className="dyn-island__icon-btn"
-                onClick={openLyrics}
-                aria-label="lyrics"
-                title="Текст песни"
+                onClick={() => openLyrics()}
+                aria-label="fullscreen"
+                title="Развернуть"
               >
-                <Mic2Icon />
+                <Maximize2Icon size={14} />
               </button>
 
               <button

@@ -28,6 +28,7 @@ interface PlayerState {
   lyricsPlain: string[] | null
   lyricsLoading: boolean
   isLyricsOpen: boolean
+  lyricsOpenMode: 'cover' | 'lyrics'
   queue: TrackResult[]
   queueIndex: number
   loopMode: LoopMode
@@ -38,6 +39,7 @@ interface PlayerState {
   play: (track: TrackResult) => void
   playQueue: (tracks: TrackResult[], startIndex: number) => void
   appendToQueue: (tracks: TrackResult[]) => void
+  shuffleQueue: () => void
   togglePlay: () => void
   next: () => void
   previous: () => void
@@ -45,7 +47,7 @@ interface PlayerState {
   seekTo: (time: number) => void
   setVolume: (v: number) => void
   setActiveGenre: (g: string | null) => void
-  openLyrics: () => void
+  openLyrics: (mode?: 'cover' | 'lyrics') => void
   closeLyrics: () => void
   getFrequencyBands: (bandCount: number) => Float32Array
 }
@@ -81,6 +83,10 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
   const [lyricsPlain, setLyricsPlain] = useState<string[] | null>(null)
   const [lyricsLoading, setLyricsLoading] = useState(false)
   const [isLyricsOpen, setIsLyricsOpen] = useState(false)
+  // Which view the fullscreen player should land on when it opens — the
+  // cover by default (expand button, cover click), or straight into lyrics
+  // when opened from the "Текст песни" menu item.
+  const [lyricsOpenMode, setLyricsOpenMode] = useState<'cover' | 'lyrics'>('cover')
   const [queue, setQueue] = useState<TrackResult[]>([])
   const [queueIndex, setQueueIndex] = useState(-1)
   const [loopMode, setLoopMode] = useState<LoopMode>('off')
@@ -340,6 +346,24 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
     setQueue(merged)
   }, [])
 
+  // Shuffles everything *after* the currently playing track — the track
+  // already playing stays put so shuffling mid-listen doesn't yank it out
+  // from under you, but Next onward becomes a fresh random order.
+  const shuffleQueue = useCallback(() => {
+    const q = queueRef.current
+    const idx = queueIndexRef.current
+    if (q.length <= idx + 2) return
+    const head = q.slice(0, idx + 1)
+    const tail = q.slice(idx + 1)
+    for (let i = tail.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[tail[i], tail[j]] = [tail[j], tail[i]]
+    }
+    const merged = [...head, ...tail]
+    queueRef.current = merged
+    setQueue(merged)
+  }, [])
+
   const togglePlay = useCallback(() => {
     const audio = audioRef.current
     if (!audio || !currentTrack) return
@@ -378,7 +402,8 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
     setActiveGenreState(g)
   }, [])
 
-  const openLyrics = useCallback(() => {
+  const openLyrics = useCallback((mode: 'cover' | 'lyrics' = 'cover') => {
+    setLyricsOpenMode(mode)
     setIsLyricsOpen(true)
     if (!currentTrack || lyrics || lyricsPlain || lyricsLoading) return
     loadLyrics(currentTrack, playTokenRef.current)
@@ -465,6 +490,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       lyricsPlain,
       lyricsLoading,
       isLyricsOpen,
+      lyricsOpenMode,
       queue,
       queueIndex,
       loopMode,
@@ -475,6 +501,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       play,
       playQueue: playQueueFn,
       appendToQueue,
+      shuffleQueue,
       togglePlay,
       next,
       previous,
@@ -498,6 +525,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       lyricsPlain,
       lyricsLoading,
       isLyricsOpen,
+      lyricsOpenMode,
       queue,
       queueIndex,
       loopMode,
@@ -508,6 +536,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       play,
       playQueueFn,
       appendToQueue,
+      shuffleQueue,
       togglePlay,
       next,
       previous,

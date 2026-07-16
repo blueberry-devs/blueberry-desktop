@@ -2,14 +2,23 @@ import { useSyncExternalStore } from 'react'
 
 const STORAGE_KEY = 'ym-clone:profile'
 
-export type Theme = 'light' | 'dark' | 'black'
+export type Theme = 'light' | 'black'
 
 export interface Profile {
   nickname: string
   theme: Theme
+  // Explicit (18+) tracks are always badged; this controls whether they're
+  // filtered out of search/wave/charts results entirely. On by default —
+  // matches how it behaved before this setting existed, and only actually
+  // does anything once the user turns it off.
+  allowExplicit: boolean
+  // Fullscreen player tries to find a matching YouTube video clip and use it
+  // as the background instead of the blurred cover — off switches back to
+  // the blurred cover unconditionally (no search request made at all).
+  videoBackground: boolean
 }
 
-const DEFAULT_PROFILE: Profile = { nickname: '', theme: 'dark' }
+const DEFAULT_PROFILE: Profile = { nickname: '', theme: 'black', allowExplicit: true, videoBackground: true }
 
 let cache: Profile = load()
 const listeners = new Set<() => void>()
@@ -52,6 +61,16 @@ export function setNickname(nickname: string): void {
 
 export function setTheme(theme: Theme): void {
   cache = { ...cache, theme }
+  emit()
+}
+
+export function setAllowExplicit(allowExplicit: boolean): void {
+  cache = { ...cache, allowExplicit }
+  emit()
+}
+
+export function setVideoBackground(videoBackground: boolean): void {
+  cache = { ...cache, videoBackground }
   emit()
 }
 

@@ -1,3 +1,4 @@
+import { useAppVersion } from '../hooks/useAppVersion'
 import './TitleBar.css'
 
 function handleMinimize(): void {
@@ -11,10 +12,11 @@ function handleClose(): void {
 }
 
 function TitleBar(): JSX.Element {
+  const version = useAppVersion()
   return (
     <div className="titlebar">
       <div className="titlebar__drag" />
-      <div className="titlebar__version">1.000</div>
+      <div className="titlebar__version">{version}</div>
       <div className="titlebar__controls">
         <button className="titlebar__btn" onClick={handleMinimize} aria-label="minimize">
           <svg width="10" height="10" viewBox="0 0 10 10">

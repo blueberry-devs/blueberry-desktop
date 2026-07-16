@@ -1,13 +1,15 @@
-import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron'
 import { join } from 'path'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { spawn, execSync, ChildProcessWithoutNullStreams } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 
 let sidecar: ChildProcessWithoutNullStreams | null = null
 let tray: Tray | null = null
 let trayMenuTemplate: Electron.MenuItemConstructorOptions[] | null = null
 let isQuitting = false
+let mainWindowRef: BrowserWindow | null = null
 const SIDECAR_PORT = 8787
 
 function resolveServerExe(): string {
@@ -110,6 +112,7 @@ function startSidecar(): void {
     console.log(`[sidecar] ${text}`)
     if (!started && text.includes('Uvicorn running')) {
       started = true
+      mainWindowRef?.webContents.send('sidecar:ready')
     }
   })
 
@@ -118,6 +121,7 @@ function startSidecar(): void {
     console.error(`[sidecar] ${text}`)
     if (!started && text.includes('Uvicorn running')) {
       started = true
+      mainWindowRef?.webContents.send('sidecar:ready')
     }
   })
 
@@ -153,9 +157,12 @@ function createWindow(): void {
     icon: join(__dirname, process.platform === 'win32' ? '../../resources/icon.ico' : '../../resources/icon.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      webSecurity: false
     }
   })
+
+  mainWindowRef = mainWindow
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
@@ -210,6 +217,8 @@ function createTray(mainWindow: BrowserWindow): void {
         mainWindow.focus()
       }
     },
+    { type: 'separator' },
+    { label: 'Check for Updates', click: () => checkForUpdates(true) },
     {
       label: 'Quit',
       click: () => {
@@ -239,6 +248,58 @@ function createTray(mainWindow: BrowserWindow): void {
     tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate))
     tray.setToolTip(`${data.artist} — ${data.track}`)
   })
+}
+
+// ===================== AUTO UPDATE =====================
+// GitHub Releases via electron-builder's `publish` config (see package.json)
+// — `npm run release:win` builds and uploads with GH_TOKEN set. Silent by
+// default (checkForUpdates below only): a manual check from the tray menu
+// is the one case that should tell the user "you're already up to date"
+// instead of doing nothing.
+let updateCheckInFlight = false
+
+function setupAutoUpdater(): void {
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-downloaded', (info) => {
+    dialog
+      .showMessageBox({
+        type: 'info',
+        title: 'Доступно обновление',
+        message: `Скачана версия ${info.version}. Перезапустить сейчас, чтобы установить?`,
+        buttons: ['Перезапустить', 'Позже'],
+        defaultId: 0,
+        cancelId: 1
+      })
+      .then(({ response }) => {
+        if (response === 0) autoUpdater.quitAndInstall()
+      })
+  })
+
+  autoUpdater.on('error', (err) => {
+    console.error('[updater] error:', err.message)
+  })
+}
+
+function checkForUpdates(manual: boolean): void {
+  if (!app.isPackaged || updateCheckInFlight) return
+  updateCheckInFlight = true
+
+  if (manual) {
+    const onNotAvailable = (): void => {
+      dialog.showMessageBox({ type: 'info', title: 'Обновления', message: 'У вас уже последняя версия.' })
+    }
+    autoUpdater.once('update-not-available', onNotAvailable)
+    autoUpdater.once('update-available', () => autoUpdater.removeListener('update-not-available', onNotAvailable))
+  }
+
+  autoUpdater
+    .checkForUpdates()
+    .catch((err) => console.error('[updater] check failed:', err.message))
+    .finally(() => {
+      updateCheckInFlight = false
+    })
 }
 
 // ===================== LYRIC CACHE =====================
@@ -322,8 +383,10 @@ ipcMain.handle('store-set', (_event, key: string, data: string): Promise<void> =
   return Promise.resolve()
 })
 
+ipcMain.handle('get-app-version', (): string => app.getVersion())
+
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.yandex.music.clone')
+  electronApp.setAppUserModelId('com.blueberry.desktop')
   app.name = 'Яндекс Музыка'
 
   app.on('browser-window-created', (_, window) => {
@@ -332,6 +395,9 @@ app.whenReady().then(() => {
 
   startSidecar()
   createWindow()
+  setupAutoUpdater()
+  // Give the window a moment to actually show before nagging about updates.
+  setTimeout(() => checkForUpdates(false), 5000)
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

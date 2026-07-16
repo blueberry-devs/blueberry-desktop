@@ -5,6 +5,7 @@
   flex-shrink: 0;
   z-index: 100;
   -webkit-app-region: drag;
+  background: var(--titlebar-bg);
 }
 
 .titlebar__drag {
@@ -15,7 +16,7 @@
 
 .titlebar__version {
   position: absolute;
-  top: 6px;
+  top: 48px;
   right: 12px;
   background: var(--surface-2);
   color: var(--text-tertiary);
@@ -52,4 +53,12 @@
 .titlebar__btn--close:hover {
   background: #e81123;
   color: #fff;
+}
+
+:root[data-theme='light'] .titlebar__btn {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme='light'] .titlebar__btn:hover {
+  background: rgba(0, 0, 0, 0.06);
 }
