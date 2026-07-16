@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar'
 import DynamicIsland from './components/DynamicIsland'
 import { PlayerProvider, usePlayer } from './player/PlayerContext'
 import { usePendingSearch } from './store/searchQuery'
+import { useDominantColor } from './hooks/useDominantColor'
 import './App.css'
 
 const MoodList = lazy(() => import('./components/MoodList'))
@@ -21,6 +22,7 @@ function AppInner(): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('wave')
   const { isPlaying, isLyricsOpen, currentTrack, getFrequencyBands, togglePlay, next, previous } = usePlayer()
   const pendingSearch = usePendingSearch()
+  const coverColor = useDominantColor(currentTrack?.cover)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', 'dark')
@@ -62,7 +64,7 @@ function AppInner(): JSX.Element {
     <div className="app">
       <Suspense fallback={null}>
         <div className="app__glow-layer">
-          <PlasmaWave playing={isPlaying} getFrequencyBands={getFrequencyBands} />
+          <PlasmaWave playing={isPlaying} getFrequencyBands={getFrequencyBands} coverColor={coverColor} />
         </div>
       </Suspense>
 
