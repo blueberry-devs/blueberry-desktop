@@ -20,7 +20,10 @@ app.add_middleware(
 )
 
 # No authorization at all — anonymous Yandex client for search/charts only.
-_client = Client().init()
+try:
+    _client = Client().init()
+except Exception:
+    _client = None
 
 # Read from .env (see .env.example) — no keys baked into source so this repo
 # can be published as open source safely.
@@ -69,6 +72,8 @@ def status():
 
 @app.get('/api/search')
 def search(text: str):
+    if _client is None:
+        raise HTTPException(status_code=503, detail='Yandex Music client unavailable (no network?)')
     result = _client.search(text, type_='track')
     tracks = result.tracks.results if result.tracks else []
     return [serialize_track(t) for t in tracks[:30]]
@@ -76,6 +81,8 @@ def search(text: str):
 
 @app.get('/api/trends')
 def trends():
+    if _client is None:
+        raise HTTPException(status_code=503, detail='Yandex Music client unavailable (no network?)')
     chart = _client.chart()
     tracks = chart.chart.tracks if chart and chart.chart else []
     return [serialize_track(ct.track) for ct in tracks[:30]]
