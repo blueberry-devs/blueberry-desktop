@@ -3,29 +3,55 @@ import { AnimatePresence } from 'motion/react'
 import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
 import DynamicIsland from './components/DynamicIsland'
+import SplashScreen from './components/SplashScreen'
+// Not lazy: this mounts/unmounts on every open/close through AnimatePresence,
+// and pairing that with Suspense's own mount/fallback cycle raced with the
+// exit animation — closing it would flash back to fullscreen for a frame
+// before actually disappearing.
+import NowPlayingFullscreen from './components/NowPlayingFullscreen'
 import { PlayerProvider, usePlayer } from './player/PlayerContext'
 import { usePendingSearch } from './store/searchQuery'
 import { useDominantColor } from './hooks/useDominantColor'
+import { useProfile } from './store/profile'
 import './App.css'
 
 const MoodList = lazy(() => import('./components/MoodList'))
 const NowPlayingPanel = lazy(() => import('./components/NowPlayingPanel'))
-const NowPlayingFullscreen = lazy(() => import('./components/NowPlayingFullscreen'))
 const PlasmaWave = lazy(() => import('./components/PlasmaWave'))
 const SearchView = lazy(() => import('./components/SearchView'))
 const TrendsView = lazy(() => import('./components/TrendsView'))
 const CollectionView = lazy(() => import('./components/CollectionView'))
+const SettingsView = lazy(() => import('./components/SettingsView'))
 
-export type Tab = 'wave' | 'search' | 'trends' | 'collection'
+export type Tab = 'wave' | 'search' | 'trends' | 'collection' | 'settings'
+
+function rgbToHue(r: number, g: number, b: number): number {
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+  if (d === 0) return -1
+  let h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return (h / 6) * 360
+}
 
 function AppInner(): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('wave')
+  const [appReady, setAppReady] = useState(false)
   const { isPlaying, isLyricsOpen, currentTrack, getFrequencyBands, togglePlay, next, previous } = usePlayer()
   const pendingSearch = usePendingSearch()
   const coverColor = useDominantColor(currentTrack?.cover)
+  const trackHue = coverColor ? rgbToHue(coverColor[0], coverColor[1], coverColor[2]) : -1
+  const profile = useProfile()
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', 'dark')
+    document.documentElement.setAttribute('data-theme', profile.theme)
+  }, [profile.theme])
+
+  useEffect(() => {
+    const off = window.api.onSidecarReady(() => setAppReady(true))
+    const timeout = setTimeout(() => setAppReady(true), 5000)
+    return () => {
+      off()
+      clearTimeout(timeout)
+    }
   }, [])
 
   // Listen for tray commands (play/pause, next, prev)
@@ -62,9 +88,11 @@ function AppInner(): JSX.Element {
 
   return (
     <div className="app">
+      <SplashScreen visible={!appReady} onEnded={() => setAppReady(true)} />
+
       <Suspense fallback={null}>
         <div className="app__glow-layer">
-          <PlasmaWave playing={isPlaying} getFrequencyBands={getFrequencyBands} coverColor={coverColor} />
+          <PlasmaWave playing={isPlaying} getFrequencyBands={getFrequencyBands} trackHue={trackHue} coverColor={coverColor?.join(',')} />
         </div>
       </Suspense>
 
@@ -82,12 +110,13 @@ function AppInner(): JSX.Element {
           {activeTab === 'search' && <Suspense fallback={null}><SearchView /></Suspense>}
           {activeTab === 'trends' && <Suspense fallback={null}><TrendsView /></Suspense>}
           {activeTab === 'collection' && <Suspense fallback={null}><CollectionView /></Suspense>}
+          {activeTab === 'settings' && <Suspense fallback={null}><SettingsView /></Suspense>}
         </div>
       </div>
 
       {showMiniPlayer && currentTrack && <DynamicIsland onExpand={() => setActiveTab('wave')} />}
       <AnimatePresence>
-        {isLyricsOpen && <Suspense fallback={null}><NowPlayingFullscreen /></Suspense>}
+        {isLyricsOpen && <NowPlayingFullscreen />}
       </AnimatePresence>
     </div>
   )

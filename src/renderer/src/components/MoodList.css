@@ -30,16 +30,16 @@
 .mood-list__row {
   display: flex;
   align-items: center;
-  gap: 18px;
-  height: 84px;
-  padding: 0 10px;
-  border-radius: 10px;
+  gap: 22px;
+  height: 102px;
+  padding: 0 12px;
+  border-radius: 12px;
   transition: background 0.12s ease;
   will-change: transform;
 }
 
 .mood-list__label {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -47,8 +47,8 @@
 
 .mood-icon {
   position: relative;
-  width: 42px;
-  height: 42px;
+  width: 52px;
+  height: 52px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -65,4 +65,15 @@
 
 .mood-icon--purple {
   color: #8a5cf6;
+}
+
+.mood-icon--cover {
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.mood-icon--cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }

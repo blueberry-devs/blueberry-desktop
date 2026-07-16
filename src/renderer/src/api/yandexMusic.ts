@@ -1,3 +1,5 @@
+import { getProfile } from '../store/profile'
+
 const BASE_URL = 'http://localhost:8787'
 
 export type TrackSource = 'yandex' | 'youtube' | 'soundcloud'
@@ -10,6 +12,7 @@ export interface TrackResult {
   cover: string | null
   artistCover?: string | null
   duration?: number
+  explicit?: boolean
 }
 
 export interface ResolvedStream {
@@ -29,20 +32,35 @@ async function getJson<T>(path: string): Promise<T> {
   return res.json()
 }
 
+// Single choke point for the "Разрешить контент 18+" setting — applied
+// here so every track list (search, wave, charts) respects it automatically
+// rather than depending on each call site to remember to filter.
+function filterExplicit(tracks: TrackResult[]): TrackResult[] {
+  if (getProfile().allowExplicit) return tracks
+  return tracks.filter((t) => !t.explicit)
+}
+
+async function getTrackList(path: string): Promise<TrackResult[]> {
+  const tracks = await getJson<TrackResult[]>(path)
+  return filterExplicit(tracks)
+}
+
 // Track search (SearchView, Моя волна, genre topics) goes through SoundCloud
 // + YouTube (see searchTracksMulti below); the plain Yandex `/api/search` is
 // reserved server-side for charts/trends only, nothing here calls it.
 export function searchTracksSoundcloud(query: string): Promise<TrackResult[]> {
-  return getJson(`/api/search/soundcloud?text=${encodeURIComponent(query)}`)
+  return getTrackList(`/api/search/soundcloud?text=${encodeURIComponent(query)}`)
 }
 
 export function searchTracksYoutube(query: string): Promise<TrackResult[]> {
-  return getJson(`/api/search/youtube?text=${encodeURIComponent(query)}`)
+  return getTrackList(`/api/search/youtube?text=${encodeURIComponent(query)}`)
 }
 
 // Merges SoundCloud + YouTube results, interleaved so neither source
 // dominates the top of the list. Either source failing (network hiccup,
 // yt-dlp unavailable) just falls back to whatever the other one found.
+// Both source calls already filter explicit content individually, so no
+// extra filtering needed here.
 export async function searchTracksMulti(query: string): Promise<TrackResult[]> {
   const [sc, yt] = await Promise.all([
     searchTracksSoundcloud(query).catch(() => []),
@@ -58,7 +76,7 @@ export async function searchTracksMulti(query: string): Promise<TrackResult[]> {
 }
 
 export function fetchTrends(): Promise<TrackResult[]> {
-  return getJson('/api/trends')
+  return getTrackList('/api/trends')
 }
 
 function parseNativeId(trackId: string): { source: TrackSource; nativeId: string } {
@@ -75,6 +93,12 @@ export function resolveStream(track: TrackResult): Promise<ResolvedStream> {
     artist: track.artists[0] ?? ''
   })
   return getJson(`/api/stream/resolve?${params.toString()}`)
+}
+
+export async function fetchVideoClip(title: string, artist: string): Promise<string | null> {
+  const params = new URLSearchParams({ title, artist })
+  const { url } = await getJson<{ url: string | null }>(`/api/video/clip?${params.toString()}`)
+  return url
 }
 
 export function fetchSyncedLyrics(title: string, artist: string, duration?: number): Promise<SyncedLyricsResponse> {

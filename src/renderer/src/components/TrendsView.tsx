@@ -41,7 +41,26 @@ const AI_SET_CARDS: Record<AiSetFilter, { kicker: string; label: string; query: 
   ]
 }
 
-const STYLE_CHIPS = ['Рок', 'Хип-хоп', 'Поп', 'Метал', 'Инди', 'Электроника']
+// Plain-keyword search (SoundCloud/YouTube) barely understands single
+// Cyrillic genre words — "Рок" mostly matches whatever happens to contain
+// that substring. English genre + "music" qualifier actually hits genre tags.
+const STYLE_CHIPS: { label: string; query: string }[] = [
+  { label: 'Рок', query: 'rock music' },
+  { label: 'Хип-хоп', query: 'hip hop music' },
+  { label: 'Поп', query: 'pop music' },
+  { label: 'Метал', query: 'metal music' },
+  { label: 'Инди', query: 'indie music' },
+  { label: 'Электроника', query: 'electronic music' }
+]
+
+function shuffle<T>(arr: T[]): T[] {
+  const out = arr.slice()
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
+}
 
 const EXPLORE_GENRES = [
   { label: 'Альтернативное прошлое', query: 'alternative rock', gradient: 'linear-gradient(135deg,#2c2c34,#4a4a58)' },
@@ -55,7 +74,7 @@ function TrendsView(): JSX.Element {
   const [topTab, setTopTab] = useState<TopTab>('foryou')
   const [aiSetFilter, setAiSetFilter] = useState<AiSetFilter>('top')
   const [trends, setTrends] = useState<TrackResult[]>([])
-  const [styleChip, setStyleChip] = useState(STYLE_CHIPS[0])
+  const [styleChip, setStyleChip] = useState(STYLE_CHIPS[0].label)
   const [styleTracks, setStyleTracks] = useState<TrackResult[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -71,8 +90,9 @@ function TrendsView(): JSX.Element {
   }, [])
 
   useEffect(() => {
-    searchTracksSoundcloud(styleChip)
-      .then((res) => setStyleTracks(res.slice(0, 5)))
+    const query = STYLE_CHIPS.find((c) => c.label === styleChip)?.query ?? styleChip
+    searchTracksSoundcloud(query)
+      .then((res) => setStyleTracks(shuffle(res).slice(0, 5)))
       .catch(() => setStyleTracks([]))
   }, [styleChip])
 
@@ -98,7 +118,10 @@ function TrendsView(): JSX.Element {
 
   const playMood = (query: string): void => {
     searchTracksSoundcloud(query)
-      .then((res) => res.length > 0 && playQueue(res, 0))
+      .then((res) => {
+        const shuffled = shuffle(res)
+        if (shuffled.length > 0) playQueue(shuffled, 0)
+      })
       .catch(() => {})
   }
 
@@ -124,75 +147,128 @@ function TrendsView(): JSX.Element {
       {loading && <div className="trends-view__status">Загружаем…</div>}
       {error && <div className="trends-view__status trends-view__status--error">{error}</div>}
 
-      <div className="trends-view__quick-row">
-        <button
-          className="trends-view__quick-card trends-view__quick-card--liked"
-          onClick={() => liked.length > 0 && playQueue(liked, 0)}
-        >
-          <span className="trends-view__quick-icon">
-            <svg width="22" height="22" viewBox="0 0 18 18" fill="none">
-              <path
-                d="M9 15.5S2 11.2 2 6.8C2 4.4 3.9 2.8 6 2.8c1.4 0 2.6.7 3 1.8.4-1.1 1.6-1.8 3-1.8 2.1 0 4 1.6 4 4 0 4.4-7 8.7-7 8.7Z"
-                fill="#fff"
-              />
-            </svg>
-          </span>
-          <span className="trends-view__quick-meta">
-            <span className="trends-view__quick-title">Мне нравится</span>
-            <span className="trends-view__quick-sub">{liked.length} треков</span>
-          </span>
-        </button>
-
-        <button
-          className="trends-view__quick-card trends-view__quick-card--history"
-          onClick={() => history.length > 0 && playQueue(history, 0)}
-        >
-          <span className="trends-view__quick-icon trends-view__quick-icon--muted">
-            <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
-              <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.4" />
-              <path d="M9 5v4l3 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-          </span>
-          <span className="trends-view__quick-meta">
-            <span className="trends-view__quick-title">История</span>
-            <span className="trends-view__quick-sub">
-              {history.length > 0
-                ? Array.from(new Set(history.map((t) => t.artists[0]))).slice(0, 3).join(', ')
-                : 'Пока пусто'}
-            </span>
-          </span>
-        </button>
-      </div>
-
-      <section className="trends-view__section">
-        <h2 className="trends-view__section-title">Свели в AI-сет</h2>
-        <div className="trends-view__pills">
-          {AI_SET_FILTERS.map((f) => (
+      {topTab === 'foryou' && (
+        <>
+          <div className="trends-view__quick-row">
             <button
-              key={f.id}
-              className={`trends-view__pill${aiSetFilter === f.id ? ' trends-view__pill--active' : ''}`}
-              onClick={() => setAiSetFilter(f.id)}
+              className="trends-view__quick-card trends-view__quick-card--liked"
+              onClick={() => liked.length > 0 && playQueue(liked, 0)}
             >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="trends-view__ai-cards">
-          {AI_SET_CARDS[aiSetFilter].map((card) => (
-            <button key={card.label} className="trends-view__ai-card" onClick={() => playMood(card.query)}>
-              <span className="trends-view__ai-kicker">{card.kicker}</span>
-              <span className="trends-view__ai-label">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M3 2l6 4-6 4Z" fill="currentColor" />
+              <span className="trends-view__quick-icon">
+                <svg width="22" height="22" viewBox="0 0 18 18" fill="none">
+                  <path
+                    d="M9 15.5S2 11.2 2 6.8C2 4.4 3.9 2.8 6 2.8c1.4 0 2.6.7 3 1.8.4-1.1 1.6-1.8 3-1.8 2.1 0 4 1.6 4 4 0 4.4-7 8.7-7 8.7Z"
+                    fill="#fff"
+                  />
                 </svg>
-                {card.label}
+              </span>
+              <span className="trends-view__quick-meta">
+                <span className="trends-view__quick-title">Мне нравится</span>
+                <span className="trends-view__quick-sub">{liked.length} треков</span>
               </span>
             </button>
-          ))}
-        </div>
-      </section>
 
-      {trends.length > 0 && (
+            <button
+              className="trends-view__quick-card trends-view__quick-card--history"
+              onClick={() => history.length > 0 && playQueue(history, 0)}
+            >
+              <span className="trends-view__quick-icon trends-view__quick-icon--muted">
+                <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
+                  <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M9 5v4l3 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+              </span>
+              <span className="trends-view__quick-meta">
+                <span className="trends-view__quick-title">История</span>
+                <span className="trends-view__quick-sub">
+                  {history.length > 0
+                    ? Array.from(new Set(history.map((t) => t.artists[0]))).slice(0, 3).join(', ')
+                    : 'Пока пусто'}
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <section className="trends-view__section">
+            <h2 className="trends-view__section-title">Свели в AI-сет</h2>
+            <div className="trends-view__pills">
+              {AI_SET_FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  className={`trends-view__pill${aiSetFilter === f.id ? ' trends-view__pill--active' : ''}`}
+                  onClick={() => setAiSetFilter(f.id)}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <div className="trends-view__ai-cards">
+              {AI_SET_CARDS[aiSetFilter].map((card) => (
+                <button key={card.label} className="trends-view__ai-card" onClick={() => playMood(card.query)}>
+                  <span className="trends-view__ai-kicker">{card.kicker}</span>
+                  <span className="trends-view__ai-label">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M3 2l6 4-6 4Z" fill="currentColor" />
+                    </svg>
+                    {card.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="trends-view__section">
+            <h2 className="trends-view__section-title">В стиле</h2>
+            <div className="trends-view__chips">
+              {STYLE_CHIPS.map((chip) => (
+                <button
+                  key={chip.label}
+                  className={`trends-view__chip${styleChip === chip.label ? ' trends-view__chip--active' : ''}`}
+                  onClick={() => setStyleChip(chip.label)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+            <div className="trends-view__style-grid">
+              {styleTracks.map((t) => (
+                <button key={t.id} className="trends-view__style-card" onClick={() => play(t)}>
+                  <span className="trends-view__style-cover">
+                    {t.cover ? <img src={t.cover} alt="" /> : null}
+                  </span>
+                  <span className="trends-view__style-title">{t.title}</span>
+                  <span className="trends-view__style-artist">{t.artists.join(', ')}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {metArtists.length > 0 && (
+            <section className="trends-view__section">
+              <h2 className="trends-view__section-title">Встречали в Моей волне</h2>
+              <div className="trends-view__artist-row">
+                {metArtists.map((a) => (
+                  <button key={a.name} className="trends-view__artist" onClick={() => requestArtistSearch(a.name)}>
+                    <span className="trends-view__artist-avatar">
+                      {a.cover ? (
+                        <img src={a.cover} alt="" />
+                      ) : (
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="9" r="4" stroke="currentColor" strokeWidth="1.4" />
+                          <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" strokeWidth="1.4" />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="trends-view__artist-name">{a.name}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {topTab === 'trends' && trends.length > 0 && (
         <section className="trends-view__section">
           <h2 className="trends-view__section-title">Новые релизы</h2>
           <div className="trends-view__release-row">
@@ -226,33 +302,7 @@ function TrendsView(): JSX.Element {
         </section>
       )}
 
-      <section className="trends-view__section">
-        <h2 className="trends-view__section-title">В стиле</h2>
-        <div className="trends-view__chips">
-          {STYLE_CHIPS.map((chip) => (
-            <button
-              key={chip}
-              className={`trends-view__chip${styleChip === chip ? ' trends-view__chip--active' : ''}`}
-              onClick={() => setStyleChip(chip)}
-            >
-              {chip}
-            </button>
-          ))}
-        </div>
-        <div className="trends-view__style-grid">
-          {styleTracks.map((t) => (
-            <button key={t.id} className="trends-view__style-card" onClick={() => play(t)}>
-              <span className="trends-view__style-cover">
-                {t.cover ? <img src={t.cover} alt="" /> : null}
-              </span>
-              <span className="trends-view__style-title">{t.title}</span>
-              <span className="trends-view__style-artist">{t.artists.join(', ')}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {trends.length > 8 && (
+      {topTab === 'trends' && trends.length > 8 && (
         <section className="trends-view__section">
           <h2 className="trends-view__section-title">Премьера</h2>
           <div className="trends-view__premiere-grid">
@@ -263,39 +313,18 @@ function TrendsView(): JSX.Element {
         </section>
       )}
 
-      <section className="trends-view__section">
-        <h2 className="trends-view__section-title">Исследуйте жанр</h2>
-        <div className="trends-view__explore-row">
-          {EXPLORE_GENRES.map((g) => (
-            <button
-              key={g.label}
-              className="trends-view__explore-card"
-              style={{ background: g.gradient }}
-              onClick={() => playMood(g.query)}
-            >
-              <span className="trends-view__explore-label">{g.label}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {metArtists.length > 0 && (
+      {topTab === 'trends' && (
         <section className="trends-view__section">
-          <h2 className="trends-view__section-title">Встречали в Моей волне</h2>
-          <div className="trends-view__artist-row">
-            {metArtists.map((a) => (
-              <button key={a.name} className="trends-view__artist" onClick={() => requestArtistSearch(a.name)}>
-                <span className="trends-view__artist-avatar">
-                  {a.cover ? (
-                    <img src={a.cover} alt="" />
-                  ) : (
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="9" r="4" stroke="currentColor" strokeWidth="1.4" />
-                      <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" strokeWidth="1.4" />
-                    </svg>
-                  )}
-                </span>
-                <span className="trends-view__artist-name">{a.name}</span>
+          <h2 className="trends-view__section-title">Исследуйте жанр</h2>
+          <div className="trends-view__explore-row">
+            {EXPLORE_GENRES.map((g) => (
+              <button
+                key={g.label}
+                className="trends-view__explore-card"
+                style={{ background: g.gradient }}
+                onClick={() => playMood(g.query)}
+              >
+                <span className="trends-view__explore-label">{g.label}</span>
               </button>
             ))}
           </div>

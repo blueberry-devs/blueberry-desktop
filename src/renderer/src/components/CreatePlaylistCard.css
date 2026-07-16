@@ -15,9 +15,9 @@
 }
 
 .create-playlist-card:hover {
-  border-color: #ffdb4d;
-  color: #ffdb4d;
-  background: rgba(255, 219, 77, 0.06);
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .create-playlist-card__plus {
@@ -32,8 +32,7 @@
 }
 
 .create-playlist-card:hover .create-playlist-card__plus {
-  background: rgba(255, 219, 77, 0.16);
-  transform: scale(1.06);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* ---- Modal ---- */
@@ -45,19 +44,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(20px);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  animation: cpFadeIn 0.15s ease both;
 }
 
 .cp-modal__card {
   position: relative;
   width: 420px;
   max-width: calc(100vw - 48px);
-  padding: 32px;
-  border-radius: 20px;
-  background: var(--surface);
+  padding: 28px;
+  border-radius: 18px;
+  background: var(--surface-2);
   border: 1px solid var(--border);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+}
+
+@keyframes cpFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .cp-modal__close {
@@ -107,12 +112,12 @@
 }
 
 .cp-modal__cover:hover {
-  border-color: #ffdb4d;
+  border-color: var(--accent);
 }
 
 .cp-modal__cover--dragging {
-  border-color: #ffdb4d;
-  background-color: rgba(255, 219, 77, 0.1);
+  border-color: var(--accent);
+  background-color: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .cp-modal__cover-placeholder {
@@ -180,7 +185,7 @@
 }
 
 .cp-modal__input:focus {
-  border-color: #ffdb4d;
+  border-color: var(--accent);
 }
 
 .cp-modal__hint {
@@ -204,11 +209,12 @@
   border-radius: 10px;
   font-size: 13px;
   font-weight: 700;
-  transition: opacity 0.15s ease, transform 0.12s ease;
+  transition: background 0.15s ease, opacity 0.15s ease;
 }
 
 .cp-modal__cancel {
-  background: var(--surface-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
   color: var(--text-primary);
 }
 
@@ -217,12 +223,12 @@
 }
 
 .cp-modal__confirm {
-  background: #ffdb4d;
-  color: #000;
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 
 .cp-modal__confirm:hover:not(:disabled) {
-  transform: translateY(-1px);
+  filter: brightness(1.08);
 }
 
 .cp-modal__confirm:disabled {

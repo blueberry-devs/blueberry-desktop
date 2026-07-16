@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { searchTracksMulti, TrackResult } from '../api/yandexMusic'
 import { getLikedTracks } from '../store/likes'
+import { getHistory } from '../store/history'
 import { usePlayer } from './PlayerContext'
 
 // How close to the end of the queue we top it up with a fresh batch, so
@@ -24,15 +25,45 @@ function isUsable(t: TrackResult): boolean {
   return !t.duration || t.duration < MAX_DURATION_SECONDS
 }
 
+// Rotates through the listener's taste signal instead of re-rolling one random
+// artist each refill — otherwise a small liked/history pool tends to keep
+// resurfacing the same one or two artists across consecutive batches.
+let rotationCursor = 0
+
+// Module-level, not a ref: MoodList/NowPlayingPanel (and this hook with them)
+// unmount every time the user leaves the "Моя волна" tab, while `activeGenre`
+// lives in PlayerContext and survives the tab switch. A per-component ref
+// would reset to null on remount and misread the untouched activeGenre as
+// "just changed", re-seeding and autoplaying a fresh wave over whatever the
+// user was actually playing (e.g. a manually picked search result).
+let lastSeededGenre: string | null = null
+
 // Biases results toward what the listener actually likes: alongside the
-// plain genre search, also search "<genre> <a liked artist>" so the feed
-// leans on real listening history instead of just the genre keyword alone.
+// plain genre search, mix in "<genre> <artist>" queries seeded from both
+// likes and recent play history, and occasionally an artist-only query so
+// the feed can drift beyond the genre keyword into what they actually play.
 function buildQueries(genre: string): string[] {
-  const liked = getLikedTracks()
-  if (liked.length === 0) return [genre]
-  const artists = Array.from(new Set(liked.map((t) => t.artists[0]).filter(Boolean)))
-  const sample = artists[Math.floor(Math.random() * artists.length)]
-  return sample ? [genre, `${genre} ${sample}`] : [genre]
+  const likedArtists = getLikedTracks().map((t) => t.artists[0])
+  const historyArtists = getHistory().map((t) => t.artists[0])
+  const artists = Array.from(new Set([...likedArtists, ...historyArtists].filter(Boolean)))
+  if (artists.length === 0) return [genre]
+
+  const a = artists[rotationCursor % artists.length]
+  const b = artists.length > 1 ? artists[(rotationCursor + 1) % artists.length] : null
+  rotationCursor++
+
+  const queries = [genre, `${genre} ${a}`]
+  if (b) queries.push(historyArtists.includes(b) ? b : `${genre} ${b}`)
+  return queries
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const out = arr.slice()
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
 }
 
 async function fetchCandidates(genre: string): Promise<TrackResult[]> {
@@ -51,7 +82,10 @@ async function fetchCandidates(genre: string): Promise<TrackResult[]> {
       merged.push(t)
     }
   }
-  return merged
+  // Search results come back in the same order every time for the same
+  // query — without this, picking the same mood twice in a row (or a
+  // refill mid-session) hands back the exact same lead track.
+  return shuffle(merged)
 }
 
 export function useWaveFeed(): {
@@ -65,7 +99,6 @@ export function useWaveFeed(): {
   // Signatures, not raw IDs — see trackSignature above.
   const seenSigsRef = useRef<Set<string>>(new Set())
   const requestTokenRef = useRef(0)
-  const lastGenreRef = useRef<string | null>(null)
   const refillingRef = useRef(false)
 
   const seedGenre = useCallback(
@@ -89,10 +122,11 @@ export function useWaveFeed(): {
     [activeGenre, playQueue]
   )
 
-  // Seed a fresh batch whenever the selected genre changes.
+  // Seed a fresh batch whenever the selected genre actually changes (not
+  // just whenever this hook happens to (re)mount).
   useEffect(() => {
-    if (activeGenre && activeGenre !== lastGenreRef.current) {
-      lastGenreRef.current = activeGenre
+    if (activeGenre && activeGenre !== lastSeededGenre) {
+      lastSeededGenre = activeGenre
       seedGenre(activeGenre, true)
     }
   }, [activeGenre, seedGenre])

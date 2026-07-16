@@ -1,6 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import AnimatedList, { AnimatedListItem } from './AnimatedList'
 import { usePlayer } from '../player/PlayerContext'
+import { useLikedTracks } from '../store/likes'
+import { useHistory } from '../store/history'
+import { TrackResult } from '../api/yandexMusic'
 import './MoodList.css'
 
 type MoodColor = 'red' | 'blue' | 'purple'
@@ -15,6 +18,10 @@ interface GenreItem {
   query: string
   color: MoodColor
   shape: 'burst' | 'flag' | 'arrow' | 'chevron'
+  // Set only for the personalized "В духе <artist>" entries — an actual
+  // artist photo/cover pulled from a liked or recently played track, shown
+  // instead of the generic shape icon.
+  cover?: string | null
 }
 
 const genres: GenreItem[] = [
@@ -50,10 +57,17 @@ const shapePaths: Record<GenreItem['shape'], string> = {
   chevron: 'M4 24 L24 4 L44 24 L30 22 L24 44 L18 22 Z'
 }
 
-function GenreIcon({ color, shape }: { color: MoodColor; shape: GenreItem['shape'] }): JSX.Element {
+function GenreIcon({ color, shape, cover }: { color: MoodColor; shape: GenreItem['shape']; cover?: string | null }): JSX.Element {
+  if (cover) {
+    return (
+      <span className="mood-icon mood-icon--cover">
+        <img src={cover} alt="" />
+      </span>
+    )
+  }
   return (
     <span className={`mood-icon mood-icon--${color}`}>
-      <svg width="42" height="42" viewBox="0 0 46 46">
+      <svg width="52" height="52" viewBox="0 0 46 46">
         <path d={shapePaths[shape]} fill="currentColor" />
       </svg>
     </span>
@@ -90,16 +104,75 @@ function applyWave(scrollEl: HTMLElement): void {
   })
 }
 
+// Top artists from what's actually been liked/played, most-listened first —
+// likes count double since an explicit like is a stronger signal than one play.
+// Carries along a cover image from whichever track it was first seen on, so
+// the mood row can show the artist's actual art instead of a shape icon.
+function topArtists(
+  liked: TrackResult[],
+  history: TrackResult[],
+  count: number
+): { artist: string; cover: string | null }[] {
+  const freq = new Map<string, number>()
+  const cover = new Map<string, string | null>()
+  for (const t of [...liked, ...history]) {
+    const a = t.artists[0]
+    if (!a) continue
+    if (!cover.has(a)) cover.set(a, t.artistCover ?? t.cover ?? null)
+  }
+  for (const t of liked) {
+    const a = t.artists[0]
+    if (a) freq.set(a, (freq.get(a) ?? 0) + 2)
+  }
+  for (const t of history) {
+    const a = t.artists[0]
+    if (a) freq.set(a, (freq.get(a) ?? 0) + 1)
+  }
+  return Array.from(freq.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, count)
+    .map(([artist]) => ({ artist, cover: cover.get(artist) ?? null }))
+}
+
 function MoodList(): JSX.Element {
   const { setActiveGenre } = usePlayer()
   const containerRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number>(0)
+  const liked = useLikedTracks()
+  const history = useHistory()
 
-  const items: AnimatedListItem[] = genres.map((genre, index) => ({
-    key: genre.label,
+  // Personal picks first, generated from real listening data instead of a
+  // fixed list — falls back to nothing (just the static genres below) until
+  // there's enough signal to build them from.
+  const personalItems: GenreItem[] = useMemo(() => {
+    const artists = topArtists(liked, history, 4)
+    if (artists.length === 0) return []
+    const shapes: GenreItem['shape'][] = ['burst', 'flag', 'arrow', 'chevron']
+    const colors: MoodColor[] = ['red', 'blue', 'purple']
+    const favorite: GenreItem = {
+      label: 'В духе любимого',
+      query: artists[0].artist,
+      color: colors[0],
+      shape: shapes[0],
+      cover: artists[0].cover
+    }
+    const rest: GenreItem[] = artists.slice(1).map(({ artist, cover: artistCover }, i) => ({
+      label: `В духе ${artist}`,
+      query: artist,
+      color: colors[(i + 1) % colors.length],
+      shape: shapes[(i + 1) % shapes.length],
+      cover: artistCover
+    }))
+    return [favorite, ...rest]
+  }, [liked, history])
+
+  const allItems = useMemo(() => [...personalItems, ...genres], [personalItems])
+
+  const items: AnimatedListItem[] = allItems.map((genre, index) => ({
+    key: `${genre.label}-${index}`,
     content: (
       <div className="mood-list__row" data-wave-index={index}>
-        <GenreIcon color={genre.color} shape={genre.shape} />
+        <GenreIcon color={genre.color} shape={genre.shape} cover={genre.cover} />
         <span className="mood-list__label">{genre.label}</span>
       </div>
     )
@@ -133,8 +206,8 @@ function MoodList(): JSX.Element {
   }, [])
 
   const handleSelect = (_item: AnimatedListItem, index: number): void => {
-    const genre = genres[index]
-    setActiveGenre(genre.query)
+    const genre = allItems[index]
+    if (genre) setActiveGenre(genre.query)
   }
 
   return (

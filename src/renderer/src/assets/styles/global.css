@@ -1,22 +1,9 @@
 :root {
   /* Shared layout tokens — keep sidebar-dependent components in sync as the window resizes. */
   --sidebar-width: clamp(198px, 15vw, 230px);
-  --mood-list-width: clamp(280px, 29vw, 400px);
+  --mood-list-width: clamp(320px, 34vw, 470px);
 
-  /* Dark (default) */
-  --bg: #000000;
-  --surface: #17171a;
-  --surface-2: rgba(255, 255, 255, 0.06);
-  --surface-hover: rgba(255, 255, 255, 0.1);
-  --border: rgba(255, 255, 255, 0.08);
-  --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.55);
-  --text-tertiary: rgba(255, 255, 255, 0.35);
-  --accent: #ffdb4d;
-  --accent-contrast: #000000;
-}
-
-:root[data-theme='black'] {
+  /* Black (default) */
   --bg: #000000;
   --surface: #000000;
   --surface-2: rgba(255, 255, 255, 0.045);
@@ -27,10 +14,13 @@
   --text-tertiary: rgba(255, 255, 255, 0.3);
   --accent: #ffdb4d;
   --accent-contrast: #000000;
+  --sidebar-bg: #000000;
+  --titlebar-bg: transparent;
+  --settings-bg: #0f0f0f;
 }
 
 :root[data-theme='light'] {
-  --bg: #f4f4f6;
+  --bg: #f0f0f2;
   --surface: #ffffff;
   --surface-2: rgba(0, 0, 0, 0.045);
   --surface-hover: rgba(0, 0, 0, 0.07);
@@ -40,6 +30,9 @@
   --text-tertiary: rgba(20, 20, 26, 0.4);
   --accent: #d69e00;
   --accent-contrast: #ffffff;
+  --sidebar-bg: #ffffff;
+  --titlebar-bg: transparent;
+  --settings-bg: #f0f0f2;
 }
 
 * {
@@ -52,7 +45,6 @@ html,
 body {
   width: 100%;
   height: 100%;
-  background: var(--bg);
   overflow: hidden;
   user-select: none;
 }
@@ -72,6 +64,7 @@ body {
 #root {
   width: 100%;
   height: 100vh;
+  background: var(--bg);
 }
 
 button {
@@ -119,6 +112,12 @@ button:active {
   }
 }
 
+@keyframes kenBurns {
+  0% { transform: scale(1) translate(0, 0); }
+  50% { transform: scale(1.08) translate(-1%, -1%); }
+  100% { transform: scale(1) translate(0, 0); }
+}
+
 .view-enter {
   animation: viewEnter 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -129,4 +128,16 @@ button:active {
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
+}
+
+:root[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+:root[data-theme='light'] .titlebar__btn {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme='light'] .titlebar__btn:hover {
+  background: rgba(0, 0, 0, 0.06);
 }

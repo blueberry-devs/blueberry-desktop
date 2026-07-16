@@ -12,6 +12,10 @@ python -m PyInstaller --noconfirm --onefile ^
   --name music-server ^
   --distpath "%OUT_DIR%" ^
   --workpath "%TEMP%\pyinstaller-music" ^
+  --collect-data certifi ^
+  --collect-all yandex_music ^
+  --collect-all yt_dlp ^
+  --collect-all pytubefix ^
   "server\main.py"
 
 if errorlevel 1 (
