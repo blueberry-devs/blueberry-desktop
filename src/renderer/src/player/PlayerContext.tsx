@@ -33,6 +33,8 @@ interface PlayerState {
   loopMode: LoopMode
   volume: number
   activeGenre: string | null
+  crossfade: boolean
+  setCrossfade: (v: boolean) => void
   play: (track: TrackResult) => void
   playQueue: (tracks: TrackResult[], startIndex: number) => void
   appendToQueue: (tracks: TrackResult[]) => void
@@ -85,6 +87,13 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
   const [volume, setVolumeState] = useState(0.7)
   const volumeRef = useRef(0.7)
   const [activeGenre, setActiveGenreState] = useState<string | null>(null)
+  const [crossfade, setCrossfadeState] = useState(false)
+  const crossfadeRef = useRef(false)
+
+  const setCrossfade = useCallback((v: boolean) => {
+    crossfadeRef.current = v
+    setCrossfadeState(v)
+  }, [])
 
   const loadLyrics = useCallback((track: TrackResult, token: number) => {
     setLyricsLoading(true)
@@ -408,6 +417,41 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
     return bands
   }, [])
 
+  // Media Session API: expose playback to OS media controls
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return
+    if (currentTrack) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.artists.join(', '),
+        album: '',
+        artwork: currentTrack.cover
+          ? [{ src: currentTrack.cover, sizes: '512x512', type: 'image/jpeg' }]
+          : []
+      })
+    } else {
+      navigator.mediaSession.metadata = null
+    }
+    navigator.mediaSession.setActionHandler('play', () => {
+      const audio = audioRef.current
+      if (audio) audio.play().catch(() => {})
+    })
+    navigator.mediaSession.setActionHandler('pause', () => {
+      const audio = audioRef.current
+      if (audio) audio.pause()
+    })
+    navigator.mediaSession.setActionHandler('previoustrack', () => advanceQueue(-1))
+    navigator.mediaSession.setActionHandler('nexttrack', () => advanceQueue(1))
+    navigator.mediaSession.setActionHandler('seekforward', () => {
+      const audio = audioRef.current
+      if (audio) audio.currentTime = Math.min(audio.currentTime + 10, audio.duration || 0)
+    })
+    navigator.mediaSession.setActionHandler('seekbackward', () => {
+      const audio = audioRef.current
+      if (audio) audio.currentTime = Math.max(audio.currentTime - 10, 0)
+    })
+  }, [currentTrack, advanceQueue])
+
   const value = useMemo<PlayerState>(
     () => ({
       currentTrack,
@@ -426,6 +470,8 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       loopMode,
       volume,
       activeGenre,
+      crossfade,
+      setCrossfade,
       play,
       playQueue: playQueueFn,
       appendToQueue,
@@ -457,6 +503,8 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       loopMode,
       volume,
       activeGenre,
+      crossfade,
+      setCrossfade,
       play,
       playQueueFn,
       appendToQueue,
