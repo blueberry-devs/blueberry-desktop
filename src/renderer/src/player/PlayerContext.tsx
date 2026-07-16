@@ -160,7 +160,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
 
     let nextIndex = queueIndexRef.current + direction
     if (nextIndex < 0) {
-      nextIndex = loopModeRef.current === 'queue' ? q.length - 1 : -1
+      nextIndex = loopModeRef.current === 'queue' ? q.length - 1 : 0
     } else if (nextIndex >= q.length) {
       nextIndex = loopModeRef.current === 'queue' ? 0 : -1
     }

@@ -207,6 +207,7 @@ function SearchView(): JSX.Element {
   }
 
   return (
+    <>
     <div className="search-view view-enter">
       <div className="search-view__input-wrap">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="search-view__icon">
@@ -478,6 +479,7 @@ function SearchView(): JSX.Element {
       </motion.div>,
       document.body
     )}
+    </>
   )
 }
 
