@@ -22,6 +22,7 @@
   overflow: hidden;
   pointer-events: auto;
   min-width: 220px;
+  cursor: pointer;
 }
 
 :root[data-theme='light'] .dyn-island__pill {

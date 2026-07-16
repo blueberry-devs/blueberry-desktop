@@ -13,7 +13,7 @@ function formatTime(sec?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-function DynamicIsland({ className = '' }: { className?: string }): JSX.Element | null {
+function DynamicIsland({ className = '', onExpand }: { className?: string; onExpand?: () => void }): JSX.Element | null {
   const {
     currentTrack,
     isPlaying,
@@ -34,8 +34,14 @@ function DynamicIsland({ className = '' }: { className?: string }): JSX.Element 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>): void => {
+    e.stopPropagation()
     const rect = e.currentTarget.getBoundingClientRect()
     seekTo(((e.clientX - rect.left) / rect.width) * duration)
+  }
+
+  const handlePillClick = (): void => {
+    if (!isHovered) return
+    onExpand?.()
   }
 
   return (
@@ -48,9 +54,10 @@ function DynamicIsland({ className = '' }: { className?: string }): JSX.Element 
         className="dyn-island__pill"
         animate={{ width: isHovered ? 320 : 260 }}
         transition={{ type: 'spring', bounce: 0.3, duration: 0.35 }}
+        onClick={handlePillClick}
       >
         {isHovered && (
-          <div className="dyn-island__progress">
+          <div className="dyn-island__progress" onClick={(e) => e.stopPropagation()}>
             <div className="dyn-island__time">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
@@ -62,7 +69,7 @@ function DynamicIsland({ className = '' }: { className?: string }): JSX.Element 
         )}
 
         <div className="dyn-island__row">
-          <div className="dyn-island__cover">
+          <div className="dyn-island__cover" onClick={(e) => e.stopPropagation()}>
             {currentTrack.cover ? (
               <img src={currentTrack.cover} alt="" />
             ) : (
@@ -80,7 +87,7 @@ function DynamicIsland({ className = '' }: { className?: string }): JSX.Element 
             </div>
           </div>
 
-          <div className="dyn-island__controls">
+          <div className="dyn-island__controls" onClick={(e) => e.stopPropagation()}>
             <button className="dyn-island__ctrl-btn" onClick={previous} aria-label="prev">
               <SkipBackIcon />
             </button>
@@ -98,7 +105,7 @@ function DynamicIsland({ className = '' }: { className?: string }): JSX.Element 
           </div>
 
           {isHovered && (
-            <div className="dyn-island__extras">
+            <div className="dyn-island__extras" onClick={(e) => e.stopPropagation()}>
               <button
                 className="dyn-island__icon-btn"
                 onClick={openLyrics}

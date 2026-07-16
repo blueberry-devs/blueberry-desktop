@@ -83,7 +83,7 @@ function AppInner(): JSX.Element {
         </div>
       </div>
 
-      {showMiniPlayer && currentTrack && <DynamicIsland />}
+      {showMiniPlayer && currentTrack && <DynamicIsland onExpand={() => setActiveTab('wave')} />}
       <AnimatePresence>
         {isLyricsOpen && <Suspense fallback={null}><NowPlayingFullscreen /></Suspense>}
       </AnimatePresence>
