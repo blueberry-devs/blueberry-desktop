@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLikedTracks } from '../store/likes'
 import { usePlaylists } from '../store/playlists'
+import { useDownloads } from '../store/downloads'
 import TrackRow from './TrackRow'
 import { requestArtistSearch } from '../store/searchQuery'
 import CreatePlaylistCard from './CreatePlaylistCard'
@@ -12,6 +13,8 @@ import './CollectionView.css'
 function CollectionView(): JSX.Element {
   const liked = useLikedTracks()
   const playlists = usePlaylists()
+  const downloads = useDownloads()
+  const downloadedTracks = useMemo(() => Object.values(downloads), [downloads])
   const { playQueue } = usePlayer()
   const [openPlaylistId, setOpenPlaylistId] = useState<string | null>(null)
 
@@ -94,6 +97,19 @@ function CollectionView(): JSX.Element {
           ))}
         </div>
       </section>
+
+      {downloadedTracks.length > 0 && (
+        <section className="collection-view__section">
+          <h2 className="collection-view__artists-title">Скачано для офлайна</h2>
+          <div className="collection-view__columns">
+            <div className="collection-view__column">
+              {downloadedTracks.map((track, index) => (
+                <TrackRow key={track.id} track={track} queue={downloadedTracks} index={index} onArtistClick={requestArtistSearch} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {liked.length === 0 ? (
         <div className="collection-view__empty">

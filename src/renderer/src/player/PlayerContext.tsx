@@ -13,6 +13,7 @@ import { resolveStream, TrackResult } from '../api/yandexMusic'
 import { parseLrc, LrcLine } from '../utils/lrc'
 import { getLyrics } from '../services/lyricsCache'
 import { pushHistory } from '../store/history'
+import { getDownloadPath } from '../store/downloads'
 
 export type LoopMode = 'off' | 'track' | 'queue'
 
@@ -36,7 +37,8 @@ interface PlayerState {
   activeGenre: string | null
   crossfade: boolean
   setCrossfade: (v: boolean) => void
-  play: (track: TrackResult) => void
+  play: (track: TrackResult, preferSource?: TrackResult['source']) => void
+  playWithSource: (source: TrackResult['source']) => void
   playQueue: (tracks: TrackResult[], startIndex: number) => void
   appendToQueue: (tracks: TrackResult[]) => void
   shuffleQueue: () => void
@@ -179,11 +181,11 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
   }, [])
 
   const playInternal = useCallback(
-    (track: TrackResult) => {
+    (track: TrackResult, preferSource?: TrackResult['source']) => {
       const audio = audioRef.current
       if (!audio) return
 
-      if (currentTrack?.id === track.id) {
+      if (currentTrack?.id === track.id && !preferSource) {
         if (audio.paused) audio.play().catch(() => {})
         else audio.pause()
         return
@@ -202,19 +204,29 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       audio.pause()
       audio.removeAttribute('src')
 
-      resolveStream(track)
-        .then((stream) => {
-          if (playTokenRef.current !== token) return
-          setPlayingSource(stream.source)
-          attachSource(stream.kind, stream.url)
-        })
-        .catch(() => {
-          if (playTokenRef.current !== token) return
-          setLoadError('Не удалось воспроизвести ни через Яндекс, ни через YouTube, ни через SoundCloud')
-        })
-        .finally(() => {
-          if (playTokenRef.current === token) setIsLoading(false)
-        })
+      // Play from the local download if we have one — skips resolving/
+      // streaming entirely, so it also works fully offline.
+      const localPath = !preferSource ? getDownloadPath(track.id) : null
+      if (localPath) {
+        setPlayingSource(track.source)
+        const fileUrl = 'file:///' + localPath.replace(/\\/g, '/').replace(/^\/+/, '')
+        attachSource('progressive', fileUrl)
+        setIsLoading(false)
+      } else {
+        resolveStream(track, preferSource)
+          .then((stream) => {
+            if (playTokenRef.current !== token) return
+            setPlayingSource(stream.source)
+            attachSource(stream.kind, stream.url)
+          })
+          .catch(() => {
+            if (playTokenRef.current !== token) return
+            setLoadError('Не удалось воспроизвести ни через Яндекс, ни через YouTube, ни через SoundCloud')
+          })
+          .finally(() => {
+            if (playTokenRef.current === token) setIsLoading(false)
+          })
+      }
 
       // Prefetch lyrics in parallel so the panel is ready instantly.
       loadLyrics(track, token)
@@ -315,14 +327,25 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
   }, [advanceQueue])
 
   const play = useCallback(
-    (track: TrackResult) => {
+    (track: TrackResult, preferSource?: TrackResult['source']) => {
       queueRef.current = [track]
       queueIndexRef.current = 0
       setQueue([track])
       setQueueIndex(0)
-      playInternal(track)
+      playInternal(track, preferSource)
     },
     [playInternal]
+  )
+
+  // Re-resolve the currently playing track through a specific service
+  // (manual source override), leaving the queue untouched — unlike `play`,
+  // which reseeds the queue to just that one track.
+  const playWithSource = useCallback(
+    (source: TrackResult['source']) => {
+      if (!currentTrack) return
+      playInternal(currentTrack, source)
+    },
+    [currentTrack, playInternal]
   )
 
   const playQueueFn = useCallback(
@@ -499,6 +522,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       crossfade,
       setCrossfade,
       play,
+      playWithSource,
       playQueue: playQueueFn,
       appendToQueue,
       shuffleQueue,
@@ -534,6 +558,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       crossfade,
       setCrossfade,
       play,
+      playWithSource,
       playQueueFn,
       appendToQueue,
       shuffleQueue,

@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from typing import Optional
@@ -16,6 +17,7 @@ if getattr(sys, 'frozen', False):
 
 import requests
 import yt_dlp
+from cachetools import TTLCache
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +26,9 @@ from yandex_music.exceptions import YandexMusicError
 from yandex_music.utils.request import Request as YandexRequest
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO, format='[%(name)s] %(message)s')
+logger = logging.getLogger('sidecar')
 
 app = FastAPI(title='Music sidecar (anonymous)')
 
@@ -53,11 +58,13 @@ except Exception:
 SOUNDCLOUD_CLIENT_ID = os.environ.get('SOUNDCLOUD_CLIENT_ID', '')
 SOUNDCLOUD_API = 'https://api-v2.soundcloud.com'
 
-# Simple in-process caches to make repeated lookups instant.
-_sc_cache: dict = {}
-_lyrics_cache: dict = {}
-_stream_cache: dict = {}
-_yt_search_cache: dict = {}
+# Simple in-process caches to make repeated lookups instant. Bounded (TTLCache)
+# so a long-running sidecar process doesn't grow these dicts unboundedly —
+# resolved stream URLs also expire upstream, so a TTL keeps entries fresh.
+_sc_cache: dict = TTLCache(maxsize=1000, ttl=3600)
+_lyrics_cache: dict = TTLCache(maxsize=2000, ttl=6 * 3600)
+_stream_cache: dict = TTLCache(maxsize=1000, ttl=1800)
+_yt_search_cache: dict = TTLCache(maxsize=1000, ttl=3600)
 
 
 def cover_url(uri: Optional[str]) -> Optional[str]:
@@ -104,7 +111,7 @@ def search(text: str):
         # Most commonly a 451 geo-block (see _client comment above) — surface
         # empty results instead of a raw 500 so the UI can just show nothing
         # found rather than an error screen.
-        print(f'[yandex] search failed: {exc}')
+        logger.warning('yandex search failed: %s', exc)
         return []
     tracks = result.tracks.results if result.tracks else []
     return [serialize_track(t) for t in tracks[:30]]
@@ -117,7 +124,7 @@ def trends():
     try:
         chart = _client.chart()
     except YandexMusicError as exc:
-        print(f'[yandex] chart failed: {exc}')
+        logger.warning('yandex chart failed: %s', exc)
         return []
     tracks = chart.chart.tracks if chart and chart.chart else []
     return [serialize_track(ct.track) for ct in tracks[:30]]
@@ -128,7 +135,7 @@ def search_youtube(text: str):
     return yt_search(text, limit=20)
 
 
-_sc_search_cache: dict = {}
+_sc_search_cache: dict = TTLCache(maxsize=1000, ttl=3600)
 
 
 @app.get('/api/search/soundcloud')
@@ -209,7 +216,8 @@ def _yt_serialize(
 def _yt_search_pytube(query: str, limit: int = 8) -> list:
     try:
         results = PytubeSearch(query).results
-    except Exception:
+    except Exception as exc:
+        logger.warning('pytubefix search failed for %r: %s', query, exc)
         return []
     out = []
     for v in results[:limit]:
@@ -222,7 +230,8 @@ def _yt_search_pytube(query: str, limit: int = 8) -> list:
             # search results — best effort only, not a reliable signal.
             explicit = bool(getattr(v, 'age_restricted', False))
             out.append(_yt_serialize(video_id, v.title, v.author, thumbnail, duration, explicit))
-        except Exception:
+        except Exception as exc:
+            logger.warning('pytubefix search result skipped: %s', exc)
             continue
     return out
 
@@ -234,7 +243,8 @@ def _yt_search_ytdlp(query: str, limit: int = 8) -> list:
     try:
         with yt_dlp.YoutubeDL(YTDLP_SEARCH_OPTS) as ydl:
             info = ydl.extract_info(f'ytsearch{limit}:{query}', download=False)
-    except Exception:
+    except Exception as exc:
+        logger.warning('yt-dlp search failed for %r: %s', query, exc)
         return []
     entries = (info or {}).get('entries') or []
     # yt-dlp's flat search entries only carry age_limit when set — 18 is
@@ -276,7 +286,8 @@ def _yt_resolve_stream_pytube(video_id: str) -> Optional[str]:
         stream = yt.streams.get_audio_only()
         if stream:
             return stream.url
-    except Exception:
+    except Exception as exc:
+        logger.warning('pytubefix stream resolve failed for %s: %s', video_id, exc)
         return None
     return None
 
@@ -286,7 +297,8 @@ def _yt_resolve_stream_ytdlp(video_id: str) -> Optional[str]:
         with yt_dlp.YoutubeDL(YTDLP_STREAM_OPTS) as ydl:
             info = ydl.extract_info(f'https://www.youtube.com/watch?v={video_id}', download=False)
         return (info or {}).get('url')
-    except Exception:
+    except Exception as exc:
+        logger.warning('yt-dlp stream resolve failed for %s: %s', video_id, exc)
         return None
 
 
@@ -319,7 +331,7 @@ YTDLP_CLIP_STREAM_OPTS = {
     'noplaylist': True,
 }
 
-_clip_cache: dict = {}
+_clip_cache: dict = TTLCache(maxsize=1000, ttl=6 * 3600)
 
 
 @app.get('/api/video/clip')
@@ -341,7 +353,8 @@ def video_clip(title: str, artist: str = ''):
         with yt_dlp.YoutubeDL(YTDLP_CLIP_STREAM_OPTS) as ydl:
             info = ydl.extract_info(f'https://www.youtube.com/watch?v={video_id}', download=False)
         url = (info or {}).get('url')
-    except Exception:
+    except Exception as exc:
+        logger.warning('background clip resolve failed for %r: %s', query, exc)
         url = None
 
     _clip_cache[cache_key] = url
@@ -464,18 +477,26 @@ def yt_resolve_by_query(title: str, artist: str) -> Optional[str]:
 
 
 @app.get('/api/stream/resolve')
-def stream_resolve(source: str, native_id: str = '', title: str = '', artist: str = ''):
+def stream_resolve(source: str, native_id: str = '', title: str = '', artist: str = '', prefer: str = ''):
     """Cascading resolver: try the track's own source first, then fall back
     across the other two services. Always returns which source actually
-    ended up playing, or a 404 if none of the three worked."""
+    ended up playing, or a 404 if none of the three worked.
+
+    `prefer` lets the caller force a specific service to be tried first
+    (manual source override from the UI) — the rest of the cascade still
+    runs as a fallback if the preferred one has no match."""
+    cache_key = f'{source}\x00{native_id}\x00{title}\x00{artist}\x00{prefer}'.lower()
     # Only successful resolutions are cached (see below) — a failure is often
     # transient (rate limit, blip), so every play attempt gets a real retry
     # instead of an instant repeat 404 for the rest of the sidecar's life.
-    cache_key = f'{source}\x00{native_id}\x00{title}\x00{artist}'.lower()
     if cache_key in _stream_cache:
         return _stream_cache[cache_key]
 
     attempts = []
+    if prefer == 'soundcloud':
+        attempts.append(('soundcloud', lambda: sc_resolve_by_query(title, artist)))
+    elif prefer == 'youtube':
+        attempts.append(('youtube', lambda: ({'kind': 'progressive', 'url': u} if (u := yt_resolve_by_query(title, artist)) else None)))
     if source == 'soundcloud' and native_id:
         attempts.append(('soundcloud', lambda: sc_resolve_by_id(native_id)))
     if source == 'youtube' and native_id:
@@ -491,7 +512,8 @@ def stream_resolve(source: str, native_id: str = '', title: str = '', artist: st
         seen_sources.add(src)
         try:
             result = fn()
-        except Exception:
+        except Exception as exc:
+            logger.warning('stream resolve attempt via %s failed for %r/%r: %s', src, title, artist, exc)
             result = None
         if result and result.get('url'):
             payload = {'source': src, 'kind': result['kind'], 'url': result['url']}

@@ -84,7 +84,7 @@ function parseNativeId(trackId: string): { source: TrackSource; nativeId: string
   return { source: source as TrackSource, nativeId: rest.join(':') }
 }
 
-export function resolveStream(track: TrackResult): Promise<ResolvedStream> {
+export function resolveStream(track: TrackResult, preferSource?: TrackSource): Promise<ResolvedStream> {
   const { source, nativeId } = parseNativeId(track.id)
   const params = new URLSearchParams({
     source,
@@ -92,6 +92,7 @@ export function resolveStream(track: TrackResult): Promise<ResolvedStream> {
     title: track.title,
     artist: track.artists[0] ?? ''
   })
+  if (preferSource) params.set('prefer', preferSource)
   return getJson(`/api/stream/resolve?${params.toString()}`)
 }
 
