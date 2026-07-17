@@ -5,6 +5,7 @@ build/
 .env
 server/.env
 server/__pycache__/
+server/.venv/
 __pycache__/
 *.pyc
 .DS_Store
