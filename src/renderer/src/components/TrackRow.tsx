@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { usePlayer } from '../player/PlayerContext'
-import { TrackResult } from '../api/yandexMusic'
+import { resolveStream, TrackResult } from '../api/yandexMusic'
 import { toggleLike, useIsLiked } from '../store/likes'
+import { downloadTrack, removeDownload, useDownloads } from '../store/downloads'
 import AddToPlaylistMenu from './AddToPlaylistMenu'
 import ServiceBadge from './ServiceBadge'
 import './TrackRow.css'
@@ -32,6 +33,9 @@ function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
   const pickerRef = useRef<HTMLDivElement>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const ctxRef = useRef<HTMLDivElement>(null)
+  const downloads = useDownloads()
+  const downloaded = !!downloads[track.id]
+  const [downloading, setDownloading] = useState(false)
 
   useEffect(() => {
     if (!showArtistPicker) return
@@ -108,6 +112,30 @@ function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
     navigator.clipboard.writeText(`${track.artists.join(', ')} — ${track.title}`).catch(() => {})
     setCtxMenu(null)
   }, [track])
+
+  const handlePlayVia = useCallback((source: 'soundcloud' | 'youtube'): void => {
+    play(track, source)
+    setCtxMenu(null)
+  }, [play, track])
+
+  const handleDownloadToggle = useCallback((): void => {
+    setCtxMenu(null)
+    if (downloaded) {
+      removeDownload(track.id).catch(() => {})
+      return
+    }
+    setDownloading(true)
+    resolveStream(track)
+      .then((stream) => {
+        if (stream.kind !== 'progressive') {
+          window.alert('Этот трек нельзя скачать для офлайна — поддерживаются только прямые аудиопотоки.')
+          return
+        }
+        return downloadTrack(track, stream.url)
+      })
+      .catch(() => window.alert('Не удалось скачать трек.'))
+      .finally(() => setDownloading(false))
+  }, [track, downloaded])
 
   return (
     <>
@@ -223,6 +251,29 @@ function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
               {name}
             </button>
           ))}
+          <div className="track-row__ctx-sep" />
+          <button className="track-row__ctx-item" onClick={handleDownloadToggle} disabled={downloading}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              {downloaded ? (
+                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              ) : (
+                <>
+                  <path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  <path d="M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </>
+              )}
+            </svg>
+            {downloading ? 'Скачивание…' : downloaded ? 'Удалить скачанное' : 'Скачать для офлайна'}
+          </button>
+          <div className="track-row__ctx-sep" />
+          <button className="track-row__ctx-item" onClick={() => handlePlayVia('soundcloud')}>
+            <ServiceBadge source="soundcloud" size={14} />
+            Слушать через SoundCloud
+          </button>
+          <button className="track-row__ctx-item" onClick={() => handlePlayVia('youtube')}>
+            <ServiceBadge source="youtube" size={14} />
+            Слушать через YouTube
+          </button>
           <div className="track-row__ctx-sep" />
           <button className="track-row__ctx-item" onClick={handleCopyInfo}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">

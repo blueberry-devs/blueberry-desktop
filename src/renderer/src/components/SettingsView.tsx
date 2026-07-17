@@ -73,6 +73,35 @@ function SettingsView(): JSX.Element {
       <section className="settings-view__section">
         <h2 className="settings-view__section-title">
           <span className="settings-view__section-icon"><InfoIcon size={14} /></span>
+          Горячие клавиши
+        </h2>
+        <div className="settings-view__about">
+          <div className="settings-view__about-row">
+            <span>Пауза / воспроизведение</span>
+            <span className="settings-view__about-value">Пробел</span>
+          </div>
+          <div className="settings-view__about-row">
+            <span>Поиск</span>
+            <span className="settings-view__about-value">Ctrl+K</span>
+          </div>
+          <div className="settings-view__about-row">
+            <span>Следующий / предыдущий трек</span>
+            <span className="settings-view__about-value">Ctrl+→ / Ctrl+←</span>
+          </div>
+          <div className="settings-view__about-row">
+            <span>Нравится</span>
+            <span className="settings-view__about-value">Ctrl+L</span>
+          </div>
+          <div className="settings-view__about-row">
+            <span>Закрыть полноэкранный плеер</span>
+            <span className="settings-view__about-value">Esc</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-view__section">
+        <h2 className="settings-view__section-title">
+          <span className="settings-view__section-icon"><InfoIcon size={14} /></span>
           О приложении
         </h2>
         <div className="settings-view__about">

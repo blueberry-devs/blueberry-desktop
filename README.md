@@ -21,8 +21,22 @@ An independent, open-source Electron music player. Search and play tracks from S
 - **Persistent storage** — likes, playlists, play history survive restarts (localStorage + file backup).
 - **"My Wave"** — infinite queue generator, biased toward your own likes/history as it goes.
 - **Fullscreen player** — optional YouTube video-clip background (toggle in Settings), synced lyrics view.
+- **Play history** — dedicated History tab, "play it all" shortcut, one-click clear.
+- **Keyboard shortcuts** — play/pause, search, next/previous track, like, close fullscreen player (see Settings for the full list).
+- **Manual source override** — force a track to stream via SoundCloud or YouTube specifically, from its context menu or the Now Playing menu.
+- **Offline downloads** — save a track locally for offline playback (direct/progressive streams only); manage downloads from the Collection tab.
 - **No authentication** — everything works anonymously, no account of any kind required.
 - **Auto-update** — checks GitHub Releases on startup, prompts to restart once downloaded.
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Space` | Play / pause |
+| `Ctrl+K` | Jump to search |
+| `Ctrl+→` / `Ctrl+←` | Next / previous track |
+| `Ctrl+L` | Like current track |
+| `Esc` | Close fullscreen player |
 
 ## Getting started
 

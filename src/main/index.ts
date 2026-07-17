@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron'
 import { join } from 'path'
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs'
 import { spawn, execSync, ChildProcessWithoutNullStreams } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
@@ -380,6 +380,43 @@ ipcMain.handle('store-get', (_event, key: string): Promise<string | null> => {
 
 ipcMain.handle('store-set', (_event, key: string, data: string): Promise<void> => {
   writeFileSync(storePath(key), data, 'utf-8')
+  return Promise.resolve()
+})
+
+// ===================== OFFLINE DOWNLOADS =====================
+// Only handles direct/progressive stream URLs — HLS (.m3u8) manifests would
+// need segment fetching + concatenation, which the renderer skips over by
+// only ever calling this for stream.kind === 'progressive' results from
+// /api/stream/resolve.
+const DOWNLOADS_DIR = 'downloads'
+
+function downloadsDir(): string {
+  const dir = join(app.getPath('userData'), DOWNLOADS_DIR)
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+function sanitizeTrackId(id: string): string {
+  return id.replace(/[^a-z0-9_-]/gi, '_')
+}
+
+ipcMain.handle('download-track', async (_event, trackId: string, url: string): Promise<string> => {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`)
+  const contentType = res.headers.get('content-type') || ''
+  const ext = contentType.includes('mp4') || contentType.includes('m4a') ? 'm4a' : 'mp3'
+  const filePath = join(downloadsDir(), `${sanitizeTrackId(trackId)}.${ext}`)
+  const buffer = Buffer.from(await res.arrayBuffer())
+  writeFileSync(filePath, buffer)
+  return filePath
+})
+
+ipcMain.handle('download-remove', (_event, filePath: string): Promise<void> => {
+  try {
+    unlinkSync(filePath)
+  } catch {
+    /* already gone */
+  }
   return Promise.resolve()
 })
 

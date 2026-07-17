@@ -11,7 +11,8 @@ const navItems: { icon: string; label: string; tab: Tab }[] = [
   { icon: 'search', label: 'Поиск', tab: 'search' },
   { icon: 'wave', label: 'Моя волна', tab: 'wave' },
   { icon: 'note', label: 'Для вас и Тренды', tab: 'trends' },
-  { icon: 'heart', label: 'Коллекция', tab: 'collection' }
+  { icon: 'heart', label: 'Коллекция', tab: 'collection' },
+  { icon: 'history', label: 'История', tab: 'history' }
 ]
 
 function NavIcon({ type }: { type: string }): JSX.Element {
@@ -48,6 +49,13 @@ function NavIcon({ type }: { type: string }): JSX.Element {
             d="M9 15.5S2 11.2 2 6.8C2 4.4 3.9 2.8 6 2.8c1.4 0 2.6.7 3 1.8.4-1.1 1.6-1.8 3-1.8 2.1 0 4 1.6 4 4 0 4.4-7 8.7-7 8.7Z"
             fill="currentColor"
           />
+        </svg>
+      )
+    case 'history':
+      return (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.4" />
+          <path d="M9 5v4l3 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         </svg>
       )
     case 'settings':

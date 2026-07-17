@@ -13,6 +13,7 @@ import { PlayerProvider, usePlayer } from './player/PlayerContext'
 import { usePendingSearch } from './store/searchQuery'
 import { useDominantColor } from './hooks/useDominantColor'
 import { useProfile } from './store/profile'
+import { toggleLike } from './store/likes'
 import './App.css'
 
 const MoodList = lazy(() => import('./components/MoodList'))
@@ -22,8 +23,9 @@ const SearchView = lazy(() => import('./components/SearchView'))
 const TrendsView = lazy(() => import('./components/TrendsView'))
 const CollectionView = lazy(() => import('./components/CollectionView'))
 const SettingsView = lazy(() => import('./components/SettingsView'))
+const HistoryView = lazy(() => import('./components/HistoryView'))
 
-export type Tab = 'wave' | 'search' | 'trends' | 'collection' | 'settings'
+export type Tab = 'wave' | 'search' | 'trends' | 'collection' | 'history' | 'settings'
 
 function rgbToHue(r: number, g: number, b: number): number {
   const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
@@ -35,7 +37,7 @@ function rgbToHue(r: number, g: number, b: number): number {
 function AppInner(): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('wave')
   const [appReady, setAppReady] = useState(false)
-  const { isPlaying, isLyricsOpen, currentTrack, getFrequencyBands, togglePlay, next, previous } = usePlayer()
+  const { isPlaying, isLyricsOpen, currentTrack, getFrequencyBands, togglePlay, next, previous, closeLyrics } = usePlayer()
   const pendingSearch = usePendingSearch()
   const coverColor = useDominantColor(currentTrack?.cover)
   const trackHue = coverColor ? rgbToHue(coverColor[0], coverColor[1], coverColor[2]) : -1
@@ -84,6 +86,46 @@ function AppInner(): JSX.Element {
     setActiveTab(tab)
   }
 
+  // Global playback/navigation hotkeys. Ignored while typing in a text
+  // field so Space/K/L etc. still work normally in search boxes and forms.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape' && isLyricsOpen) {
+        closeLyrics()
+        return
+      }
+
+      const target = e.target as HTMLElement | null
+      const isTyping =
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      if (isTyping) return
+
+      const mod = e.ctrlKey || e.metaKey
+
+      if (e.code === 'Space') {
+        e.preventDefault()
+        togglePlay()
+      } else if (mod && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setActiveTab('search')
+      } else if (mod && e.key === 'ArrowRight') {
+        e.preventDefault()
+        next()
+      } else if (mod && e.key === 'ArrowLeft') {
+        e.preventDefault()
+        previous()
+      } else if (mod && e.key.toLowerCase() === 'l') {
+        if (currentTrack) {
+          e.preventDefault()
+          toggleLike(currentTrack)
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isLyricsOpen, closeLyrics, togglePlay, next, previous, currentTrack])
+
   const showMiniPlayer = activeTab !== 'wave'
 
   return (
@@ -110,6 +152,7 @@ function AppInner(): JSX.Element {
           {activeTab === 'search' && <Suspense fallback={null}><SearchView /></Suspense>}
           {activeTab === 'trends' && <Suspense fallback={null}><TrendsView /></Suspense>}
           {activeTab === 'collection' && <Suspense fallback={null}><CollectionView /></Suspense>}
+          {activeTab === 'history' && <Suspense fallback={null}><HistoryView /></Suspense>}
           {activeTab === 'settings' && <Suspense fallback={null}><SettingsView /></Suspense>}
         </div>
       </div>

@@ -18,6 +18,8 @@ interface WindowApi {
   cacheSetLyrics: (trackId: string, entry: CacheEntry) => Promise<void>
   storeGet: (key: string) => Promise<string | null>
   storeSet: (key: string, data: string) => Promise<void>
+  downloadTrack: (trackId: string, url: string) => Promise<string>
+  removeDownload: (filePath: string) => Promise<void>
   onSidecarReady: (cb: () => void) => () => void
   getAppVersion: () => Promise<string>
 }

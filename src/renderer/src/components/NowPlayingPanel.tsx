@@ -24,6 +24,7 @@ function NowPlayingPanel(): JSX.Element {
     isPlaying,
     isLoading,
     play,
+    playWithSource,
     togglePlay,
     next,
     previous,
@@ -255,6 +256,30 @@ function NowPlayingPanel(): JSX.Element {
                   <Mic2Icon size={16} />
                   Текст песни
                 </button>
+                {currentTrack && (
+                  <>
+                    <button
+                      className="now-playing__dropdown-item"
+                      onClick={() => {
+                        setShowMenu(false)
+                        playWithSource('soundcloud')
+                      }}
+                    >
+                      <ServiceBadge source="soundcloud" size={16} />
+                      Слушать через SoundCloud
+                    </button>
+                    <button
+                      className="now-playing__dropdown-item"
+                      onClick={() => {
+                        setShowMenu(false)
+                        playWithSource('youtube')
+                      }}
+                    >
+                      <ServiceBadge source="youtube" size={16} />
+                      Слушать через YouTube
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>

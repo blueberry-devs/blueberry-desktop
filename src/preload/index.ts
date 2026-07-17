@@ -24,6 +24,8 @@ const api = {
   cacheSetLyrics: (trackId: string, entry: CacheEntry) => ipcRenderer.invoke('cache-set-lyrics', trackId, entry),
   storeGet: (key: string) => ipcRenderer.invoke('store-get', key),
   storeSet: (key: string, data: string) => ipcRenderer.invoke('store-set', key, data),
+  downloadTrack: (trackId: string, url: string): Promise<string> => ipcRenderer.invoke('download-track', trackId, url),
+  removeDownload: (filePath: string): Promise<void> => ipcRenderer.invoke('download-remove', filePath),
   onSidecarReady: (cb: () => void) => {
     const handler = (): void => cb()
     ipcRenderer.on('sidecar:ready', handler)

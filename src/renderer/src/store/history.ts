@@ -43,6 +43,11 @@ export function pushHistory(track: TrackResult): void {
   emit()
 }
 
+export function clearHistory(): void {
+  cache = []
+  emit()
+}
+
 export function useHistory(): TrackResult[] {
   return useSyncExternalStore(subscribe, getHistory)
 }
