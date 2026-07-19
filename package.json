@@ -67,7 +67,7 @@
       ]
     },
     "mac": {
-      "icon": "resources/icon.png",
+      "icon": "resources/icon-mac.png",
       "extraResources": [
         {
           "from": "build/packed-server",
