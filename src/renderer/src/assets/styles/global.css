@@ -141,3 +141,19 @@ button:active {
 :root[data-theme='light'] .titlebar__btn:hover {
   background: rgba(0, 0, 0, 0.06);
 }
+
+/* Shared animated-gradient background for "hero" action cards (Коллекция's
+   "Мне нравится", История's "Слушать всё подряд", etc). Wider color stops +
+   a slow shifting background-position reads as alive without stealing focus
+   from the label — background-size must be well over 100% for the shift to
+   be visible instead of clipped. */
+@keyframes hero-gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.hero-card--animated {
+  background-size: 220% 220%;
+  animation: hero-gradient-shift 10s ease infinite;
+}

@@ -71,6 +71,21 @@
   max-width: 420px;
 }
 
+.settings-view__select {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary, #fff);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+.settings-view__select:hover {
+  border-color: rgba(255,255,255,0.3);
+}
+
 .settings-view__explicit-badge {
   display: inline-flex;
   align-items: center;
@@ -86,6 +101,33 @@
 }
 
 /* ---------- Toggle ---------- */
+
+.settings-view__segmented {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-hover);
+  border-radius: 10px;
+}
+
+.settings-view__segmented-item {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.settings-view__segmented-item:hover {
+  color: var(--text-primary);
+}
+
+.settings-view__segmented-item--active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
 
 .settings-toggle {
   position: relative;

@@ -2,8 +2,8 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
   transition: background 0.12s ease;
   cursor: pointer;
 }
@@ -18,9 +18,9 @@
 
 .track-row__cover {
   position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 6px;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
   overflow: hidden;
   flex-shrink: 0;
   background: #2a2a2a;

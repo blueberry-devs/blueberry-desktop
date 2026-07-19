@@ -1,0 +1,73 @@
+.top-bottom-nav {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* 'top' only ever renders inline inside TitleBar now (see App.tsx) — fully
+   transparent so it reads as part of the titlebar row, not a separate bar. */
+.top-bottom-nav--top {
+  padding: 0;
+  background: transparent;
+}
+
+/* 'bottom' sits directly over PlasmaWave's reactive glow — fully
+   transparent (no background, no shadow of its own) so nothing clips the
+   glow or the wave shader behind it; centered like 'top'. */
+.top-bottom-nav--bottom {
+  width: 100%;
+  padding: 10px 8px;
+  background: transparent;
+}
+
+.top-bottom-nav__item {
+  /* gap/padding are animated inline via motion (buttonVariants in
+     TopBottomNav.tsx) — only non-animated properties belong here. */
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.top-bottom-nav__item:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.top-bottom-nav__item--active {
+  color: var(--text-primary);
+}
+
+.top-bottom-nav__pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: var(--surface-2);
+  z-index: 0;
+}
+
+.top-bottom-nav__icon {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+}
+
+.top-bottom-nav__label {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+}

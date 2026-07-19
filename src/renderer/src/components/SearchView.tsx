@@ -1,21 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from '../utils/useTranslation'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
-import { searchTracksMulti, TrackResult } from '../api/yandexMusic'
+import { searchTracksYandex, searchTracksSoundcloud, searchTracksYoutube, searchPlaylists, TrackResult, PlaylistResult } from '../api/yandexMusic'
 import { usePlayer } from '../player/PlayerContext'
 import { useHistory } from '../store/history'
 import { useArtistCovers } from '../hooks/useArtistCovers'
 import { consumePendingSearch } from '../store/searchQuery'
+import { toggleFavoritePlaylist, useIsFavoritePlaylist } from '../store/favoritePlaylists'
+import { sortByPlays } from '../store/playCount'
 import TrackRow from './TrackRow'
 import ArtistView from './ArtistView'
+import ServiceBadge from './ServiceBadge'
 import './SearchView.css'
 
 let debounceTimer: ReturnType<typeof setTimeout>
 
-type ResultsTab = 'top' | 'tracks' | 'artists'
+type ResultsTab = 'top' | 'tracks' | 'artists' | 'playlists'
 type CardIcon = 'sun' | 'smile' | 'dumbbell' | 'note' | 'clock' | 'sparkle' | 'moon' | 'guitar' | 'mic' | 'megaphone'
 
-const DISABLED_PILLS = ['Альбомы', 'Моя волна', 'Плейлисты', 'Подкасты', 'Аудиокниги', 'Клипы']
+const DISABLED_PILLS = ['Альбомы', 'Моя волна', 'Подкасты', 'Аудиокниги', 'Клипы']
 
 const COLLECTIONS: { label: string; query: string; gradient: string; icon: CardIcon }[] = [
   { label: 'Летняя', query: 'summer hits', gradient: 'linear-gradient(160deg,#ffb64d,#ff6b6b)', icon: 'sun' },
@@ -38,12 +42,7 @@ function CardBadge({ icon }: { icon: CardIcon }): JSX.Element {
     sun: (
       <>
         <circle cx="9" cy="9" r="3.2" stroke="currentColor" strokeWidth="1.4" />
-        <path
-          d="M9 1.5v2M9 14.5v2M16.5 9h-2M3.5 9h-2M14.3 3.7l-1.4 1.4M5.1 12.9l-1.4 1.4M14.3 14.3l-1.4-1.4M5.1 5.1 3.7 3.7"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-        />
+        <path d="M9 1.5v2M9 14.5v2M16.5 9h-2M3.5 9h-2M14.3 3.7l-1.4 1.4M5.1 12.9l-1.4 1.4M14.3 14.3l-1.4-1.4M5.1 5.1 3.7 3.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       </>
     ),
     smile: (
@@ -54,15 +53,7 @@ function CardBadge({ icon }: { icon: CardIcon }): JSX.Element {
         <path d="M5.5 11c1 1.3 2.3 2 3.5 2s2.5-.7 3.5-2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       </>
     ),
-    dumbbell: (
-      <path
-        d="M2 9h14M2 6.5v5M5 5v8M13 5v8M16 6.5v5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    ),
+    dumbbell: <path d="M2 9h14M2 6.5v5M5 5v8M13 5v8M16 6.5v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />,
     note: (
       <>
         <circle cx="5" cy="14" r="2.3" stroke="currentColor" strokeWidth="1.4" />
@@ -91,14 +82,7 @@ function CardBadge({ icon }: { icon: CardIcon }): JSX.Element {
       </>
     ),
     megaphone: (
-      <path
-        d="M2 7v4h2.5L11 15V3L4.5 7H2Zm11-1.5c1.3.8 1.3 4.2 0 5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        fill="none"
-      />
+      <path d="M2 7v4h2.5L11 15V3L4.5 7H2Zm11-1.5c1.3.8 1.3 4.2 0 5" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
     )
   }
   return (
@@ -116,19 +100,59 @@ interface ArtistGroup {
   trackCount: number
 }
 
+function PlaylistCard({ playlist }: { playlist: PlaylistResult }): JSX.Element {
+  const isFavorite = useIsFavoritePlaylist(playlist.id)
+  return (
+    <div className="search-view__playlist-card">
+      <div className="search-view__playlist-cover" style={playlist.cover ? { backgroundImage: `url(${playlist.cover})` } : undefined}>
+        {!playlist.cover && (
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3 14 9 20 7 16 12 21 14 14 15.5 16 21 10.5 17 6 21 7.5 14.5 2 13 7.5 10 6 4 Z" fill="#ffdb4d" />
+          </svg>
+        )}
+      </div>
+      <div className="search-view__playlist-info">
+        <div className="search-view__playlist-name">{playlist.title}</div>
+        <div className="search-view__playlist-meta">
+          <ServiceBadge source={playlist.source} size={12} />
+          <span>{playlist.owner} · {playlist.trackCount} {t('search.tracks').toLowerCase()}</span>
+        </div>
+      </div>
+      <button
+        className={`search-view__playlist-fav${isFavorite ? ' search-view__playlist-fav--active' : ''}`}
+        onClick={(e) => { e.stopPropagation(); toggleFavoritePlaylist(playlist) }}
+        title={isFavorite ? t('playlist.unfavorite') : t('playlist.addTo')}
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path
+            d="M9 15.5S2 11.2 2 6.8C2 4.4 3.9 2.8 6 2.8c1.4 0 2.6.7 3 1.8.4-1.1 1.6-1.8 3-1.8 2.1 0 4 1.6 4 4 0 4.4-7 8.7-7 8.7Z"
+            fill={isFavorite ? 'currentColor' : 'none'}
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
+const PAGE_SIZE = 15
+
 function SearchView(): JSX.Element {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<TrackResult[]>([])
+  const [playlistResults, setPlaylistResults] = useState<PlaylistResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [emptyTab, setEmptyTab] = useState<'popular' | 'history'>('popular')
   const [resultsTab, setResultsTab] = useState<ResultsTab>('top')
   const [viewingArtist, setViewingArtist] = useState<string | null>(null)
+  const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   const { playQueue } = usePlayer()
   const history = useHistory()
+  const { t } = useTranslation()
 
-  // Pick up "open this artist" requests fired from other tabs (or from
-  // within this view's own track rows / artist cards).
   useEffect(() => {
     const pending = consumePendingSearch()
     if (pending) setViewingArtist(pending)
@@ -138,6 +162,7 @@ function SearchView(): JSX.Element {
     clearTimeout(debounceTimer)
     if (!query.trim()) {
       setResults([])
+      setPlaylistResults([])
       setError(null)
       return
     }
@@ -145,13 +170,52 @@ function SearchView(): JSX.Element {
       setLoading(true)
       setError(null)
       setResultsTab('top')
-      searchTracksMulti(query)
-        .then(setResults)
-        .catch(() => setError('Не удалось подключиться к серверу'))
-        .finally(() => setLoading(false))
+      setDisplayLimit(PAGE_SIZE)
+
+      const seen = new Set<string>()
+
+      const mergeBatch = (batch: TrackResult[]) => {
+        setResults(prev => {
+          const next = [...prev]
+          for (const t of batch) {
+            const sig = `${t.artists[0] ?? ''}::${t.title}`.toLowerCase()
+            if (seen.has(sig)) continue
+            seen.add(sig)
+            next.push(t)
+          }
+          return next
+        })
+      }
+
+      searchPlaylists(query)
+        .then(pl => setPlaylistResults(pl))
+        .catch(() => {})
+
+      let settled = 0
+      const sourceDone = () => {
+        settled++
+        if (settled >= 2) setLoading(false)
+      }
+
+      searchTracksYandex(query)
+        .then(mergeBatch)
+        .catch(() => {})
+        .finally(sourceDone)
+
+      searchTracksSoundcloud(query)
+        .then(mergeBatch)
+        .catch(() => {})
+        .finally(sourceDone)
+
+      searchTracksYoutube(query)
+        .then(mergeBatch)
+        .catch(() => {})
+        .finally(sourceDone)
     }, 600)
     return () => clearTimeout(debounceTimer)
   }, [query])
+
+  const topResults = useMemo(() => sortByPlays(results), [results])
 
   const artistGroups = useMemo(() => {
     const map = new Map<string, ArtistGroup>()
@@ -171,8 +235,22 @@ function SearchView(): JSX.Element {
   const artists = artistGroups.map((a) => ({ ...a, cover: a.cover ?? resolvedArtistCovers.get(a.name) ?? null }))
 
   const topArtist = artists[0]
-  const topTrack = results[0]
-  const restTracks = results.slice(1)
+  const topTrack = topResults[0]
+  const restTracks = topResults.slice(1)
+
+  const totalVisible = resultsTab === 'playlists' ? playlistResults.length : topResults.length
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || loading || displayLimit >= totalVisible) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setDisplayLimit((p) => p + PAGE_SIZE)
+      },
+      { rootMargin: '400px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [loading, displayLimit, totalVisible])
 
   const searchFor = (q: string): void => setQuery(q)
 
@@ -216,7 +294,7 @@ function SearchView(): JSX.Element {
         </svg>
         <input
           className="search-view__input"
-          placeholder="Что вы чувствуете или ищете?"
+          placeholder={t('search.placeholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           autoFocus
@@ -238,13 +316,13 @@ function SearchView(): JSX.Element {
               className={`search-view__toptab${emptyTab === 'popular' ? ' search-view__toptab--active' : ''}`}
               onClick={() => setEmptyTab('popular')}
             >
-              Популярное
+              {t('search.top')}
             </button>
             <button
               className={`search-view__toptab${emptyTab === 'history' ? ' search-view__toptab--active' : ''}`}
               onClick={() => setEmptyTab('history')}
             >
-              История
+              {t('trends.history')}
             </button>
           </div>
 
@@ -289,7 +367,7 @@ function SearchView(): JSX.Element {
           {emptyTab === 'history' && (
             <div className="search-view__results">
               {history.length === 0 ? (
-                <div className="search-view__status">История пуста</div>
+                <div className="search-view__status">{t('trends.historyEmpty')}</div>
               ) : (
                 history.map((t, i) => <TrackRow key={t.id} track={t} queue={history} index={i} onArtistClick={setViewingArtist} />)
               )}
@@ -305,19 +383,25 @@ function SearchView(): JSX.Element {
               className={`search-view__pill${resultsTab === 'top' ? ' search-view__pill--active' : ''}`}
               onClick={() => setResultsTab('top')}
             >
-              Топ
+              {t('search.top')}
             </button>
             <button
               className={`search-view__pill${resultsTab === 'tracks' ? ' search-view__pill--active' : ''}`}
               onClick={() => setResultsTab('tracks')}
             >
-              Треки
+              {t('search.tracks')}
             </button>
             <button
               className={`search-view__pill${resultsTab === 'artists' ? ' search-view__pill--active' : ''}`}
               onClick={() => setResultsTab('artists')}
             >
-              Исполнители
+              {t('search.artists')}
+            </button>
+            <button
+              className={`search-view__pill${resultsTab === 'playlists' ? ' search-view__pill--active' : ''}`}
+              onClick={() => setResultsTab('playlists')}
+            >
+              {t('search.playlists')}
             </button>
             {DISABLED_PILLS.map((label) => (
               <button key={label} className="search-view__pill search-view__pill--disabled" disabled>
@@ -326,19 +410,33 @@ function SearchView(): JSX.Element {
             ))}
           </div>
 
-          {loading && <div className="search-view__status">Ищем…</div>}
+
+
+          {loading && <div className="search-view__status">{t('player.generating')}</div>}
           {error && <div className="search-view__status search-view__status--error">{error}</div>}
-          {!loading && !error && results.length === 0 && (
-            <div className="search-view__status">Ничего не найдено</div>
+          {!loading && !error && resultsTab !== 'playlists' && results.length === 0 && (
+            <div className="search-view__status">{t('search.noResults')}</div>
+          )}
+          {!loading && !error && resultsTab === 'playlists' && playlistResults.length === 0 && (
+            <div className="search-view__status">{t('search.noResults')}</div>
           )}
 
-          {!loading && results.length > 0 && resultsTab === 'top' && (
+          {!loading && resultsTab === 'playlists' && playlistResults.length > 0 && (
+            <div className="search-view__playlists">
+              {playlistResults.slice(0, displayLimit).map((pl) => (
+                <PlaylistCard key={pl.id} playlist={pl} />
+              ))}
+              {playlistResults.length > displayLimit && <div ref={sentinelRef} style={{ height: 1 }} />}
+            </div>
+          )}
+
+          {!loading && topResults.length > 0 && resultsTab === 'top' && (
             <>
               <div className="search-view__hero-row">
                 {topTrack && (
                   <button
                     className="search-view__hero-track"
-                    onClick={() => playQueue(results, 0)}
+                    onClick={() => playQueue(topResults, 0)}
                     onContextMenu={(e) => handleCtxMenu(e, topTrack)}
                   >
                     <span className="search-view__hero-cover">
@@ -365,7 +463,7 @@ function SearchView(): JSX.Element {
                     <span className="search-view__hero-meta">
                       <span className="search-view__hero-title">{topArtist.name}</span>
                       <span className="search-view__hero-sub">
-                        {topArtist.trackCount} {topArtist.trackCount === 1 ? 'трек' : 'треков'}
+                        {topArtist.trackCount} {t('search.tracks').toLowerCase()}
                       </span>
                     </span>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="search-view__hero-chevron">
@@ -376,14 +474,14 @@ function SearchView(): JSX.Element {
               </div>
 
               <div className="search-view__results">
-                {restTracks.map((t, i) => (
-                  <TrackRow key={t.id} track={t} queue={results} index={i + 1} onArtistClick={setViewingArtist} />
+                {restTracks.slice(0, displayLimit - 1).map((t, i) => (
+                  <TrackRow key={t.id} track={t} queue={topResults} index={i + 1} onArtistClick={setViewingArtist} />
                 ))}
               </div>
 
               {artists.length > 1 && (
                 <section className="search-view__section">
-                  <h2 className="search-view__section-title">Исполнители</h2>
+                  <h2 className="search-view__section-title">{t('search.artists')}</h2>
                   <div className="search-view__artist-row">
                     {artists.map((a) => (
                       <button key={a.name} className="search-view__artist" onClick={() => setViewingArtist(a.name)}>
@@ -403,14 +501,16 @@ function SearchView(): JSX.Element {
                   </div>
                 </section>
               )}
+              {topResults.length > displayLimit && <div ref={sentinelRef} style={{ height: 1 }} />}
             </>
           )}
 
           {!loading && results.length > 0 && resultsTab === 'tracks' && (
             <div className="search-view__results">
-              {results.map((t, i) => (
+              {results.slice(0, displayLimit).map((t, i) => (
                 <TrackRow key={t.id} track={t} queue={results} index={i} onArtistClick={setViewingArtist} />
               ))}
+              {results.length > displayLimit && <div ref={sentinelRef} style={{ height: 1 }} />}
             </div>
           )}
 
@@ -430,7 +530,7 @@ function SearchView(): JSX.Element {
                   </span>
                   <span className="search-view__artist-name">{a.name}</span>
                   <span className="search-view__artist-count">
-                    {a.trackCount} {a.trackCount === 1 ? 'трек' : 'треков'}
+                    {a.trackCount} {t('search.tracks').toLowerCase()}
                   </span>
                 </button>
               ))}

@@ -68,6 +68,11 @@
   opacity: 1;
 }
 
+.now-playing__artist--splash {
+  font-size: clamp(22px, 4vw, 48px) !important;
+  margin-bottom: -4px;
+}
+
 .now-playing__artist {
   font-size: clamp(40px, 7vw, 96px);
   line-height: 1;
@@ -80,6 +85,25 @@
   max-width: 100%;
   word-break: break-word;
 }
+
+.now-playing__splash {
+  position: relative;
+  width: 100%;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.now-playing__splash-img {
+  width: 100%;
+  max-width: 100%;
+  max-height: 50vh;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+
 
 .now-playing__island-row {
   display: flex;

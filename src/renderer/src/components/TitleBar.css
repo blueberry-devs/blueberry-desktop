@@ -26,6 +26,17 @@
   -webkit-app-region: no-drag;
 }
 
+.titlebar__center-nav {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 40px;
+  display: flex;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
 .titlebar__controls {
   position: absolute;
   top: 0;

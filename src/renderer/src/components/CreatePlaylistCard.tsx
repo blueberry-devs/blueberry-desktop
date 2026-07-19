@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { createPlaylist } from '../store/playlists'
+import { useTranslation } from '../utils/useTranslation'
 import './CreatePlaylistCard.css'
 
 function readFileAsDataUrl(file: File, onDone: (url: string) => void): void {
@@ -9,6 +10,7 @@ function readFileAsDataUrl(file: File, onDone: (url: string) => void): void {
 }
 
 function CreatePlaylistModal({ onClose }: { onClose: () => void }): JSX.Element {
+  const { t } = useTranslation()
   const [name, setName] = useState('')
   const [cover, setCover] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -23,13 +25,13 @@ function CreatePlaylistModal({ onClose }: { onClose: () => void }): JSX.Element 
   return (
     <div className="cp-modal" onClick={onClose}>
       <div className="cp-modal__card view-enter" onClick={(e) => e.stopPropagation()}>
-        <button className="cp-modal__close" onClick={onClose} aria-label="Закрыть">
+        <button className="cp-modal__close" onClick={onClose} aria-label={t('playlist.closeLabel')}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
 
-        <h2 className="cp-modal__title">Новый плейлист</h2>
+        <h2 className="cp-modal__title">{t('playlist.newTitle')}</h2>
 
         <div className="cp-modal__body">
           <button
@@ -55,7 +57,7 @@ function CreatePlaylistModal({ onClose }: { onClose: () => void }): JSX.Element 
                   <circle cx="8.5" cy="10.5" r="1.6" stroke="currentColor" strokeWidth="1.4" />
                   <path d="M21 16l-5.5-5.5a1.5 1.5 0 0 0-2.1 0L4 19" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                 </svg>
-                <span>Выберите обложку</span>
+                <span>{t('playlist.chooseCover')}</span>
               </span>
             )}
             <span className="cp-modal__cover-hover">
@@ -63,7 +65,7 @@ function CreatePlaylistModal({ onClose }: { onClose: () => void }): JSX.Element 
                 <path d="M4 7h3l1.5-2h7L17 7h3v12H4V7Z" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
                 <circle cx="12" cy="13" r="3.5" stroke="#fff" strokeWidth="1.5" />
               </svg>
-              Изменить
+              {t('playlist.changeCover')}
             </span>
           </button>
           <input
@@ -78,26 +80,26 @@ function CreatePlaylistModal({ onClose }: { onClose: () => void }): JSX.Element 
           />
 
           <div className="cp-modal__fields">
-            <label className="cp-modal__label">Название</label>
+            <label className="cp-modal__label">{t('playlist.nameLabel')}</label>
             <input
               className="cp-modal__input"
-              placeholder="Например, «Вечерний плейлист»"
+              placeholder={t('playlist.namePlaceholder')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
               autoFocus
               maxLength={60}
             />
-            <p className="cp-modal__hint">Плейлист будет виден только вам — всё хранится локально.</p>
+            <p className="cp-modal__hint">{t('playlist.localHint')}</p>
           </div>
         </div>
 
         <div className="cp-modal__actions">
           <button className="cp-modal__cancel" onClick={onClose}>
-            Отмена
+            {t('common.cancel')}
           </button>
           <button className="cp-modal__confirm" onClick={submit} disabled={!name.trim()}>
-            Создать плейлист
+            {t('playlist.createBtn')}
           </button>
         </div>
       </div>
@@ -106,6 +108,7 @@ function CreatePlaylistModal({ onClose }: { onClose: () => void }): JSX.Element 
 }
 
 function CreatePlaylistCard(): JSX.Element {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
   return (
@@ -116,7 +119,7 @@ function CreatePlaylistCard(): JSX.Element {
             <path d="M11 3v16M3 11h16" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
           </svg>
         </span>
-        <span>Создать плейлист</span>
+        <span>{t('playlist.createBtn')}</span>
       </button>
       {open && <CreatePlaylistModal onClose={() => setOpen(false)} />}
     </>

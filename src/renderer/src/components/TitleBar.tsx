@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useAppVersion } from '../hooks/useAppVersion'
 import './TitleBar.css'
 
@@ -11,12 +12,20 @@ function handleClose(): void {
   window.api?.close()
 }
 
-function TitleBar(): JSX.Element {
+interface Props {
+  // When the navbar position setting is 'top', App renders TopBottomNav
+  // here instead of as its own bar below — same 40px transparent row, no
+  // separate opaque strip stacked under the window controls.
+  centerNav?: ReactNode
+}
+
+function TitleBar({ centerNav }: Props): JSX.Element {
   const version = useAppVersion()
   return (
     <div className="titlebar">
       <div className="titlebar__drag" />
       <div className="titlebar__version">{version}</div>
+      {centerNav && <div className="titlebar__center-nav">{centerNav}</div>}
       <div className="titlebar__controls">
         <button className="titlebar__btn" onClick={handleMinimize} aria-label="minimize">
           <svg width="10" height="10" viewBox="0 0 10 10">

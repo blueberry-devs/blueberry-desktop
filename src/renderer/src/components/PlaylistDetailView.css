@@ -59,8 +59,14 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
-.playlist-detail__play {
+.playlist-detail__actions {
   margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.playlist-detail__play {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -74,6 +80,34 @@
 
 .playlist-detail__play:hover {
   transform: translateY(-1px);
+}
+
+.playlist-detail__play:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+
+.playlist-detail__delete,
+.playlist-detail__fav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.5);
+  transition: color 0.15s, background 0.15s;
+}
+
+.playlist-detail__delete:hover,
+.playlist-detail__fav:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.playlist-detail__fav--active {
+  color: #ff4d6a;
 }
 
 .playlist-detail__tracks {

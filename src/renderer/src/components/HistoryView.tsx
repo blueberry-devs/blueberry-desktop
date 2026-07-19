@@ -1,31 +1,33 @@
 import { useHistory, clearHistory } from '../store/history'
 import { usePlayer } from '../player/PlayerContext'
 import { requestArtistSearch } from '../store/searchQuery'
+import { useTranslation } from '../utils/useTranslation'
 import TrackRow from './TrackRow'
 import './HistoryView.css'
 
 function HistoryView(): JSX.Element {
+  const { t } = useTranslation()
   const history = useHistory()
   const { playQueue } = usePlayer()
 
   return (
     <div className="history-view view-enter">
       <div className="history-view__header">
-        <h1 className="history-view__title">История</h1>
+        <h1 className="history-view__title">{t('history.title')}</h1>
         {history.length > 0 && (
           <button className="history-view__clear" onClick={clearHistory}>
-            Очистить
+            {t('history.clear')}
           </button>
         )}
       </div>
 
       {history.length === 0 ? (
         <div className="history-view__empty">
-          Здесь появятся треки, которые вы недавно слушали.
+          {t('history.empty')}
         </div>
       ) : (
         <>
-          <div className="history-view__hero-card" onClick={() => playQueue(history, 0)}>
+          <div className="history-view__hero-card hero-card--animated" onClick={() => playQueue(history, 0)}>
             <div className="history-view__hero-icon">
               <svg width="22" height="22" viewBox="0 0 18 18" fill="none">
                 <circle cx="9" cy="9" r="7" stroke="#fff" strokeWidth="1.4" />

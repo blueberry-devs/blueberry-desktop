@@ -21,9 +21,26 @@ export interface ResolvedStream {
   url: string
 }
 
+export interface PlaylistResult {
+  id: string
+  source: TrackSource
+  title: string
+  owner: string
+  cover: string | null
+  trackCount: number
+  description?: string
+}
+
 export interface SyncedLyricsResponse {
   synced: string | null
   plain: string | null
+}
+
+export interface PaginatedTracks {
+  tracks: TrackResult[]
+  total: number
+  offset: number
+  hasMore: boolean
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -45,9 +62,10 @@ async function getTrackList(path: string): Promise<TrackResult[]> {
   return filterExplicit(tracks)
 }
 
-// Track search (SearchView, Моя волна, genre topics) goes through SoundCloud
-// + YouTube (see searchTracksMulti below); the plain Yandex `/api/search` is
-// reserved server-side for charts/trends only, nothing here calls it.
+export function searchTracksYandex(query: string): Promise<TrackResult[]> {
+  return getTrackList(`/api/search?text=${encodeURIComponent(query)}`)
+}
+
 export function searchTracksSoundcloud(query: string): Promise<TrackResult[]> {
   return getTrackList(`/api/search/soundcloud?text=${encodeURIComponent(query)}`)
 }
@@ -56,23 +74,32 @@ export function searchTracksYoutube(query: string): Promise<TrackResult[]> {
   return getTrackList(`/api/search/youtube?text=${encodeURIComponent(query)}`)
 }
 
-// Merges SoundCloud + YouTube results, interleaved so neither source
-// dominates the top of the list. Either source failing (network hiccup,
-// yt-dlp unavailable) just falls back to whatever the other one found.
-// Both source calls already filter explicit content individually, so no
-// extra filtering needed here.
+export function searchPlaylists(query: string): Promise<PlaylistResult[]> {
+  return getJson(`/api/search/playlists?text=${encodeURIComponent(query)}`)
+}
+
+// Searches all sources (Yandex → SoundCloud → YouTube), deduped by
+// title+artist. Each source handles its own failure gracefully.
 export async function searchTracksMulti(query: string): Promise<TrackResult[]> {
-  const [sc, yt] = await Promise.all([
+  const [yandex, sc, yt] = await Promise.all([
+    searchTracksYandex(query).catch(() => []),
     searchTracksSoundcloud(query).catch(() => []),
     searchTracksYoutube(query).catch(() => [])
   ])
+  const seen = new Set<string>()
   const merged: TrackResult[] = []
-  const max = Math.max(sc.length, yt.length)
-  for (let i = 0; i < max; i++) {
-    if (sc[i]) merged.push(sc[i])
-    if (yt[i]) merged.push(yt[i])
+  for (const t of [...yandex, ...sc, ...yt]) {
+    const sig = `${t.artists[0] ?? ''}::${t.title}`.toLowerCase()
+    if (seen.has(sig)) continue
+    seen.add(sig)
+    merged.push(t)
   }
   return merged
+}
+
+export function getPlaylistTracks(playlistId: string, offset = 0, limit = 50): Promise<PaginatedTracks> {
+  const params = new URLSearchParams({ playlist_id: playlistId, offset: String(offset), limit: String(limit) })
+  return getJson(`/api/playlist/tracks?${params.toString()}`)
 }
 
 export function fetchTrends(): Promise<TrackResult[]> {
