@@ -30,7 +30,7 @@
   },
   "build": {
     "appId": "com.yandex.music.clone",
-    "productName": "Яндекс Музыка",
+    "productName": "Yandex Music",
     "icon": "resources/icon.png",
     "extraResources": [
       {
@@ -53,6 +53,7 @@
       "repo": "blueberry-desktop"
     },
     "win": {
+      "artifactName": "Yandex-Music-Setup.${version}.exe",
       "icon": "resources/icon.ico",
       "extraResources": [
         {
@@ -62,6 +63,7 @@
       ]
     },
     "linux": {
+      "artifactName": "Yandex-Music-${version}.AppImage",
       "icon": "resources/icon.png",
       "extraResources": [
         {
@@ -71,6 +73,7 @@
       ]
     },
     "mac": {
+      "artifactName": "Yandex-Music-${version}-${arch}.dmg",
       "icon": "resources/icon-mac.png",
       "extraResources": [
         {
