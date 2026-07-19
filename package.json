@@ -1,6 +1,6 @@
 {
   "name": "blueberry-desktop",
-  "version": "1.200.2",
+  "version": "1.200.3",
   "description": "Яндекс Музыка",
   "main": "./out/main/index.js",
   "author": "torusov",
@@ -30,7 +30,7 @@
   },
   "build": {
     "appId": "com.yandex.music.clone",
-    "productName": "Yandex Music",
+    "productName": "Yandex-Music",
     "icon": "resources/icon.png",
     "extraResources": [
       {
