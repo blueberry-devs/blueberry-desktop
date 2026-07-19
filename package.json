@@ -73,7 +73,8 @@
       ]
     },
     "mac": {
-      "artifactName": "Yandex-Music-${version}-${arch}.dmg",
+      "target": ["zip"],
+      "artifactName": "Yandex-Music-${version}-${arch}.zip",
       "icon": "resources/icon-mac.png",
       "extraResources": [
         {
