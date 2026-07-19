@@ -557,7 +557,20 @@ def video_stream(video_id: str, request: Request):
 
 # --- Artist splash images ----------------------------------------------
 
-_ARTIST_IMAGES_DIR = os.path.join(os.getcwd(), os.pardir, 'resources', 'artists')
+def _find_artist_images_dir():
+    _cwd = os.getcwd()
+    candidates = [
+        os.path.join(_cwd, os.pardir, 'artists'),               # prod: resources/server/ -> artists/
+        os.path.join(_cwd, os.pardir, 'resources', 'artists'),  # dev:  server/ -> resources/artists/
+        os.path.join(_cwd, 'artists'),                          # artists/ next to cwd
+    ]
+    for p in candidates:
+        absp = os.path.abspath(p)
+        if os.path.isdir(absp):
+            return absp
+    return os.path.abspath(candidates[0])
+
+_ARTIST_IMAGES_DIR = _find_artist_images_dir()
 
 
 @app.get('/api/artist-image/{name}')

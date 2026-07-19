@@ -13,9 +13,7 @@ const inFlight = new Set<string>()
  * coverage) so "favorite artists" always shows a real photo, not the track
  * cover, regardless of where the track was originally found.
  */
-const base = window.location.origin.includes('localhost') || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:8787'
-  : ''
+const base = 'http://localhost:8787'
 
 async function fetchArtistPhoto(name: string): Promise<string | null> {
   try {

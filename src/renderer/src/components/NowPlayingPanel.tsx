@@ -116,9 +116,7 @@ function NowPlayingPanel(): JSX.Element {
     const artistName = displayTrack.artists[0]?.toLowerCase() ?? ''
     const splash = ARTIST_SPLASHES[artistName]
     if (splash) {
-      const base = window.location.origin.includes('localhost') || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:8787'
-        : ''
+      const base = 'http://localhost:8787'
       coverEl = (
         <div className="now-playing__splash">
           <img className="now-playing__splash-img" src={`${base}${splash}`} alt="" />
