@@ -40,7 +40,13 @@ const api = {
     artworkUrl: string
     isPlaying: boolean
   }) => ipcRenderer.invoke('discord-update-presence', data),
-  discordClearPresence: () => ipcRenderer.invoke('discord-clear-presence')
+  discordClearPresence: () => ipcRenderer.invoke('discord-clear-presence'),
+  onNotification: (cb: (data: { type: string; title: string; message: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: { type: string; title: string; message: string }): void => cb(data)
+    ipcRenderer.on('notification:show', handler)
+    return () => ipcRenderer.removeListener('notification:show', handler)
+  },
+  restartApp: () => ipcRenderer.send('notification:action:restart')
 }
 
 if (process.contextIsolated) {

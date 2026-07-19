@@ -110,7 +110,7 @@ function DynamicIsland({ className = '', onExpand }: { className?: string; onExp
           <div className="dyn-island__meta">
             <div className="dyn-island__title">{currentTrack.title}</div>
             <div className="dyn-island__artist">
-              {isLoading ? 'Загрузка…' : currentTrack.artists.join(', ')}
+              {isLoading ? t('player.generating') : currentTrack.artists.join(', ')}
             </div>
           </div>
 

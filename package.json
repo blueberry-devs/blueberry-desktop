@@ -1,6 +1,6 @@
 {
   "name": "blueberry-desktop",
-  "version": "1.200.0",
+  "version": "1.200.1",
   "description": "Independent open-source desktop music player — search and play from SoundCloud/YouTube, lyrics, reactive shader background, no account required",
   "main": "./out/main/index.js",
   "author": "torusov",
