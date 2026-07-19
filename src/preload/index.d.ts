@@ -22,6 +22,15 @@ interface WindowApi {
   removeDownload: (filePath: string) => Promise<void>
   onSidecarReady: (cb: () => void) => () => void
   getAppVersion: () => Promise<string>
+  discordUpdatePresence: (data: {
+    trackName: string
+    artist: string
+    currentTime: number
+    duration: number
+    artworkUrl: string
+    isPlaying: boolean
+  }) => Promise<void>
+  discordClearPresence: () => Promise<void>
 }
 
 declare global {

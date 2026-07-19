@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { TrackResult } from '../api/yandexMusic'
 import { addTrackToPlaylist, createPlaylist, usePlaylists } from '../store/playlists'
+import { useTranslation } from '../utils/useTranslation'
 import './AddToPlaylistMenu.css'
 
 function AddToPlaylistMenu({ track }: { track: TrackResult }): JSX.Element {
@@ -8,6 +9,7 @@ function AddToPlaylistMenu({ track }: { track: TrackResult }): JSX.Element {
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [added, setAdded] = useState<string | null>(null)
+  const { t } = useTranslation()
   const playlists = usePlaylists()
   const ref = useRef<HTMLDivElement>(null)
 
@@ -46,7 +48,7 @@ function AddToPlaylistMenu({ track }: { track: TrackResult }): JSX.Element {
           e.stopPropagation()
           setOpen((v) => !v)
         }}
-        title="Добавить в плейлист"
+        title={t('wave.addToPlaylist')}
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -57,7 +59,7 @@ function AddToPlaylistMenu({ track }: { track: TrackResult }): JSX.Element {
       {open && (
         <div className="add-to-playlist__menu" onClick={(e) => e.stopPropagation()}>
           {playlists.length === 0 && !creating && (
-            <div className="add-to-playlist__empty">Плейлистов пока нет</div>
+            <div className="add-to-playlist__empty">{t('wave.playlistsEmpty')}</div>
           )}
           {playlists.map((p) => (
             <button key={p.id} className="add-to-playlist__item" onClick={() => handleAdd(p.id)}>
@@ -72,7 +74,7 @@ function AddToPlaylistMenu({ track }: { track: TrackResult }): JSX.Element {
               <input
                 autoFocus
                 className="add-to-playlist__input"
-                placeholder="Название плейлиста"
+                placeholder={t('playlist.namePlaceholder')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
@@ -83,7 +85,7 @@ function AddToPlaylistMenu({ track }: { track: TrackResult }): JSX.Element {
             </div>
           ) : (
             <button className="add-to-playlist__new" onClick={() => setCreating(true)}>
-              + Создать плейлист
+              {t('playlist.createBtn')}
             </button>
           )}
         </div>

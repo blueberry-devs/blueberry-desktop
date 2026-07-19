@@ -19,7 +19,8 @@ import requests
 import yt_dlp
 from cachetools import TTLCache
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from yandex_music import Client
 from yandex_music.exceptions import YandexMusicError
@@ -80,6 +81,20 @@ def sc_upsize(url: Optional[str]) -> Optional[str]:
     return url.replace('-large.jpg', '-t500x500.jpg')
 
 
+def serialize_playlist(pid: str, source: str, title: str, owner: str,
+                       cover: Optional[str], track_count: int,
+                       description: str = '') -> dict:
+    return {
+        'id': f'{source}:{pid}',
+        'source': source,
+        'title': title,
+        'owner': owner,
+        'cover': cover,
+        'trackCount': track_count,
+        'description': description,
+    }
+
+
 def track_id(t) -> str:
     return f'yandex:{t.id}:{t.albums[0].id}' if t.albums else f'yandex:{t.id}'
 
@@ -133,6 +148,99 @@ def trends():
 @app.get('/api/search/youtube')
 def search_youtube(text: str):
     return yt_search(text, limit=20)
+
+
+_sc_search_cache: dict = TTLCache(maxsize=1000, ttl=3600)
+_pl_tracks_cache: dict = TTLCache(maxsize=500, ttl=600)
+
+
+@app.get('/api/playlist/tracks')
+def playlist_tracks(playlist_id: str, offset: int = 0, limit: int = 50):
+    """Fetch paginated tracks for a Yandex Music playlist."""
+    if not playlist_id.startswith('yandex:'):
+        raise HTTPException(status_code=400, detail='Only Yandex playlists supported')
+    parts = playlist_id.split(':', 2)
+    if len(parts) < 3:
+        raise HTTPException(status_code=400, detail='Invalid playlist ID, expected yandex:{uid}:{kind}')
+    uid, kind = parts[1], parts[2]
+    if _client is None:
+        raise HTTPException(status_code=503, detail='Yandex Music client unavailable')
+    cache_key = playlist_id
+    all_tracks = _pl_tracks_cache.get(cache_key)
+    if all_tracks is None:
+        try:
+            playlist = _client.users_playlists(kind=int(kind), user_id=uid)
+        except YandexMusicError as exc:
+            logger.warning('failed to fetch playlist tracks: %s', exc)
+            raise HTTPException(status_code=404, detail='Playlist not found')
+        if not playlist:
+            raise HTTPException(status_code=404, detail='Playlist not found')
+        try:
+            short_tracks = playlist.fetch_tracks()
+        except YandexMusicError as exc:
+            logger.warning('failed to fetch playlist track details: %s', exc)
+            raise HTTPException(status_code=502, detail='Failed to fetch track details')
+        all_tracks = []
+        for st in short_tracks:
+            if st and st.track:
+                try:
+                    all_tracks.append(serialize_track(st.track))
+                except Exception as exc:
+                    logger.warning('skipping unparseable playlist track: %s', exc)
+        _pl_tracks_cache[cache_key] = all_tracks
+    total = len(all_tracks)
+    page = all_tracks[offset:offset + limit]
+    return {
+        'tracks': page,
+        'total': total,
+        'offset': offset,
+        'hasMore': (offset + limit) < total,
+    }
+
+
+@app.get('/api/search/playlists')
+def search_playlists(text: str):
+    """Search playlists across Yandex Music and SoundCloud."""
+    results = []
+    # Yandex Music playlist search
+    if _client is not None:
+        try:
+            yandex_result = _client.search(text, type_='playlist')
+            if yandex_result and yandex_result.playlists:
+                for pl in yandex_result.playlists.results[:10]:
+                    cover = None
+                    if hasattr(pl, 'cover') and pl.cover:
+                        cover = cover_url(getattr(pl.cover, 'uri', None))
+                    owner_name = pl.owner.name if pl.owner else 'Яндекс'
+                    results.append(serialize_playlist(
+                        pid=str(pl.owner.uid) + ':' + str(pl.kind) if pl.owner else str(pl.kind),
+                        source='yandex',
+                        title=pl.title,
+                        owner=owner_name,
+                        cover=cover,
+                        track_count=pl.track_count,
+                    ))
+        except YandexMusicError as exc:
+            logger.warning('yandex playlist search failed: %s', exc)
+    # SoundCloud playlist search
+    try:
+        data = sc_get(f'{SOUNDCLOUD_API}/search/playlists', {'q': text, 'limit': 10})
+        for pl in (data.get('collection') or []):
+            if pl.get('kind') != 'playlist' or pl.get('policy') == 'BLOCK':
+                continue
+            user = pl.get('user') or {}
+            results.append(serialize_playlist(
+                pid=str(pl['id']),
+                source='soundcloud',
+                title=pl.get('title') or 'Unknown',
+                owner=user.get('username') or 'SoundCloud',
+                cover=sc_upsize(pl.get('artwork_url')),
+                track_count=pl.get('track_count', 0),
+                description=pl.get('description') or '',
+            ))
+    except requests.RequestException as exc:
+        logger.warning('soundcloud playlist search failed: %s', exc)
+    return results
 
 
 _sc_search_cache: dict = TTLCache(maxsize=1000, ttl=3600)
@@ -311,54 +419,186 @@ def yt_resolve_stream(video_id: str) -> Optional[str]:
 
 
 # --- Background video clip (fullscreen player) --------------------------
-# Capped at 480p and video-only (no audio track) — this plays muted behind
-# the UI purely as visual background while the real audio comes from the
-# track's own stream, so there's no reason to fetch anything heavier.
-YTDLP_CLIP_SEARCH_OPTS = {
+_YT_BASE_OPTS = {
     'quiet': True,
     'no_warnings': True,
-    'extract_flat': True,
     'skip_download': True,
-    'default_search': 'ytsearch1',
     'noplaylist': True,
+    'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
 }
 
-YTDLP_CLIP_STREAM_OPTS = {
-    'quiet': True,
-    'no_warnings': True,
-    'skip_download': True,
-    'format': 'best[height<=480][acodec=none]/best[height<=480]/worst',
-    'noplaylist': True,
-}
+
+def _yt_extract(url: str, **extra_opts):
+    """Try yt-dlp extract; fall back to cookiesfrombrowser on bot detection."""
+    for attempt in range(3):
+        opts = dict(_YT_BASE_OPTS, **extra_opts)
+        if attempt >= 1:
+            for browser in ('chrome', 'edge', 'brave', 'opera', 'firefox'):
+                try:
+                    opts['cookiesfrombrowser'] = (browser,)
+                    with yt_dlp.YoutubeDL(opts) as ydl:
+                        return ydl.extract_info(url, download=False)
+                except Exception:
+                    continue
+            raise RuntimeError('All browser cookie extraction attempts failed')
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                return ydl.extract_info(url, download=False)
+        except Exception as exc:
+            msg = str(exc)
+            if 'Sign in to confirm' in msg or 'bot' in msg.lower():
+                logger.info('[yt-dlp] Bot detection, retrying with cookies (%d)', attempt + 1)
+                continue
+            raise
+    raise RuntimeError('yt-dlp extraction failed after retries')
 
 _clip_cache: dict = TTLCache(maxsize=1000, ttl=6 * 3600)
 
 
 @app.get('/api/video/clip')
-def video_clip(title: str, artist: str = ''):
+def video_clip(title: str, artist: str = '', request: Request = None):
     cache_key = f'{artist.lower()}\x00{title.lower()}'
     if cache_key in _clip_cache:
         return {'url': _clip_cache[cache_key]}
 
-    query = f'{artist} {title} official video'.strip()
+    # Dev test: local numb.mp4 for Linkin Park - Numb
+    _is_numb_test = (
+        'linkin park' in artist.lower() and 'numb' in title.lower()
+    )
+    if _is_numb_test:
+        _probe = os.path.join(os.getcwd(), os.pardir, 'resources', 'numb.mp4')
+        _probe = os.path.abspath(_probe)
+        if os.path.exists(_probe):
+            import pathlib
+            url = pathlib.Path(_probe).as_uri()
+            logger.info('[100%%] Using local test video: %s', url)
+            _clip_cache[cache_key] = url
+            return {'url': url}
+
+    queries = [f'ytsearch5:{artist} {title}'.strip()]
+    if artist:
+        queries.append(f'ytsearch5:{artist} {title} official video'.strip())
+    queries.append(f'ytsearch5:{title}'.strip())
+
+    video_id = None
+    for query in queries:
+        logger.info('[25%%] Searching YouTube for clip: %s', query)
+        try:
+            search_info = _yt_extract(query, extract_flat=True)
+            entries = (search_info or {}).get('entries') or []
+            logger.info('[50%%] Found %d results', len(entries))
+            video_id = entries[0]['id'] if entries else None
+            if video_id:
+                logger.info('[100%%] Found video ID: %s', video_id)
+                break
+        except Exception as exc:
+            logger.warning('clip query %r failed: %s', query, exc)
+            continue
+
+    if not video_id:
+        logger.info('[100%%] No video found for %s - %s', artist, title)
+        _clip_cache[cache_key] = None
+        return {'url': None}
+
+    base = str(request.base_url).rstrip('/') if request else 'http://localhost:8787'
+    proxy_url = f'{base}/api/video/stream/{video_id}'
+    _clip_cache[cache_key] = proxy_url
+    logger.info('[100%%] Proxy URL: %s', proxy_url)
+    return {'url': proxy_url}
+
+
+@app.get('/api/video/stream/{video_id}')
+def video_stream(video_id: str, request: Request):
+    if not video_id:
+        raise HTTPException(400, 'video_id required')
+
+    logger.info('[video_stream] Resolving stream for %s', video_id)
     try:
-        with yt_dlp.YoutubeDL(YTDLP_CLIP_SEARCH_OPTS) as ydl:
-            search_info = ydl.extract_info(query, download=False)
-        entries = (search_info or {}).get('entries') or []
-        video_id = entries[0]['id'] if entries else None
-        if not video_id:
-            _clip_cache[cache_key] = None
-            return {'url': None}
-
-        with yt_dlp.YoutubeDL(YTDLP_CLIP_STREAM_OPTS) as ydl:
-            info = ydl.extract_info(f'https://www.youtube.com/watch?v={video_id}', download=False)
-        url = (info or {}).get('url')
+        info = _yt_extract(
+            f'https://www.youtube.com/watch?v={video_id}',
+            format='best[height<=720][acodec=none]/best[height<=720][ext=mp4]/best[height<=720]/best',
+        )
+        stream_url = (info or {}).get('url')
+        if not stream_url:
+            raise HTTPException(502, 'Failed to resolve stream URL')
     except Exception as exc:
-        logger.warning('background clip resolve failed for %r: %s', query, exc)
-        url = None
+        logger.warning('stream resolve failed for %s: %s', video_id, exc)
+        raise HTTPException(502, f'Stream resolution failed: {exc}')
 
-    _clip_cache[cache_key] = url
-    return {'url': url}
+    yt_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.youtube.com/',
+        'Origin': 'https://www.youtube.com',
+    }
+
+    range_header = request.headers.get('range')
+    if range_header:
+        yt_headers['Range'] = range_header
+
+    try:
+        r = requests.get(stream_url, headers=yt_headers, stream=True, timeout=30)
+        r.raise_for_status()
+
+        resp_headers = {}
+        for key in ('content-type', 'content-length', 'content-range', 'accept-ranges'):
+            val = r.headers.get(key)
+            if val:
+                resp_headers[key] = val
+
+        return StreamingResponse(
+            r.iter_content(chunk_size=65536),
+            status_code=r.status_code,
+            headers=resp_headers,
+        )
+    except requests.RequestException as exc:
+        logger.warning('stream proxy failed for %s: %s', video_id, exc)
+        raise HTTPException(502, f'Stream proxy failed: {exc}')
+
+
+# --- Artist splash images ----------------------------------------------
+
+_ARTIST_IMAGES_DIR = os.path.join(os.getcwd(), os.pardir, 'resources', 'artists')
+
+
+@app.get('/api/artist-image/{name}')
+def artist_image(name: str):
+    safe = name.lower().replace(' ', '-')
+    path = os.path.join(_ARTIST_IMAGES_DIR, f'{safe}.png')
+    path = os.path.abspath(path)
+    if not os.path.exists(path):
+        raise HTTPException(404)
+    return FileResponse(path, media_type='image/png')
+
+
+# --- Artist photo via Deezer public API --------------------------------
+
+_artist_photo_cache: dict = TTLCache(maxsize=500, ttl=86400)
+
+
+@app.get('/api/artist-photo')
+def artist_photo(name: str):
+    cached = _artist_photo_cache.get(name.lower())
+    if cached:
+        return {'url': cached}
+
+    try:
+        r = requests.get(
+            'https://api.deezer.com/search/artist',
+            params={'q': name, 'limit': 1, 'index': 0},
+            timeout=10,
+        )
+        data = r.json()
+        artists = data.get('data') or []
+        if artists:
+            url = artists[0].get('picture_xl') or artists[0].get('picture_big') or artists[0].get('picture_medium')
+            if url:
+                _artist_photo_cache[name.lower()] = url
+                return {'url': url}
+    except Exception as exc:
+        logger.warning('artist photo lookup failed for %r: %s', name, exc)
+
+    _artist_photo_cache[name.lower()] = None
+    return {'url': None}
 
 
 # --- SoundCloud playback -----------------------------------------------

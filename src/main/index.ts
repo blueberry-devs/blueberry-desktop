@@ -1,9 +1,14 @@
 import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron'
+
+app.commandLine.appendSwitch('enable-accelerated-video-decode')
+app.commandLine.appendSwitch('ignore-gpu-blocklist')
+app.commandLine.appendSwitch('enable-gpu-rasterization')
 import { join } from 'path'
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs'
 import { spawn, execSync, ChildProcessWithoutNullStreams } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
+import { updatePresence, clearPresence, destroy as destroyDiscord } from './discord'
 
 let sidecar: ChildProcessWithoutNullStreams | null = null
 let tray: Tray | null = null
@@ -144,6 +149,7 @@ function stopSidecar(): void {
 }
 
 function createWindow(): void {
+  const iconName = process.platform === 'win32' ? (is.dev ? 'icon-dev.ico' : 'icon.ico') : (is.dev ? 'icon-dev.png' : 'icon.png')
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -152,9 +158,7 @@ function createWindow(): void {
     frame: false,
     title: 'Яндекс Музыка',
     backgroundColor: '#000000',
-    // .ico carries multiple embedded resolutions — crisper taskbar/alt-tab
-    // icon on Windows than a single PNG.
-    icon: join(__dirname, process.platform === 'win32' ? '../../resources/icon.ico' : '../../resources/icon.png'),
+    icon: join(__dirname, `../../resources/${iconName}`),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -166,6 +170,10 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+    if (is.dev) {
+      mainWindow.webContents.openDevTools()
+      console.log('[dev] DevTools opened')
+    }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -187,6 +195,17 @@ function createWindow(): void {
   })
   ipcMain.on('window-close', () => mainWindow.close())
 
+  // F12 toggle DevTools
+  mainWindow.webContents.on('before-input-event', (_, input) => {
+    if (input.key === 'F12') {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools()
+      } else {
+        mainWindow.webContents.openDevTools()
+      }
+    }
+  })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -197,10 +216,8 @@ function createWindow(): void {
 }
 
 function createTray(mainWindow: BrowserWindow): void {
-  const iconPath = join(
-    __dirname,
-    process.platform === 'win32' ? '../../resources/icon.ico' : '../../resources/icon.png'
-  )
+  const iconName = process.platform === 'win32' ? (is.dev ? 'icon-dev.ico' : 'icon.ico') : (is.dev ? 'icon-dev.png' : 'icon.png')
+  const iconPath = join(__dirname, `../../resources/${iconName}`)
   tray = new Tray(nativeImage.createFromPath(iconPath))
   tray.setToolTip('Яндекс Музыка')
 
@@ -422,6 +439,34 @@ ipcMain.handle('download-remove', (_event, filePath: string): Promise<void> => {
 
 ipcMain.handle('get-app-version', (): string => app.getVersion())
 
+// ===================== DISCORD RPC =====================
+ipcMain.handle(
+  'discord-update-presence',
+  (
+    _event,
+    data: {
+      trackName: string
+      artist: string
+      currentTime: number
+      duration: number
+      artworkUrl: string
+      isPlaying: boolean
+    }
+  ): void => {
+    updatePresence({
+      trackName: data.trackName,
+      artist: data.artist,
+      currentTime: data.currentTime,
+      duration: data.duration,
+      artworkUrl: data.artworkUrl || undefined,
+    })
+  }
+)
+
+ipcMain.handle('discord-clear-presence', (): void => {
+  clearPresence()
+})
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.blueberry.desktop')
   app.name = 'Яндекс Музыка'
@@ -448,4 +493,5 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   isQuitting = true
   stopSidecar()
+  destroyDiscord()
 })

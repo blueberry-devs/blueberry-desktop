@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { AnimatePresence } from 'motion/react'
 import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
+import TopBottomNav from './components/TopBottomNav'
 import DynamicIsland from './components/DynamicIsland'
 import SplashScreen from './components/SplashScreen'
 // Not lazy: this mounts/unmounts on every open/close through AnimatePresence,
@@ -138,9 +139,15 @@ function AppInner(): JSX.Element {
         </div>
       </Suspense>
 
-      <TitleBar />
+      <TitleBar
+        centerNav={
+          profile.navbarPosition === 'top' ? (
+            <TopBottomNav activeTab={activeTab} onSelectTab={selectTab} position="top" />
+          ) : undefined
+        }
+      />
       <div className="app__body">
-        <Sidebar activeTab={activeTab} onSelectTab={selectTab} />
+        {profile.navbarPosition === 'left' && <Sidebar activeTab={activeTab} onSelectTab={selectTab} />}
 
         <div className={`app__content${showMiniPlayer && currentTrack ? ' app__content--with-player' : ''}`}>
           {activeTab === 'wave' && (
@@ -156,6 +163,9 @@ function AppInner(): JSX.Element {
           {activeTab === 'settings' && <Suspense fallback={null}><SettingsView /></Suspense>}
         </div>
       </div>
+      {profile.navbarPosition === 'bottom' && (
+        <TopBottomNav activeTab={activeTab} onSelectTab={selectTab} position="bottom" />
+      )}
 
       {showMiniPlayer && currentTrack && <DynamicIsland onExpand={() => setActiveTab('wave')} />}
       <AnimatePresence>

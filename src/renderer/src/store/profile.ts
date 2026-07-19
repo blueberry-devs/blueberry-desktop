@@ -7,18 +7,22 @@ export type Theme = 'light' | 'black'
 export interface Profile {
   nickname: string
   theme: Theme
-  // Explicit (18+) tracks are always badged; this controls whether they're
-  // filtered out of search/wave/charts results entirely. On by default —
-  // matches how it behaved before this setting existed, and only actually
-  // does anything once the user turns it off.
   allowExplicit: boolean
-  // Fullscreen player tries to find a matching YouTube video clip and use it
-  // as the background instead of the blurred cover — off switches back to
-  // the blurred cover unconditionally (no search request made at all).
   videoBackground: boolean
+  navbarPosition: NavbarPosition
+  language: string
 }
 
-const DEFAULT_PROFILE: Profile = { nickname: '', theme: 'black', allowExplicit: true, videoBackground: true }
+export type NavbarPosition = 'left' | 'top' | 'bottom'
+
+const DEFAULT_PROFILE: Profile = {
+  nickname: '',
+  theme: 'black',
+  allowExplicit: true,
+  videoBackground: true,
+  navbarPosition: 'left',
+  language: 'ru'
+}
 
 let cache: Profile = load()
 const listeners = new Set<() => void>()
@@ -71,6 +75,16 @@ export function setAllowExplicit(allowExplicit: boolean): void {
 
 export function setVideoBackground(videoBackground: boolean): void {
   cache = { ...cache, videoBackground }
+  emit()
+}
+
+export function setNavbarPosition(navbarPosition: NavbarPosition): void {
+  cache = { ...cache, navbarPosition }
+  emit()
+}
+
+export function setLanguage(language: string): void {
+  cache = { ...cache, language }
   emit()
 }
 

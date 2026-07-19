@@ -1,0 +1,79 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  SOUNDCLOUD_CLIENT_ID: ${{ secrets.SOUNDCLOUD_CLIENT_ID }}
+  YANDEX_PROXY_URL: ${{ secrets.YANDEX_PROXY_URL }}
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            dist-flag: --win
+            artifact: blueberry-win
+            server-script: scripts\build-server.bat
+
+          - os: macos-latest
+            dist-flag: --mac
+            artifact: blueberry-mac
+            server-script: bash scripts/build-server.sh
+
+          - os: ubuntu-latest
+            dist-flag: --linux
+            artifact: blueberry-linux
+            server-script: bash scripts/build-server.sh
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install Python deps
+        working-directory: server
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Install Node deps
+        run: pnpm install
+
+      - name: Build server sidecar
+        run: ${{ matrix.server-script }}
+
+      - name: Build and package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pnpm run build
+          pnpm dlx electron-builder ${{ matrix.dist-flag }} --publish onTagOrDraft
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request'
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/*
+          if-no-files-found: warn

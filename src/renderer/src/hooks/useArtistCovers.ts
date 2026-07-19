@@ -13,6 +13,20 @@ const inFlight = new Set<string>()
  * coverage) so "favorite artists" always shows a real photo, not the track
  * cover, regardless of where the track was originally found.
  */
+const base = window.location.origin.includes('localhost') || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8787'
+  : ''
+
+async function fetchArtistPhoto(name: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${base}/api/artist-photo?name=${encodeURIComponent(name)}`)
+    const data = await r.json()
+    return data.url ?? null
+  } catch {
+    return null
+  }
+}
+
 export function useArtistCovers(missing: { name: string; trackTitle: string }[]): Map<string, string | null> {
   const [, forceRender] = useState(0)
 
@@ -25,9 +39,13 @@ export function useArtistCovers(missing: { name: string; trackTitle: string }[])
         searchTracksSoundcloud(m.name)
           .then((results) => {
             const match = results.find((r) => r.artistCover) ?? null
-            cache.set(m.name, match?.artistCover ?? null)
+            if (match?.artistCover) {
+              cache.set(m.name, match.artistCover)
+              return
+            }
+            return fetchArtistPhoto(m.name).then((url) => cache.set(m.name, url))
           })
-          .catch(() => cache.set(m.name, null))
+          .catch(() => fetchArtistPhoto(m.name).then((url) => cache.set(m.name, url)))
           .finally(() => inFlight.delete(m.name))
       )
     ).then(() => forceRender((n) => n + 1))

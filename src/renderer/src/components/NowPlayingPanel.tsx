@@ -3,12 +3,20 @@ import { usePlayer } from '../player/PlayerContext'
 import { useWaveFeed } from '../player/useWaveFeed'
 import { toggleLike, useIsLiked } from '../store/likes'
 import { usePlaylists, addTrackToPlaylist } from '../store/playlists'
+import { useTranslation } from '../utils/useTranslation'
 import { Volume2Icon, Mic2Icon, Maximize2Icon } from './icons'
 import heartIcon from '../assets/heart.png'
 import heartSlashIcon from '../assets/heart-slash.png'
 import ServiceBadge from './ServiceBadge'
 import VolumeSlider from './VolumeSlider'
 import './NowPlayingPanel.css'
+
+const ARTIST_SPLASHES: Record<string, string> = {
+  'skillet': '/api/artist-image/skillet',
+  'linkin park': '/api/artist-image/linkin-park',
+  'limp bizkit': '/api/artist-image/limp-bizkit',
+  'disturbed': '/api/artist-image/disturbed',
+}
 
 function formatTime(s: number): string {
   if (!s || !isFinite(s)) return '0:00'
@@ -18,6 +26,7 @@ function formatTime(s: number): string {
 }
 
 function NowPlayingPanel(): JSX.Element {
+  const { t } = useTranslation()
   const { waveTrack, isGenerating, skip } = useWaveFeed()
   const {
     currentTrack,
@@ -102,38 +111,56 @@ function NowPlayingPanel(): JSX.Element {
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
+  let coverEl: JSX.Element | null = null
+  if (displayTrack) {
+    const artistName = displayTrack.artists[0]?.toLowerCase() ?? ''
+    const splash = ARTIST_SPLASHES[artistName]
+    if (splash) {
+      const base = window.location.origin.includes('localhost') || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:8787'
+        : ''
+      coverEl = (
+        <div className="now-playing__splash">
+          <img className="now-playing__splash-img" src={`${base}${splash}`} alt="" />
+        </div>
+      )
+    } else {
+      coverEl = (
+        <div className="now-playing__cover" onClick={() => currentTrack && openLyrics()}>
+          {displayTrack.cover ? (
+            <img src={displayTrack.cover} alt="" />
+          ) : (
+            <span className="now-playing__cover-placeholder" />
+          )}
+          <span className="now-playing__cover-badge">
+            <ServiceBadge source={displayTrack.source} size={18} />
+          </span>
+          {!currentTrack && (
+            <button className="now-playing__cover-play" onClick={handlePlayWave} aria-label="play">
+              <svg width="28" height="28" viewBox="0 0 20 20" fill="none">
+                <path d="M6 4l11 6-11 6Z" fill="#000" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )
+    }
+  }
+
   return (
     <div className="now-playing">
       <div className="now-playing__inner">
-        <h1 className="now-playing__artist">
-          {displayTrack?.artists.join(', ') ?? (isGenerating ? 'Загрузка...' : 'Моя волна')}
+        <h1 className={`now-playing__artist${ARTIST_SPLASHES[displayTrack?.artists[0]?.toLowerCase() ?? ''] ? ' now-playing__artist--splash' : ''}`}>
+          {displayTrack?.artists.join(', ') ?? (isGenerating ? t('player.generating') : t('sidebar.wave'))}
         </h1>
 
-        {displayTrack && (
-          <div className="now-playing__cover" onClick={() => currentTrack && openLyrics()}>
-            {displayTrack.cover ? (
-              <img src={displayTrack.cover} alt="" />
-            ) : (
-              <span className="now-playing__cover-placeholder" />
-            )}
-            <span className="now-playing__cover-badge">
-              <ServiceBadge source={displayTrack.source} size={18} />
-            </span>
-            {!currentTrack && (
-              <button className="now-playing__cover-play" onClick={handlePlayWave} aria-label="play">
-                <svg width="28" height="28" viewBox="0 0 20 20" fill="none">
-                  <path d="M6 4l11 6-11 6Z" fill="#000" />
-                </svg>
-              </button>
-            )}
-          </div>
-        )}
+        {coverEl}
 
         <div className="now-playing__island-row">
         <div className="now-playing__vol-wrap">
           <button
             className="now-playing__side-btn"
-            title="Громкость"
+            title={t('player.volume')}
             onClick={() => setShowVolume((v) => !v)}
           >
             <Volume2Icon size={22} />
@@ -149,7 +176,7 @@ function NowPlayingPanel(): JSX.Element {
             className={`now-playing__side-btn${liked ? ' now-playing__side-btn--liked' : ''}`}
             onClick={() => displayTrack && toggleLike(displayTrack)}
             disabled={!hasTrack}
-            title={liked ? 'Не нравится' : 'Мне нравится'}
+            title={liked ? t('player.unlike') : t('player.like')}
           >
             <img className="now-playing__heart-icon" src={liked ? heartIcon : heartSlashIcon} alt="" />
           </button>
@@ -177,7 +204,7 @@ function NowPlayingPanel(): JSX.Element {
             className="now-playing__side-btn"
             onClick={() => currentTrack && openLyrics()}
             disabled={!currentTrack}
-            title="Развернуть"
+            title={t('common.expand')}
           >
             <Maximize2Icon size={21} />
           </button>
@@ -187,7 +214,7 @@ function NowPlayingPanel(): JSX.Element {
               className="now-playing__side-btn"
               onClick={() => setShowMenu((v) => !v)}
               disabled={!hasTrack}
-              title="Ещё"
+              title={t('common.more')}
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                 <circle cx="4" cy="9" r="1.5" fill="currentColor" />
@@ -208,7 +235,7 @@ function NowPlayingPanel(): JSX.Element {
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  Моя волна по треку
+                  {t('wave.byTrack')}
                 </button>
                 <button
                   className="now-playing__dropdown-item"
@@ -220,12 +247,12 @@ function NowPlayingPanel(): JSX.Element {
                     <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                     <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                   </svg>
-                  Добавить в плейлист
+                  {t('wave.addToPlaylist')}
                 </button>
                 {showPlaylists && displayTrack && (
                   <div className="now-playing__dropdown-sub">
                     {playlists.length === 0 ? (
-                      <div className="now-playing__dropdown-empty">Нет плейлистов</div>
+                      <div className="now-playing__dropdown-empty">{t('wave.noPlaylists')}</div>
                     ) : (
                       playlists.map((p) => (
                         <button
@@ -254,7 +281,7 @@ function NowPlayingPanel(): JSX.Element {
                   }}
                 >
                   <Mic2Icon size={16} />
-                  Текст песни
+                  {t('player.lyrics')}
                 </button>
                 {currentTrack && (
                   <>
@@ -266,7 +293,7 @@ function NowPlayingPanel(): JSX.Element {
                       }}
                     >
                       <ServiceBadge source="soundcloud" size={16} />
-                      Слушать через SoundCloud
+                      {t('wave.listenVia').replace('{source}', 'SoundCloud')}
                     </button>
                     <button
                       className="now-playing__dropdown-item"
@@ -276,7 +303,7 @@ function NowPlayingPanel(): JSX.Element {
                       }}
                     >
                       <ServiceBadge source="youtube" size={16} />
-                      Слушать через YouTube
+                      {t('wave.listenVia').replace('{source}', 'YouTube')}
                     </button>
                   </>
                 )}
@@ -286,7 +313,7 @@ function NowPlayingPanel(): JSX.Element {
         </div>
 
         <div className="now-playing__transport">
-          <button className="now-playing__transport-btn" onClick={previous} disabled={!currentTrack} title="Назад">
+          <button className="now-playing__transport-btn" onClick={previous} disabled={!currentTrack} title={t('player.prev')}>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path d="M13 4L5 10L13 16V4Z" fill="currentColor" />
               <rect x="3" y="5" width="2" height="10" fill="currentColor" />
@@ -297,7 +324,7 @@ function NowPlayingPanel(): JSX.Element {
             className="now-playing__play-btn"
             onClick={currentTrack ? togglePlay : handlePlayWave}
             disabled={!hasTrack}
-            title={isPlaying ? 'Пауза' : 'Играть'}
+            title={isPlaying ? t('player.pause') : t('player.play')}
           >
             {isLoading ? (
               <span className="now-playing__spinner" />
@@ -313,7 +340,7 @@ function NowPlayingPanel(): JSX.Element {
             )}
           </button>
 
-          <button className="now-playing__transport-btn" onClick={next} disabled={!currentTrack} title="Вперёд">
+          <button className="now-playing__transport-btn" onClick={next} disabled={!currentTrack} title={t('player.next')}>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path d="M7 4L15 10L7 16V4Z" fill="currentColor" />
               <rect x="15" y="5" width="2" height="10" fill="currentColor" />

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { fetchTrends, searchTracksSoundcloud, TrackResult } from '../api/yandexMusic'
+import { fetchTrends, searchTracksMulti, TrackResult } from '../api/yandexMusic'
 import { usePlayer } from '../player/PlayerContext'
 import { useLikedTracks } from '../store/likes'
 import { useHistory } from '../store/history'
+import { useTranslation } from '../utils/useTranslation'
 import { useArtistCovers } from '../hooks/useArtistCovers'
 import { requestArtistSearch } from '../store/searchQuery'
 import TrackRow from './TrackRow'
@@ -10,36 +11,6 @@ import './TrendsView.css'
 
 type TopTab = 'foryou' | 'trends'
 type AiSetFilter = 'top' | 'genre' | 'mood' | 'activity'
-
-const AI_SET_FILTERS: { id: AiSetFilter; label: string }[] = [
-  { id: 'top', label: 'Топ' },
-  { id: 'genre', label: 'по жанру' },
-  { id: 'mood', label: 'под настроение' },
-  { id: 'activity', label: 'под занятие' }
-]
-
-const AI_SET_CARDS: Record<AiSetFilter, { kicker: string; label: string; query: string }[]> = {
-  top: [
-    { kicker: 'Сет Моей волны под занятие', label: 'Бег', query: 'running workout' },
-    { kicker: 'Сет Моей волны под настроение', label: 'Энергичное', query: 'energetic hype' },
-    { kicker: 'Сет Моей волны под занятие', label: 'Тренируюсь', query: 'gym workout' }
-  ],
-  genre: [
-    { kicker: 'Моя волна по жанру', label: 'Рок', query: 'рок' },
-    { kicker: 'Моя волна по жанру', label: 'Хип-хоп', query: 'хип-хоп' },
-    { kicker: 'Моя волна по жанру', label: 'Электроника', query: 'электроника' }
-  ],
-  mood: [
-    { kicker: 'Моя волна по настроению', label: 'Энергичное', query: 'energetic' },
-    { kicker: 'Моя волна по исполнителю', label: 'Slipknot', query: 'Slipknot' },
-    { kicker: 'Моя волна по настроению', label: 'Крутое', query: 'badass rock' }
-  ],
-  activity: [
-    { kicker: 'Сет Моей волны под занятие', label: 'Бег', query: 'running' },
-    { kicker: 'Сет Моей волны под занятие', label: 'Работа', query: 'focus instrumental' },
-    { kicker: 'Сет Моей волны под занятие', label: 'Вечеринка', query: 'party hits' }
-  ]
-}
 
 // Plain-keyword search (SoundCloud/YouTube) barely understands single
 // Cyrillic genre words — "Рок" mostly matches whatever happens to contain
@@ -81,18 +52,49 @@ function TrendsView(): JSX.Element {
   const { play, playQueue } = usePlayer()
   const liked = useLikedTracks()
   const history = useHistory()
+  const { t } = useTranslation()
+
+  const aiSetFilters: { id: AiSetFilter; label: string }[] = [
+    { id: 'top', label: t('trends.aiTop') },
+    { id: 'genre', label: t('trends.aiGenre') },
+    { id: 'mood', label: t('trends.aiMood') },
+    { id: 'activity', label: t('trends.aiActivity') }
+  ]
+
+  const aiSetCards: Record<AiSetFilter, { kicker: string; label: string; query: string }[]> = {
+    top: [
+      { kicker: 'Ai · ' + t('trends.aiActivity'), label: 'Бег', query: 'running workout' },
+      { kicker: 'Ai · ' + t('trends.aiMood'), label: 'Энергичное', query: 'energetic hype' },
+      { kicker: 'Ai · ' + t('trends.aiActivity'), label: 'Тренируюсь', query: 'gym workout' }
+    ],
+    genre: [
+      { kicker: 'Ai · ' + t('trends.aiGenre'), label: 'Рок', query: 'рок' },
+      { kicker: 'Ai · ' + t('trends.aiGenre'), label: 'Хип-хоп', query: 'хип-хоп' },
+      { kicker: 'Ai · ' + t('trends.aiGenre'), label: 'Электроника', query: 'электроника' }
+    ],
+    mood: [
+      { kicker: 'Ai · ' + t('trends.aiMood'), label: 'Энергичное', query: 'energetic' },
+      { kicker: 'Ai · Artist', label: 'Slipknot', query: 'Slipknot' },
+      { kicker: 'Ai · ' + t('trends.aiMood'), label: 'Крутое', query: 'badass rock' }
+    ],
+    activity: [
+      { kicker: 'Ai · ' + t('trends.aiActivity'), label: 'Бег', query: 'running' },
+      { kicker: 'Ai · ' + t('trends.aiActivity'), label: 'Работа', query: 'focus instrumental' },
+      { kicker: 'Ai · ' + t('trends.aiActivity'), label: 'Вечеринка', query: 'party hits' }
+    ]
+  }
 
   useEffect(() => {
     fetchTrends()
       .then(setTrends)
-      .catch(() => setError('Не удалось подключиться к серверу Яндекс Музыки'))
+      .catch(() => setError(t('trends.error')))
       .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
     const query = STYLE_CHIPS.find((c) => c.label === styleChip)?.query ?? styleChip
-    searchTracksSoundcloud(query)
-      .then((res) => setStyleTracks(shuffle(res).slice(0, 5)))
+    searchTracksMulti(query)
+      .then((res) => setStyleTracks(shuffle(res).slice(0, 10)))
       .catch(() => setStyleTracks([]))
   }, [styleChip])
 
@@ -117,7 +119,7 @@ function TrendsView(): JSX.Element {
   }))
 
   const playMood = (query: string): void => {
-    searchTracksSoundcloud(query)
+    searchTracksMulti(query)
       .then((res) => {
         const shuffled = shuffle(res)
         if (shuffled.length > 0) playQueue(shuffled, 0)
@@ -127,20 +129,20 @@ function TrendsView(): JSX.Element {
 
   return (
     <div className="trends-view view-enter">
-      <h1 className="trends-view__title">Для вас и Тренды</h1>
+      <h1 className="trends-view__title">{t('trends.title')}</h1>
 
       <div className="trends-view__toptabs">
         <button
           className={`trends-view__toptab${topTab === 'foryou' ? ' trends-view__toptab--active' : ''}`}
           onClick={() => setTopTab('foryou')}
         >
-          Для вас
+          {t('trends.foryou')}
         </button>
         <button
           className={`trends-view__toptab${topTab === 'trends' ? ' trends-view__toptab--active' : ''}`}
           onClick={() => setTopTab('trends')}
         >
-          Тренды
+          {t('trends.trends')}
         </button>
       </div>
 
@@ -163,8 +165,8 @@ function TrendsView(): JSX.Element {
                 </svg>
               </span>
               <span className="trends-view__quick-meta">
-                <span className="trends-view__quick-title">Мне нравится</span>
-                <span className="trends-view__quick-sub">{liked.length} треков</span>
+                <span className="trends-view__quick-title">{t('trends.liked')}</span>
+                <span className="trends-view__quick-sub">{t('trends.likedCount').replace('{n}', String(liked.length))}</span>
               </span>
             </button>
 
@@ -179,20 +181,20 @@ function TrendsView(): JSX.Element {
                 </svg>
               </span>
               <span className="trends-view__quick-meta">
-                <span className="trends-view__quick-title">История</span>
+                <span className="trends-view__quick-title">{t('trends.history')}</span>
                 <span className="trends-view__quick-sub">
                   {history.length > 0
                     ? Array.from(new Set(history.map((t) => t.artists[0]))).slice(0, 3).join(', ')
-                    : 'Пока пусто'}
+                    : t('trends.historyEmpty')}
                 </span>
               </span>
             </button>
           </div>
 
           <section className="trends-view__section">
-            <h2 className="trends-view__section-title">Свели в AI-сет</h2>
+            <h2 className="trends-view__section-title">{t('trends.aiSet')}</h2>
             <div className="trends-view__pills">
-              {AI_SET_FILTERS.map((f) => (
+              {aiSetFilters.map((f) => (
                 <button
                   key={f.id}
                   className={`trends-view__pill${aiSetFilter === f.id ? ' trends-view__pill--active' : ''}`}
@@ -203,7 +205,7 @@ function TrendsView(): JSX.Element {
               ))}
             </div>
             <div className="trends-view__ai-cards">
-              {AI_SET_CARDS[aiSetFilter].map((card) => (
+              {aiSetCards[aiSetFilter].map((card) => (
                 <button key={card.label} className="trends-view__ai-card" onClick={() => playMood(card.query)}>
                   <span className="trends-view__ai-kicker">{card.kicker}</span>
                   <span className="trends-view__ai-label">
@@ -218,7 +220,7 @@ function TrendsView(): JSX.Element {
           </section>
 
           <section className="trends-view__section">
-            <h2 className="trends-view__section-title">В стиле</h2>
+            <h2 className="trends-view__section-title">{t('trends.style')}</h2>
             <div className="trends-view__chips">
               {STYLE_CHIPS.map((chip) => (
                 <button
@@ -245,7 +247,7 @@ function TrendsView(): JSX.Element {
 
           {metArtists.length > 0 && (
             <section className="trends-view__section">
-              <h2 className="trends-view__section-title">Встречали в Моей волне</h2>
+              <h2 className="trends-view__section-title">{t('trends.metInWave')}</h2>
               <div className="trends-view__artist-row">
                 {metArtists.map((a) => (
                   <button key={a.name} className="trends-view__artist" onClick={() => requestArtistSearch(a.name)}>
@@ -315,7 +317,7 @@ function TrendsView(): JSX.Element {
 
       {topTab === 'trends' && (
         <section className="trends-view__section">
-          <h2 className="trends-view__section-title">Исследуйте жанр</h2>
+          <h2 className="trends-view__section-title">{t('trends.explore')}</h2>
           <div className="trends-view__explore-row">
             {EXPLORE_GENRES.map((g) => (
               <button

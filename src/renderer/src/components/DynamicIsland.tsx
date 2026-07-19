@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, HeartIcon, Maximize2Icon } from './icons'
 import { usePlayer } from '../player/PlayerContext'
 import { toggleLike, useIsLiked } from '../store/likes'
+import { useTranslation } from '../utils/useTranslation'
 import ServiceBadge from './ServiceBadge'
 import './DynamicIsland.css'
 
@@ -27,6 +28,7 @@ function DynamicIsland({ className = '', onExpand }: { className?: string; onExp
     seekTo
   } = usePlayer()
   const liked = useIsLiked(currentTrack?.id)
+  const { t } = useTranslation()
   const [isHovered, setIsHovered] = useState(false)
 
   if (!currentTrack) return null
@@ -135,7 +137,7 @@ function DynamicIsland({ className = '', onExpand }: { className?: string; onExp
                 className="dyn-island__icon-btn"
                 onClick={() => openLyrics()}
                 aria-label="fullscreen"
-                title="Развернуть"
+                title={t('common.expand')}
               >
                 <Maximize2Icon size={14} />
               </button>
@@ -144,7 +146,7 @@ function DynamicIsland({ className = '', onExpand }: { className?: string; onExp
                 className={`dyn-island__icon-btn${liked ? ' dyn-island__icon-btn--active' : ''}`}
                 onClick={() => toggleLike(currentTrack)}
                 aria-label="like"
-                title="Мне нравится"
+                title={t('player.like')}
               >
                 <HeartIcon fill={liked ? 'currentColor' : 'none'} />
               </button>

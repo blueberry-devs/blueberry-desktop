@@ -31,7 +31,16 @@ const api = {
     ipcRenderer.on('sidecar:ready', handler)
     return () => ipcRenderer.removeListener('sidecar:ready', handler)
   },
-  getAppVersion: () => ipcRenderer.invoke('get-app-version')
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  discordUpdatePresence: (data: {
+    trackName: string
+    artist: string
+    currentTime: number
+    duration: number
+    artworkUrl: string
+    isPlaying: boolean
+  }) => ipcRenderer.invoke('discord-update-presence', data),
+  discordClearPresence: () => ipcRenderer.invoke('discord-clear-presence')
 }
 
 if (process.contextIsolated) {

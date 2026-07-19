@@ -1,12 +1,36 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 out/
 build/
-.env
-server/.env
-server/__pycache__/
-server/.venv/
+
+# Python
 __pycache__/
 *.pyc
+server/.venv/
+venv/
+.venv/
+
+# PyInstaller
+*.spec
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment
+.env
+server/.env
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs
 *.log
+
+# Temp
+tmp/
+temp/
+*pyinstaller*

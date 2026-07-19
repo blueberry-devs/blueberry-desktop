@@ -1,8 +1,15 @@
-import { useProfile, setAllowExplicit, setVideoBackground } from '../store/profile'
+import { useTranslation } from '../utils/useTranslation'
+import { useProfile, setAllowExplicit, setVideoBackground, setNavbarPosition, setLanguage, type NavbarPosition } from '../store/profile'
 import { usePlayer } from '../player/PlayerContext'
 import { useAppVersion } from '../hooks/useAppVersion'
-import { ShieldIcon, InfoIcon, PlayIcon } from './icons'
+import { ShieldIcon, InfoIcon, PlayIcon, Maximize2Icon } from './icons'
 import './SettingsView.css'
+
+const NAVBAR_OPTIONS: { value: NavbarPosition; label: string }[] = [
+  { value: 'left', label: 'Слева' },
+  { value: 'top', label: 'Сверху' },
+  { value: 'bottom', label: 'Снизу' }
+]
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }): JSX.Element {
   return (
@@ -21,10 +28,35 @@ function SettingsView(): JSX.Element {
   const profile = useProfile()
   const { crossfade, setCrossfade } = usePlayer()
   const version = useAppVersion()
+  const { t } = useTranslation()
 
   return (
     <div className="settings-view view-enter">
-      <h1 className="settings-view__title">Настройки</h1>
+      <h1 className="settings-view__title">{t('settings.title')}</h1>
+
+      <section className="settings-view__section">
+        <h2 className="settings-view__section-title">
+          <span className="settings-view__section-icon"><Maximize2Icon size={14} /></span>
+          {t('settings.general')}
+        </h2>
+        <div className="settings-view__row">
+          <div className="settings-view__row-text">
+            <div className="settings-view__row-label">{t('settings.navPosition')}</div>
+            <div className="settings-view__row-hint">{t('settings.navHint')}</div>
+          </div>
+          <div className="settings-view__segmented">
+            {NAVBAR_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                className={`settings-view__segmented-item${profile.navbarPosition === opt.value ? ' settings-view__segmented-item--active' : ''}`}
+                onClick={() => setNavbarPosition(opt.value)}
+              >
+                {t('settings.nav' + opt.value.charAt(0).toUpperCase() + opt.value.slice(1))}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section className="settings-view__section">
         <h2 className="settings-view__section-title">
@@ -33,18 +65,15 @@ function SettingsView(): JSX.Element {
         </h2>
         <div className="settings-view__row">
           <div className="settings-view__row-text">
-            <div className="settings-view__row-label">Видео-фон в полноэкранном режиме</div>
-            <div className="settings-view__row-hint">
-              Ищет клип трека на YouTube и проигрывает его вместо размытой обложки на фоне. Выключите, если не хотите
-              лишних сетевых запросов или предпочитаете обложку.
-            </div>
+            <div className="settings-view__row-label">{t('settings.videoBg')}</div>
+            <div className="settings-view__row-hint">{t('settings.videoBgHint')}</div>
           </div>
           <Toggle checked={profile.videoBackground} onChange={setVideoBackground} />
         </div>
         <div className="settings-view__row">
           <div className="settings-view__row-text">
-            <div className="settings-view__row-label">Плавный переход между треками</div>
-            <div className="settings-view__row-hint">Кроссфейд в конце трека вместо резкой смены.</div>
+            <div className="settings-view__row-label">{t('settings.crossfade')}</div>
+            <div className="settings-view__row-hint">{t('settings.crossfadeHint')}</div>
           </div>
           <Toggle checked={crossfade} onChange={setCrossfade} />
         </div>
@@ -58,42 +87,56 @@ function SettingsView(): JSX.Element {
         <div className="settings-view__row">
           <div className="settings-view__row-text">
             <div className="settings-view__row-label">
-              Показывать контент 18+
+              {t('settings.explicitTitle')}
               <span className="settings-view__explicit-badge">!</span>
             </div>
-            <div className="settings-view__row-hint">
-              Треки с ненормативной лексикой и другим взрослым контентом помечены значком «!». Выключите, чтобы они
-              не попадали в поиск, «Мою волну» и чарты.
-            </div>
+            <div className="settings-view__row-hint">{t('settings.explicitHint')}</div>
           </div>
           <Toggle checked={profile.allowExplicit} onChange={setAllowExplicit} />
         </div>
       </section>
 
       <section className="settings-view__section">
+        <h2 className="settings-view__section-title">{t('settings.language')}</h2>
+        <div className="settings-view__row">
+          <div className="settings-view__row-text">
+            <div className="settings-view__row-label">{t('settings.languageLabel')}</div>
+          </div>
+          <select
+            className="settings-view__select"
+            value={profile.language}
+            onChange={(e) => setLanguage(e.target.value)}
+          >
+            <option value="ru">{t('settings.langRu')}</option>
+            <option value="en">{t('settings.langEn')}</option>
+          </select>
+        </div>
+      </section>
+
+      <section className="settings-view__section">
         <h2 className="settings-view__section-title">
           <span className="settings-view__section-icon"><InfoIcon size={14} /></span>
-          Горячие клавиши
+          {t('settings.hotkeysTitle')}
         </h2>
         <div className="settings-view__about">
           <div className="settings-view__about-row">
-            <span>Пауза / воспроизведение</span>
+            <span>{t('settings.hotkeyPlay')}</span>
             <span className="settings-view__about-value">Пробел</span>
           </div>
           <div className="settings-view__about-row">
-            <span>Поиск</span>
+            <span>{t('settings.hotkeySearch')}</span>
             <span className="settings-view__about-value">Ctrl+K</span>
           </div>
           <div className="settings-view__about-row">
-            <span>Следующий / предыдущий трек</span>
+            <span>{t('settings.hotkeyNextPrev')}</span>
             <span className="settings-view__about-value">Ctrl+→ / Ctrl+←</span>
           </div>
           <div className="settings-view__about-row">
-            <span>Нравится</span>
+            <span>{t('settings.hotkeyLike')}</span>
             <span className="settings-view__about-value">Ctrl+L</span>
           </div>
           <div className="settings-view__about-row">
-            <span>Закрыть полноэкранный плеер</span>
+            <span>{t('settings.hotkeyCloseFullscreen')}</span>
             <span className="settings-view__about-value">Esc</span>
           </div>
         </div>
@@ -102,16 +145,16 @@ function SettingsView(): JSX.Element {
       <section className="settings-view__section">
         <h2 className="settings-view__section-title">
           <span className="settings-view__section-icon"><InfoIcon size={14} /></span>
-          О приложении
+          {t('settings.about')}
         </h2>
         <div className="settings-view__about">
           <div className="settings-view__about-row">
-            <span>Версия</span>
+            <span>{t('about.version')}</span>
             <span className="settings-view__about-value">{version}</span>
           </div>
           <div className="settings-view__about-row">
             <span>Сборка</span>
-            <span className="settings-view__about-value">Blueberry Wave</span>
+            <span className="settings-view__about-value">{t('about.buildName')}</span>
           </div>
         </div>
       </section>

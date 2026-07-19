@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { searchTracksSoundcloud, TrackResult } from '../api/yandexMusic'
 import { usePlayer } from '../player/PlayerContext'
+import { useTranslation } from '../utils/useTranslation'
 import TrackRow from './TrackRow'
 import './ArtistView.css'
 
@@ -12,6 +13,7 @@ interface Props {
 function ArtistView({ name, onBack }: Props): JSX.Element {
   const [tracks, setTracks] = useState<TrackResult[]>([])
   const [loading, setLoading] = useState(true)
+  const { t } = useTranslation()
   const { playQueue } = usePlayer()
 
   useEffect(() => {
@@ -52,7 +54,7 @@ function ArtistView({ name, onBack }: Props): JSX.Element {
           )}
         </div>
         <div className="artist-view__meta">
-          <div className="artist-view__label">Исполнитель</div>
+          <div className="artist-view__label">{t('artist.label')}</div>
           <h1 className="artist-view__name">{name}</h1>
           {tracks.length > 0 && (
             <button className="artist-view__play" onClick={() => playQueue(tracks, 0)}>
@@ -66,10 +68,10 @@ function ArtistView({ name, onBack }: Props): JSX.Element {
       </div>
 
       <section className="artist-view__section">
-        <h2 className="artist-view__section-title">Самое популярное</h2>
-        {loading && <div className="artist-view__status">Загружаем…</div>}
+        <h2 className="artist-view__section-title">{t('artist.popular')}</h2>
+        {loading && <div className="artist-view__status">{t('artist.loading')}</div>}
         {!loading && tracks.length === 0 && (
-          <div className="artist-view__status">Треки не найдены</div>
+          <div className="artist-view__status">{t('artist.notFound')}</div>
         )}
         {!loading && tracks.length > 0 && (
           <div className="artist-view__tracks">

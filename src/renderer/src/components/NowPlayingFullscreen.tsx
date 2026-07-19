@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { usePlayer } from '../player/PlayerContext'
+import { useTranslation } from '../utils/useTranslation'
 import { activeLineIndex } from '../utils/lrc'
 import { toggleLike, useIsLiked } from '../store/likes'
 import { usePlaylists, addTrackToPlaylist } from '../store/playlists'
@@ -19,6 +20,8 @@ import {
   HeartIcon
 } from './icons'
 import './NowPlayingFullscreen.css'
+
+const _clipCache = new Map<string, string | null>()
 
 function NowPlayingFullscreen(): JSX.Element | null {
   const {
@@ -53,12 +56,14 @@ function NowPlayingFullscreen(): JSX.Element | null {
   const [showQueue, setShowQueue] = useState(false)
   const liked = useIsLiked(currentTrack?.id)
   const queueRef = useRef<HTMLDivElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const [clipUrl, setClipUrl] = useState<string | null>(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showPlaylists, setShowPlaylists] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const playlists = usePlaylists()
   const profile = useProfile()
+  const { t } = useTranslation()
 
   useEffect(() => {
     if (!showMenu) return
@@ -72,21 +77,44 @@ function NowPlayingFullscreen(): JSX.Element | null {
     return () => document.removeEventListener('mousedown', handler)
   }, [showMenu])
 
-  // Fetch as soon as the fullscreen opens for this track — swaps in over the
-  // blurred cover the moment it resolves rather than blocking on it.
   useEffect(() => {
     setClipUrl(null)
     if (!currentTrack || !profile.videoBackground) return
+    const trackId = currentTrack.id
+    const cached = _clipCache.get(trackId)
+    if (cached !== undefined) {
+      if (cached) console.log('[cache] Video background: %s', cached.slice(0, 60))
+      setClipUrl(cached)
+      return
+    }
     let cancelled = false
+    console.log('[0%] Fetching video background for %s - %s', currentTrack.title, currentTrack.artists[0])
     fetchVideoClip(currentTrack.title, currentTrack.artists[0] ?? '')
       .then((url) => {
-        if (!cancelled) setClipUrl(url)
+        if (cancelled) return
+        _clipCache.set(trackId, url)
+        if (url) {
+          console.log('[100%] Video background ready: %s', url.slice(0, 60))
+        } else {
+          console.log('[100%] No video background found')
+        }
+        setClipUrl(url)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [currentTrack?.id, profile.videoBackground])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !clipUrl) return
+    if (isPlaying) {
+      if (video.paused) video.play().catch(() => {})
+    } else {
+      if (!video.paused) video.pause()
+    }
+  }, [isPlaying, clipUrl])
 
   const progress = duration > 0 ? currentTime / duration : 0
   const activeIndex = isPlaying && lyrics ? activeLineIndex(lyrics, currentTime) : -1
@@ -138,15 +166,24 @@ function NowPlayingFullscreen(): JSX.Element | null {
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
     >
       {clipUrl ? (
-        <video
-          key={clipUrl}
-          className="np-fullscreen__bg np-fullscreen__bg-video"
-          src={clipUrl}
-          autoPlay
-          loop
-          muted
-          playsInline
-        />
+        <div className="np-fullscreen__video-wrap">
+          <video
+            ref={videoRef}
+            key={clipUrl}
+            className="np-fullscreen__bg-video"
+            src={clipUrl}
+            autoPlay
+            muted
+            playsInline
+            loop
+            onLoadedMetadata={() => {
+              const video = videoRef.current
+              if (video) {
+                video.currentTime = Math.min(currentTime, video.duration || 0)
+              }
+            }}
+          />
+        </div>
       ) : (
         currentTrack.cover && (
           <div className="np-fullscreen__bg" style={{ backgroundImage: `url(${currentTrack.cover})` }} />
@@ -183,7 +220,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
                     e.stopPropagation()
                     setShowQueue((v) => !v)
                   }}
-                  title="Очередь"
+                  title={t('player.queue')}
                 >
                   <ListIcon size={16} />
                 </button>
@@ -220,7 +257,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
                     e.stopPropagation()
                     shuffleQueue()
                   }}
-                  title="Перемешать"
+                  title={t('player.shuffle')}
                 >
                   <ShuffleIcon size={17} />
                 </button>
@@ -230,7 +267,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
                     e.stopPropagation()
                     previous()
                   }}
-                  title="Назад"
+                  title={t('player.prev')}
                 >
                   <SkipBackIcon size={18} />
                 </button>
@@ -241,7 +278,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
                     togglePlay()
                   }}
                   disabled={isLoading}
-                  title={isPlaying ? 'Пауза' : 'Играть'}
+                  title={t(isPlaying ? 'player.pause' : 'player.play')}
                 >
                   {isPlaying ? <PauseIcon size={20} /> : <PlayIcon size={18} />}
                 </button>
@@ -251,7 +288,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
                     e.stopPropagation()
                     next()
                   }}
-                  title="Вперёд"
+                  title={t('player.next')}
                 >
                   <SkipForwardIcon size={18} />
                 </button>
@@ -261,7 +298,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
                     e.stopPropagation()
                     cycleLoopMode()
                   }}
-                  title={loopMode === 'off' ? 'Повтор выключен' : loopMode === 'queue' ? 'Повтор очереди' : 'Повтор трека'}
+                  title={t('player.loop')}
                 >
                   <RepeatIcon size={17} />
                   {loopMode === 'track' && <span className="np-fullscreen__loop-badge">1</span>}
@@ -276,7 +313,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
                       e.stopPropagation()
                       setShowMenu((v) => !v)
                     }}
-                    title="Ещё"
+                    title={t('common.more')}
                   >
                     <MoreHorizontalIcon size={17} />
                   </button>
@@ -290,12 +327,12 @@ function NowPlayingFullscreen(): JSX.Element | null {
                           <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                           <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                         </svg>
-                        Добавить в плейлист
+                        {t('wave.addToPlaylist')}
                       </button>
                       {showPlaylists && (
                         <div className="np-fullscreen__queue-sub">
                           {playlists.length === 0 ? (
-                            <div className="np-fullscreen__queue-empty">Нет плейлистов</div>
+                            <div className="np-fullscreen__queue-empty">{t('wave.noPlaylists')}</div>
                           ) : (
                             playlists.map((p) => (
                               <button
@@ -325,7 +362,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
                     e.stopPropagation()
                     setShowLyrics((v) => !v)
                   }}
-                  title="Текст песни"
+                  title={t('player.lyrics')}
                 >
                   <Mic2Icon size={16} />
                 </button>
@@ -335,7 +372,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
                     e.stopPropagation()
                     toggleLike(currentTrack)
                   }}
-                  title={liked ? 'Не нравится' : 'Мне нравится'}
+                  title={t(liked ? 'player.unlike' : 'player.like')}
                 >
                   <HeartIcon size={16} fill={liked ? 'currentColor' : 'none'} />
                 </button>
@@ -345,7 +382,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
           <div className="np-fullscreen__title">
             {currentTrack.title}
             {currentTrack.explicit && (
-              <span className="np-fullscreen__explicit-badge" title="Ненормативная лексика и другой взрослый контент">
+              <span className="np-fullscreen__explicit-badge" title={t('explicit.badge')}>
                 !
               </span>
             )}

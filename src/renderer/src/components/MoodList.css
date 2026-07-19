@@ -2,7 +2,7 @@
   position: relative;
   z-index: 5;
   width: var(--mood-list-width);
-  min-width: 220px;
+  min-width: 650px;
   flex-shrink: 0;
   height: 100%;
   margin-left: clamp(-70px, -6vw, -30px);

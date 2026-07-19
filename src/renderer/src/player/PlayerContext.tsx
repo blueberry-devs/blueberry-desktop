@@ -13,7 +13,41 @@ import { resolveStream, TrackResult } from '../api/yandexMusic'
 import { parseLrc, LrcLine } from '../utils/lrc'
 import { getLyrics } from '../services/lyricsCache'
 import { pushHistory } from '../store/history'
+import { recordPlay } from '../store/playCount'
 import { getDownloadPath } from '../store/downloads'
+
+function updateDiscordPlaying(track: TrackResult): void {
+  window.api.discordUpdatePresence({
+    trackName: track.title,
+    artist: track.artists.join(', '),
+    currentTime: 0,
+    duration: track.duration ?? 0,
+    artworkUrl: track.cover ?? '',
+    isPlaying: true,
+  }).catch(() => {})
+}
+
+function updateDiscordPause(track: TrackResult, elapsed: number): void {
+  window.api.discordUpdatePresence({
+    trackName: track.title,
+    artist: track.artists.join(', '),
+    currentTime: Math.floor(elapsed),
+    duration: track.duration ?? 0,
+    artworkUrl: track.cover ?? '',
+    isPlaying: false,
+  }).catch(() => {})
+}
+
+function updateDiscordResume(track: TrackResult, elapsed: number): void {
+  window.api.discordUpdatePresence({
+    trackName: track.title,
+    artist: track.artists.join(', '),
+    currentTime: Math.floor(elapsed),
+    duration: track.duration ?? 0,
+    artworkUrl: track.cover ?? '',
+    isPlaying: true,
+  }).catch(() => {})
+}
 
 export type LoopMode = 'off' | 'track' | 'queue'
 
@@ -75,6 +109,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
   const bandsCacheRef = useRef<Float32Array>(new Float32Array(0))
 
   const [currentTrack, setCurrentTrack] = useState<TrackResult | null>(null)
+  const currentTrackRef = useRef<TrackResult | null>(null)
   const [playingSource, setPlayingSource] = useState<TrackResult['source'] | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -102,6 +137,10 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
     crossfadeRef.current = v
     setCrossfadeState(v)
   }, [])
+
+  useEffect(() => {
+    currentTrackRef.current = currentTrack
+  }, [currentTrack])
 
   const loadLyrics = useCallback((track: TrackResult, token: number) => {
     setLyricsLoading(true)
@@ -186,15 +225,22 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       if (!audio) return
 
       if (currentTrack?.id === track.id && !preferSource) {
-        if (audio.paused) audio.play().catch(() => {})
-        else audio.pause()
+        if (audio.paused) {
+          audio.play().catch(() => {})
+          updateDiscordResume(track, audio.currentTime)
+        } else {
+          audio.pause()
+          updateDiscordPause(track, audio.currentTime)
+        }
         return
       }
 
       const token = ++playTokenRef.current
       pushHistory(track)
+      recordPlay(track.id)
       setCurrentTrack(track)
       setPlayingSource(null)
+      updateDiscordPlaying(track)
       setLyrics(null)
       setLyricsPlain(null)
       setLoadError(null)
@@ -292,10 +338,14 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       if (!shadow.paused) return
       shadow.currentTime = audio.currentTime
       shadow.play().catch(() => {})
+      const t = currentTrackRef.current
+      if (t) updateDiscordResume(t, audio.currentTime)
     }
     const onPause = (): void => {
       setIsPlaying(false)
       shadow.pause()
+      const t = currentTrackRef.current
+      if (t) updateDiscordPause(t, audio.currentTime)
     }
     const onEnded = (): void => {
       if (loopModeRef.current === 'track') {

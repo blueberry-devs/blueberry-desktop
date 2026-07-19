@@ -4,6 +4,7 @@ import { usePlayer } from '../player/PlayerContext'
 import { useLikedTracks } from '../store/likes'
 import { useHistory } from '../store/history'
 import { TrackResult } from '../api/yandexMusic'
+import { useTranslation } from '../utils/useTranslation'
 import './MoodList.css'
 
 type MoodColor = 'red' | 'blue' | 'purple'
@@ -135,36 +136,59 @@ function topArtists(
 }
 
 function MoodList(): JSX.Element {
+  const { t } = useTranslation()
   const { setActiveGenre } = usePlayer()
   const containerRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number>(0)
   const liked = useLikedTracks()
   const history = useHistory()
 
-  // Personal picks first, generated from real listening data instead of a
-  // fixed list — falls back to nothing (just the static genres below) until
-  // there's enough signal to build them from.
+  const genreLabel: Record<string, string> = {
+    'Рок': t('mood.genre.рок'),
+    'Поп': t('mood.genre.поп'),
+    'Джаз': t('mood.genre.джаз'),
+    'Электроника': t('mood.genre.электроника'),
+    'Хип-хоп': t('mood.genre.хип-хоп'),
+    'Метал': t('mood.genre.метал'),
+    'Инди': t('mood.genre.инди'),
+    'Классика': t('mood.genre.классика'),
+    'R&B': t('mood.genre.рэб'),
+    'Регги': t('mood.genre.регги'),
+    'Кантри': t('mood.genre.кантри'),
+    'Фолк': t('mood.genre.фолк'),
+    'Панк': t('mood.genre.панк'),
+    'Соул': t('mood.genre.соул'),
+    'Блюз': t('mood.genre.блюз'),
+    'Латино': t('mood.genre.латино'),
+    'К-поп': t('mood.genre.к-поп'),
+    'Эмбиент': t('mood.genre.эмбиент'),
+    'Транс': t('mood.genre.транс'),
+    'Хаус': t('mood.genre.хаус'),
+    'Диско': t('mood.genre.диско'),
+    'Синти-поп': t('mood.genre.синти-поп'),
+  }
+
   const personalItems: GenreItem[] = useMemo(() => {
     const artists = topArtists(liked, history, 4)
     if (artists.length === 0) return []
     const shapes: GenreItem['shape'][] = ['burst', 'flag', 'arrow', 'chevron']
     const colors: MoodColor[] = ['red', 'blue', 'purple']
     const favorite: GenreItem = {
-      label: 'В духе любимого',
+      label: t('mood.inSpiritOf'),
       query: artists[0].artist,
       color: colors[0],
       shape: shapes[0],
       cover: artists[0].cover
     }
     const rest: GenreItem[] = artists.slice(1).map(({ artist, cover: artistCover }, i) => ({
-      label: `В духе ${artist}`,
+      label: t('mood.inSpiritOfArtist').replace('{artist}', artist),
       query: artist,
       color: colors[(i + 1) % colors.length],
       shape: shapes[(i + 1) % shapes.length],
       cover: artistCover
     }))
     return [favorite, ...rest]
-  }, [liked, history])
+  }, [liked, history, t])
 
   const allItems = useMemo(() => [...personalItems, ...genres], [personalItems])
 
@@ -173,7 +197,7 @@ function MoodList(): JSX.Element {
     content: (
       <div className="mood-list__row" data-wave-index={index}>
         <GenreIcon color={genre.color} shape={genre.shape} cover={genre.cover} />
-        <span className="mood-list__label">{genre.label}</span>
+        <span className="mood-list__label">{genreLabel[genre.label] ?? genre.label}</span>
       </div>
     )
   }))

@@ -43,12 +43,14 @@
 
 .history-view__hero-card {
   margin-top: 24px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 14px;
-  background: linear-gradient(135deg, #4a4a58, #2c2c34);
-  border-radius: 12px;
-  padding: 14px 22px 14px 14px;
+  gap: 18px;
+  width: 100%;
+  max-width: 560px;
+  background: linear-gradient(120deg, #4a4a58, #2c2c34, #5a5a6c, #232329);
+  border-radius: 16px;
+  padding: 20px 28px 20px 20px;
   cursor: pointer;
   transition: transform 0.12s ease;
 }
@@ -58,25 +60,26 @@
 }
 
 .history-view__hero-icon {
-  width: 50px;
-  height: 50px;
-  border-radius: 8px;
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .history-view__hero-title {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 800;
   color: #fff;
 }
 
 .history-view__hero-sub {
-  font-size: 13px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.8);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .history-view__list {
