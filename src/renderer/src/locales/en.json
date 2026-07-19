@@ -177,5 +177,11 @@
   "settings.interface": "Interface",
   "settings.hotkeyNextPrev": "Next / Previous track",
   "settings.hotkeyLike": "Like",
-  "settings.hotkeyCloseFullscreen": "Close fullscreen player"
+  "settings.hotkeyCloseFullscreen": "Close fullscreen player",
+
+  "notification.updateTitle": "Update available",
+  "notification.updateMessage": "Version {version} downloaded. Click to restart.",
+  "notification.upToDate": "Your version is up to date.",
+  "notification.vpnTitle": "VPN",
+  "notification.vpnMessage": "Enable VPN with a Russian IP for better service performance."
 }

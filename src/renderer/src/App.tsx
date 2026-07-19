@@ -4,6 +4,7 @@ import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
 import TopBottomNav from './components/TopBottomNav'
 import DynamicIsland from './components/DynamicIsland'
+import ToastNotification from './components/ToastNotification'
 import SplashScreen from './components/SplashScreen'
 // Not lazy: this mounts/unmounts on every open/close through AnimatePresence,
 // and pairing that with Suspense's own mount/fallback cycle raced with the
@@ -168,6 +169,7 @@ function AppInner(): JSX.Element {
       )}
 
       {showMiniPlayer && currentTrack && <DynamicIsland onExpand={() => setActiveTab('wave')} />}
+      <ToastNotification />
       <AnimatePresence>
         {isLyricsOpen && <NowPlayingFullscreen />}
       </AnimatePresence>

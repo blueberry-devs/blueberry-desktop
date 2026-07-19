@@ -72,7 +72,6 @@ jobs:
           npx electron-builder ${{ matrix.dist-flag }} --publish onTagOrDraft
 
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'pull_request'
         with:
           name: ${{ matrix.artifact }}
           path: dist/*

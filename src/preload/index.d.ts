@@ -31,6 +31,8 @@ interface WindowApi {
     isPlaying: boolean
   }) => Promise<void>
   discordClearPresence: () => Promise<void>
+  onNotification: (cb: (data: { type: string; title: string; message: string }) => void) => () => void
+  restartApp: () => void
 }
 
 declare global {

@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron'
+import https from 'https'
 
 app.commandLine.appendSwitch('enable-accelerated-video-decode')
 app.commandLine.appendSwitch('ignore-gpu-blocklist')
@@ -279,19 +280,17 @@ function setupAutoUpdater(): void {
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
 
+  autoUpdater.on('download-progress', (info) => {
+    console.log(`[ ${Math.round(info.percent)}% ] Downloading update...`)
+  })
+
   autoUpdater.on('update-downloaded', (info) => {
-    dialog
-      .showMessageBox({
-        type: 'info',
-        title: 'Доступно обновление',
-        message: `Скачана версия ${info.version}. Перезапустить сейчас, чтобы установить?`,
-        buttons: ['Перезапустить', 'Позже'],
-        defaultId: 0,
-        cancelId: 1
-      })
-      .then(({ response }) => {
-        if (response === 0) autoUpdater.quitAndInstall()
-      })
+    console.log('Update downloaded. Restart the app to install.')
+    mainWindowRef?.webContents.send('notification:show', {
+      type: 'update',
+      title: 'update',
+      message: info.version
+    })
   })
 
   autoUpdater.on('error', (err) => {
@@ -302,6 +301,11 @@ function setupAutoUpdater(): void {
 function checkForUpdates(manual: boolean): void {
   if (!app.isPackaged || updateCheckInFlight) return
   updateCheckInFlight = true
+
+  console.log('')
+  console.log('Checking for updates')
+  console.log('')
+  console.log(`Current version: ${app.getVersion()}`)
 
   if (manual) {
     const onNotAvailable = (): void => {
@@ -467,6 +471,89 @@ ipcMain.handle('discord-clear-presence', (): void => {
   clearPresence()
 })
 
+ipcMain.on('notification:action:restart', (): void => {
+  autoUpdater.quitAndInstall()
+})
+
+function checkRussianIp(): void {
+  https.get('https://ip-api.com/json/', (res) => {
+    let data = ''
+    res.on('data', (chunk) => (data += chunk))
+    res.on('end', () => {
+      try {
+        const geo = JSON.parse(data)
+        if (geo.countryCode === 'RU') {
+          mainWindowRef?.webContents.send('notification:show', {
+            type: 'vpn',
+            title: 'vpn',
+            message: ''
+          })
+        }
+      } catch {
+        /* ignore */
+      }
+    })
+  }).on('error', () => {
+    /* ignore */
+  })
+}
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.replace('v', '').split('.').map(Number)
+  const pb = b.replace('v', '').split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0
+    const nb = pb[i] || 0
+    if (na > nb) return 1
+    if (na < nb) return -1
+  }
+  return 0
+}
+
+function checkDevUpdate(): void {
+  const currentVersion = app.getVersion()
+  console.log('')
+  console.log('Checking for updates')
+  console.log('')
+  console.log(`Current version: ${currentVersion}`)
+
+  const repo = 'blueberry-devs/blueberry-desktop'
+  https.get(`https://api.github.com/repos/${repo}/releases/latest`, { headers: { 'User-Agent': 'blueberry-desktop' } }, (res) => {
+    let data = ''
+    res.on('data', (chunk) => (data += chunk))
+    res.on('end', () => {
+      try {
+        const release = JSON.parse(data)
+        const latestVersion = release.tag_name || release.name || ''
+        console.log(`Latest version: ${latestVersion}`)
+
+        if (compareVersions(currentVersion, latestVersion) < 0) {
+          console.log(`Update available: ${latestVersion}`)
+          if (!app.isPackaged) {
+            console.log('Run git pull && npm run build to update.')
+          }
+          mainWindowRef?.webContents.send('notification:show', {
+            type: 'update',
+            title: 'update',
+            message: latestVersion
+          })
+        } else {
+          console.log('Your version is up to date')
+          mainWindowRef?.webContents.send('notification:show', {
+            type: 'uptodate',
+            title: 'uptodate',
+            message: ''
+          })
+        }
+      } catch {
+        /* ignore */
+      }
+    })
+  }).on('error', () => {
+    /* ignore */
+  })
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.blueberry.desktop')
   app.name = 'Яндекс Музыка'
@@ -480,6 +567,8 @@ app.whenReady().then(() => {
   setupAutoUpdater()
   // Give the window a moment to actually show before nagging about updates.
   setTimeout(() => checkForUpdates(false), 5000)
+  setTimeout(() => checkDevUpdate(), 3000)
+  setTimeout(() => checkRussianIp(), 8000)
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

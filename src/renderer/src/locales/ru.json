@@ -177,5 +177,11 @@
   "settings.interface": "Интерфейс",
   "settings.hotkeyNextPrev": "Следующий / предыдущий трек",
   "settings.hotkeyLike": "Нравится",
-  "settings.hotkeyCloseFullscreen": "Закрыть полноэкранный плеер"
+  "settings.hotkeyCloseFullscreen": "Закрыть полноэкранный плеер",
+
+  "notification.updateTitle": "Доступно обновление",
+  "notification.updateMessage": "Скачана версия {version}. Нажмите, чтобы перезапустить.",
+  "notification.upToDate": "У вас уже последняя версия.",
+  "notification.vpnTitle": "VPN",
+  "notification.vpnMessage": "Для лучшей работы сервиса включите VPN с российским IP."
 }
