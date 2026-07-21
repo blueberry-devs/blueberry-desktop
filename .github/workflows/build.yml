@@ -41,9 +41,9 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SUBMODULE_DEPLOY_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -O KexAlgorithms=curve25519-sha256 -t rsa github.com >> ~/.ssh/known_hosts
           echo "Host github.com" >> ~/.ssh/config
           echo "  KexAlgorithms curve25519-sha256,ecdh-sha2-nistp256" >> ~/.ssh/config
+          ssh-keyscan -O KexAlgorithms=curve25519-sha256 -t rsa github.com >> ~/.ssh/known_hosts
 
 
       - uses: actions/checkout@v4
