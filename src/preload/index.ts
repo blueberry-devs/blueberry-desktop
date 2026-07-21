@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import log from 'electron-log/renderer'
 
 export type TrayCommand = 'togglePlay' | 'next' | 'prev'
 
@@ -54,7 +55,7 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
-    console.error(error)
+    log.error('preload contextBridge failed:', error)
   }
 } else {
   // @ts-ignore (define in dts)
