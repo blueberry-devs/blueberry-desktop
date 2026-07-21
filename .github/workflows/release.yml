@@ -4,12 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       version_bump:
-        description: Version bump
+        description: Version bump (skip if already bumped)
         type: choice
         options:
           - patch
           - minor
           - major
+          - skip
         default: patch
       release_notes:
         description: Release notes (markdown)
@@ -41,6 +42,12 @@ jobs:
       - name: Bump version and push
         id: bump
         run: |
+          if [ "${{ inputs.version_bump }}" = "skip" ]; then
+            VERSION=$(node -p "require('./package.json').version")
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "Skipping version bump, current: $VERSION"
+            exit 0
+          fi
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           npm version ${{ inputs.version_bump }} -m "v%s"
