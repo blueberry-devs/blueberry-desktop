@@ -42,6 +42,8 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.PRIVATE_KEY }}
+          owner: blueberry-devs
+          repositories: blueberry-desktop,blueberry-music-lib
 
       - uses: actions/checkout@v4
         with:
