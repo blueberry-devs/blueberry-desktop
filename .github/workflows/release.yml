@@ -105,7 +105,7 @@ jobs:
           pip install pyinstaller
 
       - name: Install Node deps
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build server sidecar
         run: ${{ matrix.server-script }}
