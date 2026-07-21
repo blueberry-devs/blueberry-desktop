@@ -13,9 +13,9 @@ on:
           - skip
         default: patch
       release_notes:
-        description: Release notes (markdown)
+        description: Short summary (optional — full notes from RELEASE_NOTES.md)
         type: string
-        required: true
+        required: false
 
 env:
   SOUNDCLOUD_CLIENT_ID: ${{ secrets.SOUNDCLOUD_CLIENT_ID }}
@@ -161,16 +161,33 @@ jobs:
           find release-artifacts -type f \( -name '*.exe' -o -name '*.AppImage' -o -name '*.zip' -o -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} release/ \;
           ls -la release/
 
+      - name: Build release body
+        id: body
+        run: |
+          NOTES_FILE="RELEASE_NOTES.md"
+          SUMMARY="${{ inputs.release_notes }}"
+          BODY_FILE="${{ runner.temp }}/release_body.md"
+
+          if [ -n "$SUMMARY" ]; then
+            echo "$SUMMARY" > "$BODY_FILE"
+            echo "" >> "$BODY_FILE"
+            echo "" >> "$BODY_FILE"
+          else
+            > "$BODY_FILE"
+          fi
+
+          if [ -f "$NOTES_FILE" ]; then
+            cat "$NOTES_FILE" >> "$BODY_FILE"
+          fi
+
+          echo "path=$BODY_FILE" >> "$GITHUB_OUTPUT"
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
-          body: |
-            ${{ inputs.release_notes }}
-
-            ---
-            _Generated from commits since last release._
+          body_path: ${{ steps.body.outputs.path }}
           files: release/*
           generate_release_notes: true
           fail_on_unmatched_files: false
