@@ -6,15 +6,15 @@ dist/
 out/
 build/
 
+# Rust
+server/target/
+
 # Python
 __pycache__/
 *.pyc
 server/.venv/
 venv/
 .venv/
-
-# PyInstaller
-*.spec
 
 # TypeScript
 *.tsbuildinfo
@@ -33,4 +33,3 @@ Thumbs.db
 # Temp
 tmp/
 temp/
-*pyinstaller*

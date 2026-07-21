@@ -77,7 +77,7 @@ jobs:
             server-script: bash scripts/build-server.sh
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -93,16 +93,8 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-
-      - name: Install Python deps
-        working-directory: server
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install Node deps
         run: pnpm install --frozen-lockfile
@@ -158,13 +150,10 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir release
+
           # Only the actual distributables — skip helpers (elevate, music-server, portable exe)
-          find release-artifacts -type f \
-            -name 'Yandex-Music-Setup*.exe' -o \
-            -name 'Yandex-Music-*.AppImage' -o \
-            -name 'Yandex-Music-*.zip' -o \
-            -name 'Yandex-Music-*.dmg' \
-            -exec cp {} release/ \;
+          find release-artifacts -type f \( -name '*.exe' -o -name '*.AppImage' -o -name '*.zip' -o -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name 'latest*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
+
           ls -la release/
 
       - name: Build release body

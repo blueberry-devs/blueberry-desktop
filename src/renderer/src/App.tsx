@@ -136,7 +136,7 @@ function AppInner(): JSX.Element {
 
       <Suspense fallback={null}>
         <div className="app__glow-layer">
-          <PlasmaWave playing={isPlaying} getFrequencyBands={getFrequencyBands} trackHue={trackHue} coverColor={coverColor?.join(',')} />
+          <PlasmaWave playing={isPlaying} getFrequencyBands={getFrequencyBands} trackHue={trackHue} coverColor={coverColor?.join(',')} colorPreset={profile.waveColorPreset} />
         </div>
       </Suspense>
 
