@@ -39,8 +39,8 @@
         "to": "server",
         "filter": [
           "**/*",
-          "!**/__pycache__",
-          "!**/.venv"
+          "!**/target",
+          "!**/.cargo"
         ]
       },
       {
