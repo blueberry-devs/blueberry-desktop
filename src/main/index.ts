@@ -19,6 +19,11 @@ let isQuitting = false
 let mainWindowRef: BrowserWindow | null = null
 const SIDECAR_PORT = 8787
 
+// Sidecar auto-restart state
+let restartCount = 0
+const MAX_RESTART_ATTEMPTS = 10
+let restartTimer: ReturnType<typeof setTimeout> | null = null
+
 function resolveServerExe(): string {
   if (is.dev) return ''
   const name = process.platform === 'win32' ? 'music-server.exe' : 'music-server'
@@ -96,7 +101,31 @@ function pollServer(port: number, timeoutMs: number): Promise<void> {
   })
 }
 
+function scheduleRestart(): void {
+  if (isQuitting) return
+  restartCount++
+  if (restartCount > MAX_RESTART_ATTEMPTS) {
+    log.error('[sidecar] max restart attempts reached, giving up')
+    return
+  }
+  const delay = Math.min(1000 * restartCount, 10_000)
+  log.info(`[sidecar] restarting in ${delay}ms (attempt ${restartCount}/${MAX_RESTART_ATTEMPTS})`)
+  restartTimer = setTimeout(() => {
+    restartTimer = null
+    startSidecar()
+  }, delay)
+}
+
 function startSidecar(): void {
+  // Prevent old sidecar's exit from triggering restart while we intentionally replace it
+  if (restartTimer) {
+    clearTimeout(restartTimer)
+    restartTimer = null
+  }
+  if (sidecar) {
+    sidecar = null
+  }
+
   const serverDir = resolveServerDir()
   const exePath = resolveServerExe()
 
@@ -119,38 +148,41 @@ function startSidecar(): void {
     return
   }
 
+  restartCount++
+
   killExistingSidecar()
 
   const env = { ...process.env, SIDECAR_PORT: String(SIDECAR_PORT) }
+  const child = spawn(entry, [], {
+    cwd: serverDir,
+    env: { ...env, RUST_LOG: 'info,tower_http=info' },
+    stdio: 'pipe',
+  })
+  sidecar = child
+
+  child.stdout.on('data', (data) => {
+    for (const line of data.toString().trim().split('\n')) {
+      log.info(`[server] ${line}`)
+    }
+  })
+
+  child.on('error', (err) => log.error('[sidecar] spawn failed:', err.message))
+
+  child.on('exit', (code, signal) => {
+    log.info(`[sidecar] exited code=${code} signal=${signal}`)
+    if (sidecar === child) {
+      sidecar = null
+      scheduleRestart()
+    }
+  })
 
   if (is.dev) {
-    log.info('[sidecar] starting dev:', entry)
-
-    try {
-      const child = spawn(entry, [], {
-        cwd: serverDir,
-        env: { ...env, RUST_LOG: 'info,tower_http=info' },
-        stdio: 'pipe',
-      })
-      child.stdout.on('data', (data) => {
-        for (const line of data.toString().trim().split('\n')) {
-          log.info(`[server] ${line}`)
-        }
-      })
-      child.stderr.on('data', (data) => {
-        for (const line of data.toString().trim().split('\n')) {
-          log.warn(`[server] ${line}`)
-        }
-      })
-      child.on('error', (err) => log.error('[sidecar] spawn failed:', err.message))
-      child.on('exit', (code, signal) => {
-        log.info(`[sidecar] exited code=${code} signal=${signal}`)
-        if (sidecar === child) sidecar = null
-      })
-      sidecar = child
-    } catch (err) {
-      log.error('[sidecar] spawn threw:', err)
-    }
+    // Dev mode: stderr → log.warn, poll /api/status for readiness
+    child.stderr.on('data', (data) => {
+      for (const line of data.toString().trim().split('\n')) {
+        log.warn(`[server] ${line}`)
+      }
+    })
 
     let ready = false
     const readyTimeout = setTimeout(() => {
@@ -163,6 +195,7 @@ function startSidecar(): void {
         .then(() => {
           ready = true
           clearTimeout(readyTimeout)
+          restartCount = 0
           mainWindowRef?.webContents.send('sidecar:ready')
           log.info('[sidecar] ready')
         })
@@ -170,44 +203,27 @@ function startSidecar(): void {
     }
     poll()
   } else {
-    // Production: spawn in background, detect readiness from stderr (tracing)
-    log.info('[sidecar] starting production:', entry)
-    sidecar = spawn(entry, [], {
-      cwd: serverDir,
-      env: { ...env, RUST_LOG: 'info,tower_http=info' },
-      stdio: 'pipe',
-    })
-
+    // Production mode: detect readiness from stderr (tracing: "sidecar starting on http")
     let started = false
-
-    sidecar.stdout.on('data', (data) => {
-      for (const line of data.toString().trim().split('\n')) {
-        log.info(`[server] ${line}`)
-      }
-    })
-
-    sidecar.stderr.on('data', (data) => {
+    child.stderr.on('data', (data) => {
       for (const line of data.toString().trim().split('\n')) {
         log.info(`[server] ${line}`)
         if (!started && line.includes('sidecar starting on http')) {
           started = true
+          restartCount = 0
           mainWindowRef?.webContents.send('sidecar:ready')
         }
       }
-    })
-
-    sidecar.on('error', (err) => {
-      log.error('[sidecar] failed to start:', err.message)
-    })
-
-    sidecar.on('exit', (code, signal) => {
-      log.info(`[sidecar] exited code=${code} signal=${signal}`)
-      sidecar = null
     })
   }
 }
 
 function stopSidecar(): void {
+  isQuitting = true
+  if (restartTimer) {
+    clearTimeout(restartTimer)
+    restartTimer = null
+  }
   if (sidecar) {
     sidecar.kill()
     sidecar = null
