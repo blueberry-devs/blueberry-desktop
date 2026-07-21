@@ -76,6 +76,7 @@ jobs:
           npx electron-builder ${{ matrix.dist-flag }} --publish onTagOrDraft
 
       - name: Delete old artifact (keep only latest)
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
