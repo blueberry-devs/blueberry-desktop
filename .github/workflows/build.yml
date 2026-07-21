@@ -33,7 +33,7 @@ jobs:
             server-script: bash scripts/build-server.sh
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -47,21 +47,17 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - uses: actions/setup-python@v5
+      - name: Install Rust toolchain
+        uses: actions-rust-toolchain@v1
         with:
-          python-version: '3.12'
-          cache: pip
-
-      - name: Install Python deps
-        working-directory: server
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
+          toolchain: stable
+          profile: minimal
 
       - name: Install Node deps
         run: pnpm install --frozen-lockfile
 
       - name: Build server sidecar
+        shell: bash
         run: ${{ matrix.server-script }}
 
       - name: Build and package
