@@ -154,6 +154,18 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       hls.loadSource(url)
       hls.attachMedia(audio)
       hls.on(Hls.Events.MANIFEST_PARSED, () => audio.play().catch(() => {}))
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data.fatal) return
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            setTimeout(() => hls.startLoad(), 1000)
+            break
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            hls.recoverMediaError()
+            break
+          // default: non-recoverable, let the audio element fire ended naturally
+        }
+      })
       hlsRef.current = hls
     } else {
       audio.src = url
@@ -171,6 +183,17 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
         shadowHls.loadSource(url)
         shadowHls.attachMedia(shadow)
         shadowHls.on(Hls.Events.MANIFEST_PARSED, () => shadow.play().catch(() => {}))
+        shadowHls.on(Hls.Events.ERROR, (_event, data) => {
+          if (!data.fatal) return
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              setTimeout(() => shadowHls.startLoad(), 1000)
+              break
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              shadowHls.recoverMediaError()
+              break
+          }
+        })
         shadowHlsRef.current = shadowHls
       } else {
         shadow.src = url
