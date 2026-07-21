@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from typing import Optional
+from urllib.parse import quote
 
 import certifi
 
@@ -75,6 +76,7 @@ _sc_cache: dict = TTLCache(maxsize=1000, ttl=3600)
 _lyrics_cache: dict = TTLCache(maxsize=2000, ttl=6 * 3600)
 _stream_cache: dict = TTLCache(maxsize=1000, ttl=1800)
 _yt_search_cache: dict = TTLCache(maxsize=1000, ttl=3600)
+_yt_playlist_search_cache: dict = TTLCache(maxsize=500, ttl=3600)
 
 
 def cover_url(uri: Optional[str]) -> Optional[str]:
@@ -223,7 +225,7 @@ def playlist_tracks(playlist_id: str, offset: int = 0, limit: int = 50):
 
 @app.get('/api/search/playlists')
 def search_playlists(text: str):
-    """Search playlists across Yandex Music and SoundCloud."""
+    """Search playlists across Yandex Music, SoundCloud, and YouTube."""
     cache_key = text.lower()
     cached = _pl_search_cache.get(cache_key)
     if cached is not None:
@@ -267,6 +269,11 @@ def search_playlists(text: str):
             ))
     except requests.RequestException as exc:
         logger.warning('soundcloud playlist search failed: %s', exc)
+    # YouTube playlist search
+    try:
+        results.extend(yt_search_playlists(text, limit=5))
+    except Exception as exc:
+        logger.warning('youtube playlist search failed: %s', exc)
     _pl_search_cache[cache_key] = results
     return results
 
@@ -403,13 +410,45 @@ def yt_search(query: str, limit: int = 8) -> list:
     cache_key = f'{query.lower()}\x00{limit}'
     if cache_key in _yt_search_cache:
         return _yt_search_cache[cache_key]
-    if _has_pytubefix:
+    # yt-dlp first (fast, ~3-10s), pytubefix fallback (can be 30s+)
+    results = _yt_search_ytdlp(query, limit)
+    if not results and _has_pytubefix:
         results = _yt_search_pytube(query, limit)
-        if not results:
-            results = _yt_search_ytdlp(query, limit)
-    else:
-        results = _yt_search_ytdlp(query, limit)
     _yt_search_cache[cache_key] = results
+    return results
+
+
+def yt_search_playlists(query: str, limit: int = 10) -> list:
+    """Search YouTube for playlists via yt-dlp on the playlist-filtered search page."""
+    cache_key = f'{query.lower()}\x00{limit}'
+    if cache_key in _yt_playlist_search_cache:
+        return _yt_playlist_search_cache[cache_key]
+    try:
+        with yt_dlp.YoutubeDL({**YTDLP_SEARCH_OPTS, 'extract_flat': 'in_playlist'}) as ydl:
+            url = f'https://www.youtube.com/results?search_query={quote(query)}&sp=EgIQAw%3D%3D'
+            info = ydl.extract_info(url, download=False)
+    except Exception as exc:
+        logger.warning('yt playlist search failed for %r: %s', query, exc)
+        return []
+    entries = (info or {}).get('entries') or []
+    results = []
+    for e in entries[:limit]:
+        if not e or not e.get('id') or not e.get('title'):
+            continue
+        eid = e['id']
+        # Playlist IDs start with PL and are longer than video IDs (11 chars).
+        if len(eid) == 11:
+            continue
+        results.append(serialize_playlist(
+            pid=eid,
+            source='youtube',
+            title=e.get('title') or 'Unknown',
+            owner=e.get('uploader') or e.get('channel') or 'YouTube',
+            cover=(e.get('thumbnails') or [{}])[-1].get('url') if e.get('thumbnails') else e.get('thumbnail'),
+            track_count=e.get('playlist_count') or e.get('n_entries') or 0,
+            description=e.get('description') or '',
+        ))
+    _yt_playlist_search_cache[cache_key] = results
     return results
 
 
