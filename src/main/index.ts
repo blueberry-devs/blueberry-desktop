@@ -458,6 +458,7 @@ ipcMain.handle(
     updatePresence({
       trackName: data.trackName,
       artist: data.artist,
+      isPlaying: data.isPlaying,
       currentTime: data.currentTime,
       duration: data.duration,
       artworkUrl: data.artworkUrl || undefined,
@@ -562,6 +563,9 @@ app.whenReady().then(() => {
   setTimeout(() => checkForUpdates(false), 5000)
   setTimeout(() => checkDevUpdate(), 3000)
   setTimeout(() => checkRussianIp(), 8000)
+  // Connect to Discord RPC early so the app shows in the activity
+  // list even before the user plays anything.
+  clearPresence().catch(() => {})
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -16,36 +16,14 @@ import { pushHistory } from '../store/history'
 import { recordPlay } from '../store/playCount'
 import { getDownloadPath } from '../store/downloads'
 
-function updateDiscordPlaying(track: TrackResult): void {
-  window.api.discordUpdatePresence({
-    trackName: track.title,
-    artist: track.artists.join(', '),
-    currentTime: 0,
-    duration: track.duration ?? 0,
-    artworkUrl: track.cover ?? '',
-    isPlaying: true,
-  }).catch(() => {})
-}
-
-function updateDiscordPause(track: TrackResult, elapsed: number): void {
+function updateDiscordPresence(track: TrackResult, elapsed: number, playing: boolean): void {
   window.api.discordUpdatePresence({
     trackName: track.title,
     artist: track.artists.join(', '),
     currentTime: Math.floor(elapsed),
     duration: track.duration ?? 0,
     artworkUrl: track.cover ?? '',
-    isPlaying: false,
-  }).catch(() => {})
-}
-
-function updateDiscordResume(track: TrackResult, elapsed: number): void {
-  window.api.discordUpdatePresence({
-    trackName: track.title,
-    artist: track.artists.join(', '),
-    currentTime: Math.floor(elapsed),
-    duration: track.duration ?? 0,
-    artworkUrl: track.cover ?? '',
-    isPlaying: true,
+    isPlaying: playing,
   }).catch(() => {})
 }
 
@@ -213,6 +191,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
     }
     if (nextIndex === -1) {
       setIsPlaying(false)
+      window.api.discordClearPresence().catch(() => {})
       return
     }
     // eslint-disable-next-line @typescript-eslint/no-use-before-define
@@ -227,10 +206,10 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       if (currentTrack?.id === track.id && !preferSource) {
         if (audio.paused) {
           audio.play().catch(() => {})
-          updateDiscordResume(track, audio.currentTime)
+          updateDiscordPresence(track, audio.currentTime, true)
         } else {
           audio.pause()
-          updateDiscordPause(track, audio.currentTime)
+          updateDiscordPresence(track, audio.currentTime, false)
         }
         return
       }
@@ -240,7 +219,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       recordPlay(track.id)
       setCurrentTrack(track)
       setPlayingSource(null)
-      updateDiscordPlaying(track)
+      updateDiscordPresence(track, 0, true)
       setLyrics(null)
       setLyricsPlain(null)
       setLoadError(null)
@@ -339,13 +318,13 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       shadow.currentTime = audio.currentTime
       shadow.play().catch(() => {})
       const t = currentTrackRef.current
-      if (t) updateDiscordResume(t, audio.currentTime)
+      if (t) updateDiscordPresence(t, audio.currentTime, true)
     }
     const onPause = (): void => {
       setIsPlaying(false)
       shadow.pause()
       const t = currentTrackRef.current
-      if (t) updateDiscordPause(t, audio.currentTime)
+      if (t) updateDiscordPresence(t, audio.currentTime, false)
     }
     const onEnded = (): void => {
       if (loopModeRef.current === 'track') {
