@@ -158,7 +158,13 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir release
-          find release-artifacts -type f \( -name '*.exe' -o -name '*.AppImage' -o -name '*.zip' -o -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} release/ \;
+          # Only the actual distributables — skip helpers (elevate, music-server, portable exe)
+          find release-artifacts -type f \
+            -name 'Yandex-Music-Setup*.exe' -o \
+            -name 'Yandex-Music-*.AppImage' -o \
+            -name 'Yandex-Music-*.zip' -o \
+            -name 'Yandex-Music-*.dmg' \
+            -exec cp {} release/ \;
           ls -la release/
 
       - name: Build release body
