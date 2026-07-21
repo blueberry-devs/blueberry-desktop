@@ -412,7 +412,37 @@ function SearchView(): JSX.Element {
 
 
 
-          {loading && <div className="search-view__status">{t('player.generating')}</div>}
+          {loading && (
+            <>
+              <div className="search-view__hero-row">
+                <div className="skeleton-hero">
+                  <div className="skeleton skeleton-hero__cover" />
+                  <div className="skeleton-hero__lines">
+                    <div className="skeleton skeleton-hero__line" />
+                    <div className="skeleton skeleton-hero__line skeleton-hero__line--sub" />
+                  </div>
+                </div>
+                <div className="skeleton-hero">
+                  <div className="skeleton skeleton-hero__cover skeleton-hero__cover--round" />
+                  <div className="skeleton-hero__lines">
+                    <div className="skeleton skeleton-hero__line" />
+                    <div className="skeleton skeleton-hero__line skeleton-hero__line--sub" />
+                  </div>
+                </div>
+              </div>
+              <div className="search-view__results">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <div key={i} className="skeleton-row">
+                    <div className="skeleton skeleton-row__cover" />
+                    <div className="skeleton-row__lines">
+                      <div className="skeleton skeleton-row__line" />
+                      <div className="skeleton skeleton-row__line skeleton-row__line--short" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
           {error && <div className="search-view__status search-view__status--error">{error}</div>}
           {!loading && !error && resultsTab !== 'playlists' && results.length === 0 && (
             <div className="search-view__status">{t('search.noResults')}</div>

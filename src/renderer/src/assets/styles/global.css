@@ -157,3 +157,203 @@ button:active {
   background-size: 220% 220%;
   animation: hero-gradient-shift 10s ease infinite;
 }
+
+/* Skeleton loading placeholders — pulse at a subtle pace so the page
+   doesn't flicker. Layout-matching classes below let each component
+   build skeletons that mirror real card/row shapes. */
+@keyframes skeleton-shimmer {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.35; }
+  100% { opacity: 1; }
+}
+
+.skeleton {
+  background: rgba(255, 255, 255, 0.09);
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+:root[data-theme='light'] .skeleton {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* TrackRow skeleton — 48×48 cover, 14px gap, 14px/12px text lines */
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.skeleton-row__cover {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+}
+
+.skeleton-row__lines {
+  flex: 1;
+  min-width: 0;
+}
+
+.skeleton-row__line {
+  height: 14px;
+  border-radius: 4px;
+  width: 100%;
+}
+
+.skeleton-row__line--short {
+  width: 55%;
+  height: 12px;
+  margin-top: 4px;
+}
+
+/* TrendsView release-card skeleton — 200px wide, 64px circle, track bar */
+.skeleton-release {
+  flex: 0 0 auto;
+  width: 200px;
+  text-align: left;
+}
+
+.skeleton-release__avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  margin-bottom: 8px;
+}
+
+.skeleton-release__name {
+  height: 14px;
+  width: 100px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.skeleton-release__track {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+:root[data-theme='light'] .skeleton-release__track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.skeleton-release__thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.skeleton-release__title {
+  flex: 1;
+  height: 12px;
+  border-radius: 4px;
+}
+
+/* TrendsView style-card skeleton — square cover, title + artist */
+.skeleton-style {
+  text-align: left;
+}
+
+.skeleton-style__cover {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.skeleton-style__title {
+  height: 13px;
+  width: 70%;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.skeleton-style__artist {
+  height: 12px;
+  width: 50%;
+  border-radius: 4px;
+}
+
+/* Search hero skeleton — 64×64 cover + lines */
+.skeleton-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.skeleton-hero__cover {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+}
+
+.skeleton-hero__cover--round {
+  border-radius: 50%;
+}
+
+.skeleton-hero__lines {
+  flex: 1;
+  min-width: 0;
+}
+
+.skeleton-hero__line {
+  height: 16px;
+  border-radius: 4px;
+  width: 80%;
+}
+
+.skeleton-hero__line--sub {
+  height: 13px;
+  width: 55%;
+  margin-top: 5px;
+}
+
+/* DynamicIsland skeleton — 38×38 cover + lines */
+.skeleton-dyn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.skeleton-dyn__cover {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+.skeleton-dyn__lines {
+  flex: 1;
+  min-width: 0;
+}
+
+.skeleton-dyn__line {
+  height: 13px;
+  border-radius: 4px;
+  width: 80%;
+}
+
+.skeleton-dyn__line--artist {
+  height: 11px;
+  width: 60%;
+  margin-top: 2px;
+}
+
+/* NowPlayingPanel large skeleton — for generating state */
+.skeleton-np {
+  display: inline-block;
+  width: 240px;
+  height: 1.2em;
+  border-radius: 6px;
+  vertical-align: middle;
+}

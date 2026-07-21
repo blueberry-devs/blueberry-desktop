@@ -146,7 +146,31 @@ function TrendsView(): JSX.Element {
         </button>
       </div>
 
-      {loading && <div className="trends-view__status">Загружаем…</div>}
+      {loading && (
+        <>
+          <div className="trends-view__release-row" style={{ marginBottom: 32 }}>
+            {Array.from({ length: 4 }, (_, i) => (
+              <div key={i} className="skeleton-release">
+                <div className="skeleton skeleton-release__avatar" />
+                <div className="skeleton skeleton-release__name" />
+                <div className="skeleton-release__track">
+                  <div className="skeleton skeleton-release__thumb" />
+                  <div className="skeleton skeleton-release__title" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="trends-view__style-grid">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="skeleton-style">
+                <div className="skeleton skeleton-style__cover" />
+                <div className="skeleton skeleton-style__title" />
+                <div className="skeleton skeleton-style__artist" />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       {error && <div className="trends-view__status trends-view__status--error">{error}</div>}
 
       {topTab === 'foryou' && (

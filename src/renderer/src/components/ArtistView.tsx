@@ -69,7 +69,19 @@ function ArtistView({ name, onBack }: Props): JSX.Element {
 
       <section className="artist-view__section">
         <h2 className="artist-view__section-title">{t('artist.popular')}</h2>
-        {loading && <div className="artist-view__status">{t('artist.loading')}</div>}
+        {loading && (
+          <div style={{ maxWidth: 640 }}>
+            {Array.from({ length: 5 }, (_, i) => (
+              <div key={i} className="skeleton-row">
+                <div className="skeleton skeleton-row__cover" />
+                <div className="skeleton-row__lines">
+                  <div className="skeleton skeleton-row__line" />
+                  <div className="skeleton skeleton-row__line skeleton-row__line--short" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {!loading && tracks.length === 0 && (
           <div className="artist-view__status">{t('artist.notFound')}</div>
         )}
