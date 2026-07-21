@@ -16,8 +16,17 @@ if getattr(sys, 'frozen', False):
     os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import yt_dlp
 from cachetools import TTLCache
+
+# Shared session with automatic retry on 429 Rate Limited responses.
+# Exponential backoff: 1s, 2s, 4s between retries, max 3 attempts total.
+_session = requests.Session()
+_session.mount('https://', HTTPAdapter(max_retries=Retry(total=3, status_forcelist=[429], backoff_factor=1, raise_on_status=False)))
+_session.mount('http://', HTTPAdapter(max_retries=Retry(total=3, status_forcelist=[429], backoff_factor=1, raise_on_status=False)))
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
@@ -118,6 +127,10 @@ def status():
 
 @app.get('/api/search')
 def search(text: str):
+    cache_key = text.lower()
+    cached = _yandex_search_cache.get(cache_key)
+    if cached is not None:
+        return cached
     if _client is None:
         raise HTTPException(status_code=503, detail='Yandex Music client unavailable (no network?)')
     try:
@@ -129,11 +142,16 @@ def search(text: str):
         logger.warning('yandex search failed: %s', exc)
         return []
     tracks = result.tracks.results if result.tracks else []
-    return [serialize_track(t) for t in tracks[:30]]
+    out = [serialize_track(t) for t in tracks[:30]]
+    _yandex_search_cache[cache_key] = out
+    return out
 
 
 @app.get('/api/trends')
 def trends():
+    cached = _trends_cache.get('default')
+    if cached is not None:
+        return cached
     if _client is None:
         raise HTTPException(status_code=503, detail='Yandex Music client unavailable (no network?)')
     try:
@@ -142,7 +160,9 @@ def trends():
         logger.warning('yandex chart failed: %s', exc)
         return []
     tracks = chart.chart.tracks if chart and chart.chart else []
-    return [serialize_track(ct.track) for ct in tracks[:30]]
+    out = [serialize_track(ct.track) for ct in tracks[:30]]
+    _trends_cache['default'] = out
+    return out
 
 
 @app.get('/api/search/youtube')
@@ -152,6 +172,9 @@ def search_youtube(text: str):
 
 _sc_search_cache: dict = TTLCache(maxsize=1000, ttl=3600)
 _pl_tracks_cache: dict = TTLCache(maxsize=500, ttl=600)
+_yandex_search_cache: dict = TTLCache(maxsize=1000, ttl=3600)
+_trends_cache: dict = TTLCache(maxsize=50, ttl=600)
+_pl_search_cache: dict = TTLCache(maxsize=500, ttl=3600)
 
 
 @app.get('/api/playlist/tracks')
@@ -201,6 +224,10 @@ def playlist_tracks(playlist_id: str, offset: int = 0, limit: int = 50):
 @app.get('/api/search/playlists')
 def search_playlists(text: str):
     """Search playlists across Yandex Music and SoundCloud."""
+    cache_key = text.lower()
+    cached = _pl_search_cache.get(cache_key)
+    if cached is not None:
+        return cached
     results = []
     # Yandex Music playlist search
     if _client is not None:
@@ -240,10 +267,8 @@ def search_playlists(text: str):
             ))
     except requests.RequestException as exc:
         logger.warning('soundcloud playlist search failed: %s', exc)
+    _pl_search_cache[cache_key] = results
     return results
-
-
-_sc_search_cache: dict = TTLCache(maxsize=1000, ttl=3600)
 
 
 @app.get('/api/search/soundcloud')
@@ -595,7 +620,7 @@ def artist_photo(name: str):
         return {'url': cached}
 
     try:
-        r = requests.get(
+        r = _session.get(
             'https://api.deezer.com/search/artist',
             params={'q': name, 'limit': 1, 'index': 0},
             timeout=10,
@@ -622,7 +647,7 @@ SC_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 def sc_get(url: str, params: Optional[dict] = None) -> dict:
     p = dict(params or {})
     p['client_id'] = SOUNDCLOUD_CLIENT_ID
-    r = requests.get(url, params=p, headers=SC_HEADERS, timeout=15)
+    r = _session.get(url, params=p, headers=SC_HEADERS, timeout=15)
     r.raise_for_status()
     return r.json()
 
@@ -782,7 +807,7 @@ LRCLIB_HEADERS = {'User-Agent': 'yandex-music-clone (https://github.com/local/ym
 
 
 def _lrclib_search(params: dict) -> list:
-    r = requests.get('https://lrclib.net/api/search', params=params, headers=LRCLIB_HEADERS, timeout=15)
+    r = _session.get('https://lrclib.net/api/search', params=params, headers=LRCLIB_HEADERS, timeout=15)
     if r.status_code == 404:
         return []
     r.raise_for_status()
