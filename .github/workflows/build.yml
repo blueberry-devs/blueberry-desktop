@@ -36,22 +36,17 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Setup SSH for private submodules
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SUBMODULE_DEPLOY_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          echo "Host github.com" >> ~/.ssh/config
-          echo "  KexAlgorithms curve25519-sha256,ecdh-sha2-nistp256" >> ~/.ssh/config
-          ssh-keyscan -O KexAlgorithms=curve25519-sha256 -t rsa github.com >> ~/.ssh/known_hosts
-
+      - name: Generate token for private submodules
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
 
       - uses: actions/checkout@v4
-
-      - name: Init private submodules
-        run: |
-          git submodule sync --recursive
-          git submodule update --init --recursive
+        with:
+          submodules: recursive
+          token: ${{ steps.app-token.outputs.token }}
 
       - uses: pnpm/action-setup@v4
         with:
