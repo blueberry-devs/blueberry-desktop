@@ -20,9 +20,10 @@ let mainWindowRef: BrowserWindow | null = null
 const SIDECAR_PORT = 8787
 
 function resolveServerExe(): string {
-  // Production: bundled Rust .exe
-  const exePath = join(process.resourcesPath, 'server', 'music-server.exe')
-  if (!is.dev && existsSync(exePath)) return exePath
+  if (is.dev) return ''
+  const name = process.platform === 'win32' ? 'music-server.exe' : 'music-server'
+  const exePath = join(process.resourcesPath, 'server', name)
+  if (existsSync(exePath)) return exePath
   return ''
 }
 
@@ -169,27 +170,29 @@ function startSidecar(): void {
     }
     poll()
   } else {
-    // Production: spawn in background, detect readiness from stdout
+    // Production: spawn in background, detect readiness from stderr (tracing)
     log.info('[sidecar] starting production:', entry)
-    sidecar = spawn(entry, [], { cwd: serverDir, env })
+    sidecar = spawn(entry, [], {
+      cwd: serverDir,
+      env: { ...env, RUST_LOG: 'info,tower_http=info' },
+      stdio: 'pipe',
+    })
 
     let started = false
 
     sidecar.stdout.on('data', (data) => {
-      const text = data.toString()
-      log.info(`[sidecar] stdout: ${text.trim()}`)
-      if (!started && text.includes('sidecar starting on http')) {
-        started = true
-        mainWindowRef?.webContents.send('sidecar:ready')
+      for (const line of data.toString().trim().split('\n')) {
+        log.info(`[server] ${line}`)
       }
     })
 
     sidecar.stderr.on('data', (data) => {
-      const text = data.toString()
-      log.warn(`[sidecar] stderr: ${text.trim()}`)
-      if (!started && text.includes('sidecar starting on http')) {
-        started = true
-        mainWindowRef?.webContents.send('sidecar:ready')
+      for (const line of data.toString().trim().split('\n')) {
+        log.info(`[server] ${line}`)
+        if (!started && line.includes('sidecar starting on http')) {
+          started = true
+          mainWindowRef?.webContents.send('sidecar:ready')
+        }
       }
     })
 
