@@ -27,9 +27,18 @@ jobs:
     outputs:
       version: ${{ steps.bump.outputs.version }}
     steps:
+      - name: Generate token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          owner: blueberry-devs
+          repositories: blueberry-desktop
+
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - uses: pnpm/action-setup@v4
         with:
