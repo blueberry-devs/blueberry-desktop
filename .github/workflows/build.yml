@@ -44,8 +44,11 @@ jobs:
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+
+      - name: Init private submodules
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --recursive
 
       - uses: pnpm/action-setup@v4
         with:
