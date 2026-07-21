@@ -475,6 +475,7 @@ def _yt_resolve_stream_ytdlp(video_id: str) -> Optional[str]:
 
 
 def yt_resolve_stream(video_id: str) -> Optional[str]:
+    # pytubefix first (faster direct URL), yt-dlp fallback if it fails
     if _has_pytubefix:
         url = _yt_resolve_stream_pytube(video_id)
         if url:
@@ -577,23 +578,38 @@ def video_stream(video_id: str, request: Request):
         raise HTTPException(400, 'video_id required')
 
     logger.info('[video_stream] Resolving stream for %s', video_id)
-    try:
-        info = _yt_extract(
-            f'https://www.youtube.com/watch?v={video_id}',
-            format='best[height<=720][acodec=none]/best[height<=720][ext=mp4]/best[height<=720]/best',
-        )
-        stream_url = (info or {}).get('url')
-        if not stream_url:
-            raise HTTPException(502, 'Failed to resolve stream URL')
-    except Exception as exc:
-        logger.warning('stream resolve failed for %s: %s', video_id, exc)
-        raise HTTPException(502, f'Stream resolution failed: {exc}')
-
+    stream_url = None
     yt_headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Referer': 'https://www.youtube.com/',
         'Origin': 'https://www.youtube.com',
     }
+
+    # pytubefix first — direct URL, no extraction overhead
+    if _has_pytubefix:
+        try:
+            yt = YouTube(f'https://www.youtube.com/watch?v={video_id}')
+            stream = yt.streams.filter(adaptive=True, file_extension='mp4').order_by('resolution').desc().first()
+            if stream and stream.url:
+                stream_url = stream.url
+                logger.info('[video_stream] resolved via pytubefix')
+        except Exception as exc:
+            logger.warning('pytubefix stream resolve failed for %s: %s', video_id, exc)
+
+    # yt-dlp fallback if pytubefix didn't work
+    if not stream_url:
+        try:
+            info = _yt_extract(
+                f'https://www.youtube.com/watch?v={video_id}',
+                format='best[height<=720][acodec=none]/best[height<=720][ext=mp4]/best[height<=720]/best',
+            )
+            stream_url = (info or {}).get('url')
+        except Exception as exc:
+            logger.warning('yt-dlp stream resolve failed for %s: %s', video_id, exc)
+            raise HTTPException(502, f'Stream resolution failed: {exc}')
+
+    if not stream_url:
+        raise HTTPException(502, 'Failed to resolve stream URL')
 
     range_header = request.headers.get('range')
     if range_header:

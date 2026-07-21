@@ -113,7 +113,17 @@ function RemotePlaylistDetailView({ playlist, onBack }: Props): JSX.Element {
 
       <div className="playlist-detail__tracks">
         {loading && (
-          <div className="playlist-detail__empty">Загружаем треки…</div>
+          <div style={{ maxWidth: 640 }}>
+            {Array.from({ length: 5 }, (_, i) => (
+              <div key={i} className="skeleton-row">
+                <div className="skeleton skeleton-row__cover" />
+                <div className="skeleton-row__lines">
+                  <div className="skeleton skeleton-row__line" />
+                  <div className="skeleton skeleton-row__line skeleton-row__line--short" />
+                </div>
+              </div>
+            ))}
+          </div>
         )}
         {error && (
           <div className="playlist-detail__empty">{error}</div>
@@ -125,7 +135,15 @@ function RemotePlaylistDetailView({ playlist, onBack }: Props): JSX.Element {
           <TrackRow key={t.id} track={t} queue={tracks} index={i} onArtistClick={requestArtistSearch} />
         ))}
         <div ref={loaderRef} style={{ height: 1 }} />
-        {loadingMore && <div className="playlist-detail__empty">Загружаем ещё…</div>}
+        {loadingMore && (
+          <div className="skeleton-row" style={{ opacity: 0.5 }}>
+            <div className="skeleton skeleton-row__cover" />
+            <div className="skeleton-row__lines">
+              <div className="skeleton skeleton-row__line" />
+              <div className="skeleton skeleton-row__line skeleton-row__line--short" />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
