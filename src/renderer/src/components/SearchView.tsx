@@ -102,6 +102,7 @@ interface ArtistGroup {
 
 function PlaylistCard({ playlist }: { playlist: PlaylistResult }): JSX.Element {
   const isFavorite = useIsFavoritePlaylist(playlist.id)
+  const { t } = useTranslation()
   return (
     <div className="search-view__playlist-card">
       <div className="search-view__playlist-cover" style={playlist.cover ? { backgroundImage: `url(${playlist.cover})` } : undefined}>
