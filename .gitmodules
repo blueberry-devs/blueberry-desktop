@@ -1,3 +1,3 @@
 [submodule "server"]
 	path = server
-	url = git@github.com:blueberry-devs/blueberry-music-lib.git
+	url = https://github.com/blueberry-devs/blueberry-music-lib
