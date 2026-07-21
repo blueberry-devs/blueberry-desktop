@@ -100,26 +100,27 @@ jobs:
       - name: Install Node deps
         run: pnpm install
 
-      - name: Decode Windows certificate
-        if: runner.os == 'Windows' && secrets.WIN_CERT_BASE64 != ''
-        env:
-          WIN_CERT_BASE64: ${{ secrets.WIN_CERT_BASE64 }}
-        run: |
-          $bytes = [Convert]::FromBase64String("$env:WIN_CERT_BASE64")
-          Set-Content -Path "$env:RUNNER_TEMP\cert.pfx" -Value $bytes -AsByteStream
-
       - name: Build server sidecar
         run: ${{ matrix.server-script }}
 
       - name: Build and package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ runner.os == 'Windows' && secrets.WIN_CERT_BASE64 != '' && format('{0}\cert.pfx', runner.temp) || '' }}
-          CSC_KEY_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+          WIN_CERT_BASE64: ${{ secrets.WIN_CERT_BASE64 }}
+          WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        shell: bash
         run: |
+          # Decode and set signing vars per-platform
+          if [ "$RUNNER_OS" = "Windows" ] && [ -n "$WIN_CERT_BASE64" ]; then
+            echo "$WIN_CERT_BASE64" | base64 -d > "$RUNNER_TEMP/cert.pfx"
+            export CSC_LINK="$RUNNER_TEMP/cert.pfx"
+            export CSC_KEY_PASSWORD="$WIN_CERT_PASSWORD"
+            echo "[signing] Windows certificate configured"
+          fi
+          # macOS signing uses APPLE_ID/APPLE_ID_PASSWORD/APPLE_TEAM_ID directly
           pnpm run build
           npx electron-builder ${{ matrix.dist-flag }} --publish never
 
@@ -158,6 +159,11 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
-          body: ${{ inputs.release_notes }}
+          body: |
+            ${{ inputs.release_notes }}
+
+            ---
+            _Generated from commits since last release._
           files: release/*
+          generate_release_notes: true
           fail_on_unmatched_files: false
