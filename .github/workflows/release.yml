@@ -90,7 +90,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-tags: true
-          submodules: recursive
+
+      - name: Init private submodules
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --recursive
 
       - uses: pnpm/action-setup@v4
         with:
