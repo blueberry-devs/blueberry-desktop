@@ -54,7 +54,6 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build server sidecar
-        shell: bash
         run: ${{ matrix.server-script }}
 
       - name: Build and package
