@@ -20,19 +20,16 @@ let mainWindowRef: BrowserWindow | null = null
 const SIDECAR_PORT = 8787
 
 function resolveServerExe(): string {
-  // Production: bundled PyInstaller .exe
+  // Production: bundled Rust .exe
   const exePath = join(process.resourcesPath, 'server', 'music-server.exe')
   if (!is.dev && existsSync(exePath)) return exePath
   return ''
 }
 
 function resolveServerDir(): string {
-  // Production: try PyInstaller bundle first, then raw Python
   if (!is.dev) {
     const exePath = resolveServerExe()
     if (exePath) return join(process.resourcesPath, 'server')
-    const packagedDir = join(process.resourcesPath, 'server')
-    if (existsSync(packagedDir)) return packagedDir
   }
   return join(app.getAppPath(), 'server')
 }
@@ -82,64 +79,129 @@ function killExistingSidecar(): void {
   sleepSync(300)
 }
 
+function pollServer(port: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  return new Promise((resolve, reject) => {
+    const poll = (): void => {
+      if (Date.now() > deadline) {
+        reject(new Error('server did not start within ' + timeoutMs + 'ms'))
+        return
+      }
+      fetch(`http://127.0.0.1:${port}/api/status`)
+        .then(() => resolve())
+        .catch(() => setTimeout(poll, 200))
+    }
+    poll()
+  })
+}
+
 function startSidecar(): void {
   const serverDir = resolveServerDir()
   const exePath = resolveServerExe()
-  let command: string
-  let args: string[]
-  let cwd: string
+
+  let entry: string | null = null
 
   if (exePath) {
-    command = exePath
-    args = []
-    cwd = serverDir
-    log.info('[sidecar] starting packed exe:', exePath)
+    entry = exePath
   } else {
-    const entry = join(serverDir, 'main.py')
-    if (!existsSync(entry)) {
-      log.warn('[sidecar] server/main.py not found, skipping start:', entry)
-      return
-    }
-    const pythonBin = process.platform === 'win32' ? 'python' : 'python3'
-    command = pythonBin
-    args = ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', String(SIDECAR_PORT)]
-    cwd = serverDir
-    log.info('[sidecar] starting via python:', entry)
+    const devPaths = [
+      join(serverDir, 'music-server.exe'),
+      join(serverDir, 'target', 'release', 'music-server.exe'),
+      join(serverDir, 'target', 'debug', 'music-server.exe'),
+      join(serverDir, 'target', 'x86_64-pc-windows-gnu', 'release', 'music-server.exe'),
+    ]
+    entry = devPaths.find((p) => existsSync(p)) ?? null
+  }
+
+  if (!entry) {
+    log.warn('[sidecar] music-server.exe not found in', serverDir)
+    return
   }
 
   killExistingSidecar()
 
   const env = { ...process.env, SIDECAR_PORT: String(SIDECAR_PORT) }
-  sidecar = spawn(command, args, { cwd, env })
 
-  let started = false
+  if (is.dev) {
+    log.info('[sidecar] starting dev:', entry)
 
-  sidecar.stdout.on('data', (data) => {
-    const text = data.toString()
-    log.info(`[sidecar] stdout: ${text.trim()}`)
-    if (!started && text.includes('Uvicorn running')) {
-      started = true
-      mainWindowRef?.webContents.send('sidecar:ready')
+    try {
+      const child = spawn(entry, [], {
+        cwd: serverDir,
+        env: { ...env, RUST_LOG: 'info,tower_http=info' },
+        stdio: 'pipe',
+      })
+      child.stdout.on('data', (data) => {
+        for (const line of data.toString().trim().split('\n')) {
+          log.info(`[server] ${line}`)
+        }
+      })
+      child.stderr.on('data', (data) => {
+        for (const line of data.toString().trim().split('\n')) {
+          log.warn(`[server] ${line}`)
+        }
+      })
+      child.on('error', (err) => log.error('[sidecar] spawn failed:', err.message))
+      child.on('exit', (code, signal) => {
+        log.info(`[sidecar] exited code=${code} signal=${signal}`)
+        if (sidecar === child) sidecar = null
+      })
+      sidecar = child
+    } catch (err) {
+      log.error('[sidecar] spawn threw:', err)
     }
-  })
 
-  sidecar.stderr.on('data', (data) => {
-    const text = data.toString()
-    log.warn(`[sidecar] stderr: ${text.trim()}`)
-    if (!started && text.includes('Uvicorn running')) {
-      started = true
-      mainWindowRef?.webContents.send('sidecar:ready')
+    let ready = false
+    const readyTimeout = setTimeout(() => {
+      if (!ready) log.warn('[sidecar] server not ready after 30s')
+    }, 30_000)
+
+    const poll = (): void => {
+      if (ready) return
+      fetch(`http://127.0.0.1:${SIDECAR_PORT}/api/status`)
+        .then(() => {
+          ready = true
+          clearTimeout(readyTimeout)
+          mainWindowRef?.webContents.send('sidecar:ready')
+          log.info('[sidecar] ready')
+        })
+        .catch(() => setTimeout(poll, 200))
     }
-  })
+    poll()
+  } else {
+    // Production: spawn in background, detect readiness from stdout
+    log.info('[sidecar] starting production:', entry)
+    sidecar = spawn(entry, [], { cwd: serverDir, env })
 
-  sidecar.on('error', (err) => {
-    log.error('[sidecar] failed to start:', err.message)
-  })
+    let started = false
 
-  sidecar.on('exit', (code) => {
-    log.info(`[sidecar] exited with code ${code}`)
-    sidecar = null
-  })
+    sidecar.stdout.on('data', (data) => {
+      const text = data.toString()
+      log.info(`[sidecar] stdout: ${text.trim()}`)
+      if (!started && text.includes('sidecar starting on http')) {
+        started = true
+        mainWindowRef?.webContents.send('sidecar:ready')
+      }
+    })
+
+    sidecar.stderr.on('data', (data) => {
+      const text = data.toString()
+      log.warn(`[sidecar] stderr: ${text.trim()}`)
+      if (!started && text.includes('sidecar starting on http')) {
+        started = true
+        mainWindowRef?.webContents.send('sidecar:ready')
+      }
+    })
+
+    sidecar.on('error', (err) => {
+      log.error('[sidecar] failed to start:', err.message)
+    })
+
+    sidecar.on('exit', (code, signal) => {
+      log.info(`[sidecar] exited code=${code} signal=${signal}`)
+      sidecar = null
+    })
+  }
 }
 
 function stopSidecar(): void {
@@ -522,10 +584,11 @@ function checkDevUpdate(): void {
         const release = JSON.parse(data)
         const latestVersion = release.tag_name || release.name || ''
         if (compareVersions(currentVersion, latestVersion) < 0) {
-          log.info(`[updater] Update available: ${latestVersion}`)
-          if (!app.isPackaged) {
-            log.info('[updater] Run git pull && npm run build to update.')
+          if (app.isPackaged) {
+            log.info(`[updater] Update available: ${latestVersion}. electron-updater will handle the download.`)
+            return
           }
+          log.info('[updater] Run git pull && npm run build to update.')
           mainWindowRef?.webContents.send('notification:show', {
             type: 'update',
             title: 'update',
@@ -581,3 +644,5 @@ app.on('before-quit', () => {
   stopSidecar()
   destroyDiscord()
 })
+
+process.on('exit', stopSidecar)

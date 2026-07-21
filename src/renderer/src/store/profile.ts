@@ -11,6 +11,7 @@ export interface Profile {
   videoBackground: boolean
   navbarPosition: NavbarPosition
   language: string
+  waveColorPreset: string
 }
 
 export type NavbarPosition = 'left' | 'top' | 'bottom'
@@ -21,7 +22,8 @@ const DEFAULT_PROFILE: Profile = {
   allowExplicit: true,
   videoBackground: true,
   navbarPosition: 'left',
-  language: 'ru'
+  language: 'ru',
+  waveColorPreset: 'random'
 }
 
 let cache: Profile = load()
@@ -85,6 +87,11 @@ export function setNavbarPosition(navbarPosition: NavbarPosition): void {
 
 export function setLanguage(language: string): void {
   cache = { ...cache, language }
+  emit()
+}
+
+export function setWaveColorPreset(preset: string): void {
+  cache = { ...cache, waveColorPreset: preset }
   emit()
 }
 
