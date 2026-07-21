@@ -10,6 +10,7 @@ import { spawn, execSync, ChildProcessWithoutNullStreams } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import { updatePresence, clearPresence, destroy as destroyDiscord } from './discord'
+import log from 'electron-log'
 
 let sidecar: ChildProcessWithoutNullStreams | null = null
 let tray: Tray | null = null
@@ -49,9 +50,9 @@ function killOrphansOnPort(port: number): void {
       for (const pid of pids) {
         try {
           execSync(`taskkill /F /T /PID ${pid}`)
-          console.log(`[sidecar] killed orphaned process tree on port ${port} (pid ${pid})`)
-        } catch {
-          /* already gone */
+          log.info(`[sidecar] killed orphaned process tree on port ${port} (pid ${pid})`)
+        } catch (e) {
+          log.warn('[sidecar] orphan kill race on pid', pid, e)
         }
       }
     } else {
@@ -59,9 +60,9 @@ function killOrphansOnPort(port: number): void {
       for (const pid of out.split('\n').map((p) => p.trim()).filter(Boolean)) {
         try {
           execSync(`kill -9 ${pid}`)
-          console.log(`[sidecar] killed orphaned process on port ${port} (pid ${pid})`)
-        } catch {
-          /* already gone */
+          log.info(`[sidecar] killed orphaned process on port ${port} (pid ${pid})`)
+        } catch (e) {
+          log.warn('[sidecar] orphan kill race on pid', pid, e)
         }
       }
     }
@@ -92,18 +93,18 @@ function startSidecar(): void {
     command = exePath
     args = []
     cwd = serverDir
-    console.log('[sidecar] starting packed exe:', exePath)
+    log.info('[sidecar] starting packed exe:', exePath)
   } else {
     const entry = join(serverDir, 'main.py')
     if (!existsSync(entry)) {
-      console.warn('[sidecar] server/main.py not found, skipping start:', entry)
+      log.warn('[sidecar] server/main.py not found, skipping start:', entry)
       return
     }
     const pythonBin = process.platform === 'win32' ? 'python' : 'python3'
     command = pythonBin
     args = ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', String(SIDECAR_PORT)]
     cwd = serverDir
-    console.log('[sidecar] starting via python:', entry)
+    log.info('[sidecar] starting via python:', entry)
   }
 
   killExistingSidecar()
@@ -115,7 +116,7 @@ function startSidecar(): void {
 
   sidecar.stdout.on('data', (data) => {
     const text = data.toString()
-    console.log(`[sidecar] ${text}`)
+    log.info(`[sidecar] stdout: ${text.trim()}`)
     if (!started && text.includes('Uvicorn running')) {
       started = true
       mainWindowRef?.webContents.send('sidecar:ready')
@@ -124,7 +125,7 @@ function startSidecar(): void {
 
   sidecar.stderr.on('data', (data) => {
     const text = data.toString()
-    console.error(`[sidecar] ${text}`)
+    log.warn(`[sidecar] stderr: ${text.trim()}`)
     if (!started && text.includes('Uvicorn running')) {
       started = true
       mainWindowRef?.webContents.send('sidecar:ready')
@@ -132,11 +133,11 @@ function startSidecar(): void {
   })
 
   sidecar.on('error', (err) => {
-    console.error('[sidecar] failed to start:', err.message)
+    log.error('[sidecar] failed to start:', err.message)
   })
 
   sidecar.on('exit', (code) => {
-    console.log(`[sidecar] exited with code ${code}`)
+    log.info(`[sidecar] exited with code ${code}`)
     sidecar = null
   })
 }
@@ -173,7 +174,7 @@ function createWindow(): void {
     mainWindow.show()
     if (is.dev) {
       mainWindow.webContents.openDevTools()
-      console.log('[dev] DevTools opened')
+      log.info('[dev] DevTools opened')
     }
   })
 
@@ -281,11 +282,11 @@ function setupAutoUpdater(): void {
   autoUpdater.autoInstallOnAppQuit = true
 
   autoUpdater.on('download-progress', (info) => {
-    console.log(`[ ${Math.round(info.percent)}% ] Downloading update...`)
+    log.info(`[updater] ${Math.round(info.percent)}% downloaded`)
   })
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('Update downloaded. Restart the app to install.')
+    log.info('[updater] Update downloaded. Restart the app to install.')
     mainWindowRef?.webContents.send('notification:show', {
       type: 'update',
       title: 'update',
@@ -294,7 +295,7 @@ function setupAutoUpdater(): void {
   })
 
   autoUpdater.on('error', (err) => {
-    console.error('[updater] error:', err.message)
+    log.error('[updater] error:', err.message)
   })
 }
 
@@ -302,10 +303,7 @@ function checkForUpdates(manual: boolean): void {
   if (!app.isPackaged || updateCheckInFlight) return
   updateCheckInFlight = true
 
-  console.log('')
-  console.log('Checking for updates')
-  console.log('')
-  console.log(`Current version: ${app.getVersion()}`)
+  log.info('[updater] checking for updates, current version:', app.getVersion())
 
   if (manual) {
     const onNotAvailable = (): void => {
@@ -317,7 +315,7 @@ function checkForUpdates(manual: boolean): void {
 
   autoUpdater
     .checkForUpdates()
-    .catch((err) => console.error('[updater] check failed:', err.message))
+    .catch((err) => log.error('[updater] check failed:', err.message))
     .finally(() => {
       updateCheckInFlight = false
     })
@@ -489,12 +487,12 @@ function checkRussianIp(): void {
             message: ''
           })
         }
-      } catch {
-        /* ignore */
+      } catch (e) {
+        log.warn('[vpn-check] geo parse failed:', e)
       }
     })
-  }).on('error', () => {
-    /* ignore */
+  }).on('error', (err) => {
+    log.warn('[vpn-check] ip-api network error:', err.message)
   })
 }
 
@@ -512,10 +510,7 @@ function compareVersions(a: string, b: string): number {
 
 function checkDevUpdate(): void {
   const currentVersion = app.getVersion()
-  console.log('')
-  console.log('Checking for updates')
-  console.log('')
-  console.log(`Current version: ${currentVersion}`)
+  log.info('[updater] dev check, current version:', currentVersion)
 
   const repo = 'blueberry-devs/blueberry-desktop'
   https.get(`https://api.github.com/repos/${repo}/releases/latest`, { headers: { 'User-Agent': 'blueberry-desktop' } }, (res) => {
@@ -525,12 +520,10 @@ function checkDevUpdate(): void {
       try {
         const release = JSON.parse(data)
         const latestVersion = release.tag_name || release.name || ''
-        console.log(`Latest version: ${latestVersion}`)
-
         if (compareVersions(currentVersion, latestVersion) < 0) {
-          console.log(`Update available: ${latestVersion}`)
+          log.info(`[updater] Update available: ${latestVersion}`)
           if (!app.isPackaged) {
-            console.log('Run git pull && npm run build to update.')
+            log.info('[updater] Run git pull && npm run build to update.')
           }
           mainWindowRef?.webContents.send('notification:show', {
             type: 'update',
@@ -538,19 +531,19 @@ function checkDevUpdate(): void {
             message: latestVersion
           })
         } else {
-          console.log('Your version is up to date')
+          log.info('[updater] up to date')
           mainWindowRef?.webContents.send('notification:show', {
             type: 'uptodate',
             title: 'uptodate',
             message: ''
           })
         }
-      } catch {
-        /* ignore */
+      } catch (e) {
+        log.warn('[updater] dev check parse error:', e)
       }
     })
-  }).on('error', () => {
-    /* ignore */
+  }).on('error', (err) => {
+    log.warn('[updater] dev check network error:', err.message)
   })
 }
 

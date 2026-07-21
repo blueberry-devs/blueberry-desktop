@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import log from 'electron-log/renderer'
 
 type Listener = () => void
 
@@ -52,7 +53,7 @@ export function createStore<T>(key: string, fallback: T) {
     // localStorage is instant — guarantees in-session survival
     try { localStorage.setItem(lsKey, json) } catch { /* quota */ }
     // IPC file — survives restart even if localStorage is wiped
-    try { await window.api.storeSet(key, json) } catch (e) { console.error('store persist failed:', e) }
+    try { await window.api.storeSet(key, json) } catch (e) { log.error('store persist failed:', e) }
   }
 
   function set(value: T): void {
