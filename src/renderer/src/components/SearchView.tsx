@@ -101,6 +101,7 @@ interface ArtistGroup {
 }
 
 function PlaylistCard({ playlist }: { playlist: PlaylistResult }): JSX.Element {
+  const { t } = useTranslation()
   const isFavorite = useIsFavoritePlaylist(playlist.id)
   const { t } = useTranslation()
   return (

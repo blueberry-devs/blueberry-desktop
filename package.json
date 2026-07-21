@@ -35,13 +35,8 @@
     "icon": "resources/icon.png",
     "extraResources": [
       {
-        "from": "server",
-        "to": "server",
-        "filter": [
-          "**/*",
-          "!**/__pycache__",
-          "!**/.venv"
-        ]
+        "from": "build/packed-server",
+        "to": "server"
       },
       {
         "from": "resources/artists",
@@ -55,36 +50,18 @@
     },
     "win": {
       "artifactName": "Yandex-Music-Setup.${version}.exe",
-      "icon": "resources/icon.ico",
-      "extraResources": [
-        {
-          "from": "build/packed-server",
-          "to": "server"
-        }
-      ]
+      "icon": "resources/icon.ico"
     },
     "linux": {
       "artifactName": "Yandex-Music-${version}.AppImage",
-      "icon": "resources/icon.png",
-      "extraResources": [
-        {
-          "from": "build/packed-server",
-          "to": "server"
-        }
-      ]
+      "icon": "resources/icon.png"
     },
     "mac": {
       "target": [
         "zip"
       ],
       "artifactName": "Yandex-Music-${version}-${arch}.zip",
-      "icon": "resources/icon-mac.png",
-      "extraResources": [
-        {
-          "from": "build/packed-server",
-          "to": "server"
-        }
-      ]
+      "icon": "resources/icon-mac.png"
     }
   },
   "devDependencies": {
