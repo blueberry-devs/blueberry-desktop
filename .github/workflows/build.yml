@@ -64,6 +64,10 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+
       - name: Install Node deps
         run: pnpm install --frozen-lockfile
 
