@@ -638,6 +638,7 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  log.initialize()
   startSidecar()
   createWindow()
   setupAutoUpdater()
