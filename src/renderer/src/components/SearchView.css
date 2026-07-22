@@ -179,6 +179,70 @@
   cursor: default;
 }
 
+/* ---- Source filter pills with PNG icons ---- */
+.search-view__source-filters {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.search-view__source-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  height: 38px;
+  border-radius: 999px;
+  padding: 0 16px 0 12px;
+  cursor: pointer;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  border: 1.5px solid transparent;
+}
+
+.search-view__source-pill:hover {
+  background: var(--surface-hover);
+}
+
+.search-view__source-pill--active {
+  border-color: var(--accent, #ffdb4d);
+  color: #fff;
+  background: rgba(255, 219, 77, 0.1);
+}
+
+.search-view__source-pill-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.search-view__source-pill-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.search-view__source-pill-label {
+  line-height: 1;
+}
+
+.search-view__source-pill-check {
+  font-size: 11px;
+  color: var(--accent, #ffdb4d);
+  margin-left: -2px;
+}
+
 .search-view__status {
   margin-top: 24px;
   font-size: 13px;

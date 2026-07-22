@@ -1,9 +1,11 @@
 import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron'
 import https from 'https'
 
-app.commandLine.appendSwitch('enable-accelerated-video-decode')
-app.commandLine.appendSwitch('ignore-gpu-blocklist')
-app.commandLine.appendSwitch('enable-gpu-rasterization')
+if (!is.dev) {
+  app.commandLine.appendSwitch('enable-accelerated-video-decode')
+  app.commandLine.appendSwitch('ignore-gpu-blocklist')
+  app.commandLine.appendSwitch('enable-gpu-rasterization')
+}
 import { join } from 'path'
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs'
 import { spawn, execSync, ChildProcessWithoutNullStreams } from 'child_process'
@@ -156,7 +158,7 @@ function startSidecar(): void {
   const child = spawn(entry, [], {
     cwd: serverDir,
     env: { ...env, RUST_LOG: 'info,tower_http=info' },
-    stdio: 'pipe',
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
   sidecar = child
 
@@ -253,10 +255,6 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
-    if (is.dev) {
-      mainWindow.webContents.openDevTools()
-      log.info('[dev] DevTools opened')
-    }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -645,10 +643,10 @@ app.whenReady().then(() => {
   // Give the window a moment to actually show before nagging about updates.
   setTimeout(() => checkForUpdates(false), 5000)
   setTimeout(() => checkDevUpdate(), 3000)
-  setTimeout(() => checkRussianIp(), 8000)
-  // Connect to Discord RPC early so the app shows in the activity
-  // list even before the user plays anything.
-  clearPresence().catch(() => {})
+  if (!is.dev) {
+    setTimeout(() => checkRussianIp(), 8000)
+    clearPresence().catch(() => {})
+  }
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

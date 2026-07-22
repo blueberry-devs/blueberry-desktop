@@ -93,7 +93,7 @@ function TrendsView(): JSX.Element {
 
   useEffect(() => {
     const query = STYLE_CHIPS.find((c) => c.label === styleChip)?.query ?? styleChip
-    searchTracksMulti(query)
+    searchTracksMulti(query, ['yandex', 'soundcloud', 'youtube'])
       .then((res) => setStyleTracks(shuffle(res).slice(0, 10)))
       .catch(() => setStyleTracks([]))
   }, [styleChip])
@@ -119,7 +119,7 @@ function TrendsView(): JSX.Element {
   }))
 
   const playMood = (query: string): void => {
-    searchTracksMulti(query)
+    searchTracksMulti(query, ['yandex', 'soundcloud', 'youtube'])
       .then((res) => {
         const shuffled = shuffle(res)
         if (shuffled.length > 0) playQueue(shuffled, 0)

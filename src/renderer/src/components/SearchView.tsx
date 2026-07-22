@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from '../utils/useTranslation'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
-import { searchTracksYandex, searchTracksSoundcloud, searchTracksYoutube, searchPlaylists, TrackResult, PlaylistResult } from '../api/yandexMusic'
+import { searchTracksYandex, searchTracksSoundcloud, searchTracksYoutube, searchPlaylists, TrackResult, PlaylistResult, TrackSource } from '../api/yandexMusic'
 import { usePlayer } from '../player/PlayerContext'
 import { useHistory } from '../store/history'
 import { useArtistCovers } from '../hooks/useArtistCovers'
@@ -12,6 +12,9 @@ import { sortByPlays } from '../store/playCount'
 import TrackRow from './TrackRow'
 import ArtistView from './ArtistView'
 import ServiceBadge from './ServiceBadge'
+import yandexIcon from '../assets/yandex.png'
+import soundcloudIcon from '../assets/soundcloud.png'
+import youtubeIcon from '../assets/youtube.png'
 import './SearchView.css'
 
 let debounceTimer: ReturnType<typeof setTimeout>
@@ -20,6 +23,19 @@ type ResultsTab = 'top' | 'tracks' | 'artists' | 'playlists'
 type CardIcon = 'sun' | 'smile' | 'dumbbell' | 'note' | 'clock' | 'sparkle' | 'moon' | 'guitar' | 'mic' | 'megaphone'
 
 const DISABLED_PILLS = ['Альбомы', 'Моя волна', 'Подкасты', 'Аудиокниги', 'Клипы']
+
+const ALL_SOURCES: TrackSource[] = ['yandex', 'soundcloud', 'youtube']
+
+interface SourceConfig {
+  label: string
+  icon: string
+}
+
+const SOURCE_CONFIGS: Record<TrackSource, SourceConfig> = {
+  yandex: { label: 'Яндекс', icon: yandexIcon },
+  soundcloud: { label: 'SoundCloud', icon: soundcloudIcon },
+  youtube: { label: 'YouTube', icon: youtubeIcon },
+}
 
 const COLLECTIONS: { label: string; query: string; gradient: string; icon: CardIcon }[] = [
   { label: 'Летняя', query: 'summer hits', gradient: 'linear-gradient(160deg,#ffb64d,#ff6b6b)', icon: 'sun' },
@@ -149,6 +165,7 @@ function SearchView(): JSX.Element {
   const [resultsTab, setResultsTab] = useState<ResultsTab>('top')
   const [viewingArtist, setViewingArtist] = useState<string | null>(null)
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE)
+  const [sourceFilter, setSourceFilter] = useState<TrackSource[]>(ALL_SOURCES)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const { playQueue } = usePlayer()
   const history = useHistory()
@@ -159,6 +176,87 @@ function SearchView(): JSX.Element {
     if (pending) setViewingArtist(pending)
   }, [])
 
+  const toggleSource = useCallback((source: TrackSource): void => {
+    setSourceFilter(prev => {
+      // Don't allow disabling the last source
+      if (prev.length === 1 && prev.includes(source)) return prev
+      return prev.includes(source)
+        ? prev.filter(s => s !== source)
+        : [...prev, source]
+    })
+  }, [])
+
+  // Clear results when sources change mid-query so stale data isn't shown
+  useEffect(() => {
+    if (!query.trim()) return
+    setResults([])
+    setPlaylistResults([])
+    setLoading(true)
+    setError(null)
+    setResultsTab('top')
+    setDisplayLimit(PAGE_SIZE)
+    runSearch(query, sourceFilter)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceFilter])
+
+  function runSearch(q: string, sources: TrackSource[]): void {
+    clearTimeout(debounceTimer)
+    if (!q.trim()) return
+
+    const seen = new Set<string>()
+
+    const mergeBatch = (batch: TrackResult[]) => {
+      setResults(prev => {
+        const next = [...prev]
+        for (const t of batch) {
+          const sig = `${t.artists[0] ?? ''}::${t.title}`.toLowerCase()
+          if (seen.has(sig)) continue
+          seen.add(sig)
+          next.push(t)
+        }
+        return next
+      })
+    }
+
+    searchPlaylists(q)
+      .then(pl => setPlaylistResults(pl))
+      .catch(() => {})
+
+    const activeSources = sources.length
+    let settled = 0
+    const sourceDone = () => {
+      settled++
+      if (settled >= activeSources) setLoading(false)
+    }
+
+    if (sources.includes('yandex')) {
+      searchTracksYandex(q)
+        .then(mergeBatch)
+        .catch(() => {})
+        .finally(sourceDone)
+    } else {
+      sourceDone()
+    }
+
+    if (sources.includes('soundcloud')) {
+      searchTracksSoundcloud(q)
+        .then(mergeBatch)
+        .catch(() => {})
+        .finally(sourceDone)
+    } else {
+      sourceDone()
+    }
+
+    if (sources.includes('youtube')) {
+      searchTracksYoutube(q)
+        .then(mergeBatch)
+        .catch(() => {})
+        .finally(sourceDone)
+    } else {
+      sourceDone()
+    }
+  }
+
   useEffect(() => {
     clearTimeout(debounceTimer)
     if (!query.trim()) {
@@ -168,52 +266,10 @@ function SearchView(): JSX.Element {
       return
     }
     debounceTimer = setTimeout(() => {
-      setLoading(true)
-      setError(null)
-      setResultsTab('top')
-      setDisplayLimit(PAGE_SIZE)
-
-      const seen = new Set<string>()
-
-      const mergeBatch = (batch: TrackResult[]) => {
-        setResults(prev => {
-          const next = [...prev]
-          for (const t of batch) {
-            const sig = `${t.artists[0] ?? ''}::${t.title}`.toLowerCase()
-            if (seen.has(sig)) continue
-            seen.add(sig)
-            next.push(t)
-          }
-          return next
-        })
-      }
-
-      searchPlaylists(query)
-        .then(pl => setPlaylistResults(pl))
-        .catch(() => {})
-
-      let settled = 0
-      const sourceDone = () => {
-        settled++
-        if (settled >= 2) setLoading(false)
-      }
-
-      searchTracksYandex(query)
-        .then(mergeBatch)
-        .catch(() => {})
-        .finally(sourceDone)
-
-      searchTracksSoundcloud(query)
-        .then(mergeBatch)
-        .catch(() => {})
-        .finally(sourceDone)
-
-      searchTracksYoutube(query)
-        .then(mergeBatch)
-        .catch(() => {})
-        .finally(sourceDone)
+      runSearch(query, sourceFilter)
     }, 600)
     return () => clearTimeout(debounceTimer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
 
   const topResults = useMemo(() => sortByPlays(results), [results])
@@ -379,6 +435,28 @@ function SearchView(): JSX.Element {
 
       {query && (
         <>
+          {/* Source filter pills with PNG icons */}
+          <div className="search-view__source-filters">
+            {ALL_SOURCES.map((source) => {
+              const active = sourceFilter.includes(source)
+              const cfg = SOURCE_CONFIGS[source]
+              return (
+                <button
+                  key={source}
+                  className={`search-view__source-pill${active ? ' search-view__source-pill--active' : ''}`}
+                  onClick={() => toggleSource(source)}
+                  title={active ? `Отключить ${cfg.label}` : `Включить ${cfg.label}`}
+                >
+                  <span className="search-view__source-pill-icon">
+                    <img src={cfg.icon} alt={cfg.label} />
+                  </span>
+                  <span className="search-view__source-pill-label">{cfg.label}</span>
+                  {active && <span className="search-view__source-pill-check">✓</span>}
+                </button>
+              )
+            })}
+          </div>
+
           <div className="search-view__pills">
             <button
               className={`search-view__pill${resultsTab === 'top' ? ' search-view__pill--active' : ''}`}

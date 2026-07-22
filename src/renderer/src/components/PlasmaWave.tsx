@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import * as THREE from 'three'
 import './PlasmaWave.css'
 
 const vertexShader = `
+attribute vec2 position;
 void main() {
-  gl_Position = vec4(position, 1.0);
+  gl_Position = vec4(position, 0.0, 1.0);
 }
 `
 
@@ -445,11 +445,6 @@ export const COLOR_PRESETS: WaveColorPreset[] = [
   },
 ]
 
-// Named hue anchors the track color snaps to — guarantees the full spread
-// (red/orange/yellow/green/cyan/blue/purple/pink) actually shows up across
-// different covers, instead of leaving it to however the cover's raw
-// dominant hue happens to fall (which in practice clustered away from some
-// of these, cyan included).
 const HUE_ANCHORS = [0, 30, 55, 120, 190, 220, 270, 320]
 
 function snapHue(h: number): number {
@@ -465,9 +460,6 @@ function snapHue(h: number): number {
   return closest
 }
 
-// All 3 blobs ([0,3], [1,4], [2,5]) stay on the same hue as the track now —
-// only lightness varies between them — so the shader reads as one coherent
-// color rather than several distinct ones layered together.
 const buildTrackColors = (trackHue: number) => {
   const h = snapHue(((trackHue % 360) + 360) % 360)
   return [
@@ -478,6 +470,35 @@ const buildTrackColors = (trackHue: number) => {
     lt(h, 1, 0.45),
     lt(h, 1, 0.4),
   ] as [number, number, number][]
+}
+
+function compileShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
+  const shader = gl.createShader(type)
+  if (!shader) return null
+  gl.shaderSource(shader, source)
+  gl.compileShader(shader)
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(shader))
+    gl.deleteShader(shader)
+    return null
+  }
+  return shader
+}
+
+function linkProgram(gl: WebGLRenderingContext, vs: string, fs: string): WebGLProgram | null {
+  const vert = compileShader(gl, gl.VERTEX_SHADER, vs)
+  const frag = compileShader(gl, gl.FRAGMENT_SHADER, fs)
+  if (!vert || !frag) return null
+  const prog = gl.createProgram()
+  if (!prog) return null
+  gl.attachShader(prog, vert)
+  gl.attachShader(prog, frag)
+  gl.linkProgram(prog)
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(prog))
+    return null
+  }
+  return prog
 }
 
 interface PlasmaWaveProps {
@@ -491,7 +512,7 @@ interface PlasmaWaveProps {
   colorPreset?: string
 }
 
-function PlasmaWave({ playing = false, getFrequencyBands, energy = 0.6, trackHue, collectionHue, coverColor, className = '', colorPreset = 'random' }: PlasmaWaveProps): JSX.Element {
+function PlasmaWave({ playing = false, getFrequencyBands, energy = 0.6, trackHue, collectionHue, coverColor, className = '', colorPreset = 'random' }: PlasmaWaveProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const playingRef = useRef(playing)
   const getFrequencyBandsRef = useRef(getFrequencyBands)
@@ -532,64 +553,60 @@ function PlasmaWave({ playing = false, getFrequencyBands, energy = 0.6, trackHue
     const container = containerRef.current
     if (!container) return
 
-    let renderer: THREE.WebGLRenderer
-    try {
-      renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true })
-      renderer.setClearColor(0x000000, 0)
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
-      container.appendChild(renderer.domElement)
-    } catch {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('webgl', { antialias: false, alpha: true })
+    if (!ctx) return
+    const gl: WebGLRenderingContext = ctx
+    container.appendChild(canvas)
+
+    const program = linkProgram(gl, vertexShader, fragmentShader)
+    if (!program) {
+      canvas.remove()
       return
     }
+    gl.useProgram(program)
 
-    const scene = new THREE.Scene()
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
-
-    const cvec = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
-    const c0 = () => new THREE.Vector3()
-
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
     const bgVal = isDark ? 0.0 : 0.9607
 
-    const uniforms = {
-      vTime: { value: Math.floor(3600 * Math.random()) },
-      vScreenSize: { value: new THREE.Vector2() },
-      vScale: { value: 0.35 },
-      vColorBackground: { value: new THREE.Vector3(bgVal, bgVal, bgVal) },
-      uColor0: { value: c0() },
-      uColor1: { value: c0() },
-      uColor2: { value: c0() },
-      uColor3: { value: c0() },
-      uColor4: { value: c0() },
-      uColor5: { value: c0() },
-      uRotation0: { value: cvec(-0.3, 0.3, 0.2) },
-      uRotation1: { value: cvec(-0.3, -0.3, -0.2) },
-      uRotation2: { value: cvec(-0.3, -0.3, 0.2) },
-      uAudio0: { value: 0 },
-      uAudio1: { value: 0 },
-      uAudio2: { value: 0 },
-      uReact0: { value: 0 },
-      uReact1: { value: 0 },
-      uReact2: { value: 0 }
-    }
+    const posLoc = gl.getAttribLocation(program, 'position')
+    const vertices = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])
+    const buffer = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW)
+    gl.enableVertexAttribArray(posLoc)
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
 
-    const material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      uniforms
-    })
+    const uloc = (name: string) => gl.getUniformLocation(program, name)
 
-    const geometry = new THREE.PlaneGeometry(2, 2)
-    const mesh = new THREE.Mesh(geometry, material)
-    scene.add(mesh)
+    const uTime = uloc('vTime')
+    const uScreenSize = uloc('vScreenSize')
+    const uScale = uloc('vScale')
+    const uBg = uloc('vColorBackground')
+    const uColor = [uloc('uColor0'), uloc('uColor1'), uloc('uColor2'), uloc('uColor3'), uloc('uColor4'), uloc('uColor5')]
+    const uRot = [uloc('uRotation0'), uloc('uRotation1'), uloc('uRotation2')]
+    const uAudio = [uloc('uAudio0'), uloc('uAudio1'), uloc('uAudio2')]
+    const uReact = [uloc('uReact0'), uloc('uReact1'), uloc('uReact2')]
+
+    let time = Math.floor(3600 * Math.random())
+    const screenSize = [0, 0]
+    let scale = 0.35
+
+    gl.uniform1f(uScale, scale)
+    gl.uniform3f(uBg, bgVal, bgVal, bgVal)
+
+    const rotations = [
+      [-0.3, 0.3, 0.2],
+      [-0.3, -0.3, -0.2],
+      [-0.3, -0.3, 0.2],
+    ]
+    for (let i = 0; i < 3; i++) gl.uniform3f(uRot[i], rotations[i][0], rotations[i][1], rotations[i][2])
 
     const currentColors: [number, number, number][] = Array.from({ length: 6 }, () => [0, 0, 0])
-    const ucv = [
-      uniforms.uColor0, uniforms.uColor1, uniforms.uColor2,
-      uniforms.uColor3, uniforms.uColor4, uniforms.uColor5
-    ]
+
     function applyColors(c: [number, number, number][]): void {
-      for (let i = 0; i < 6; i++) ucv[i].value.set(c[i][0], c[i][1], c[i][2])
+      for (let i = 0; i < 6; i++) gl.uniform3f(uColor[i], c[i][0], c[i][1], c[i][2])
     }
 
     const presetColors = (COLOR_PRESETS.find(p => p.id === colorPreset) ?? COLOR_PRESETS[0]).colors()
@@ -615,25 +632,28 @@ function PlasmaWave({ playing = false, getFrequencyBands, energy = 0.6, trackHue
         el.style.setProperty('--plasmawave-glow-color', toHex(colors[0]))
         el.style.setProperty('--plasmawave-glow-color-2', toHex(colors[2]))
         el.style.setProperty('--plasmawave-glow-color-3', toHex(colors[4]))
-      } else {
-        // Keep the last colors set — the fade-out is driven by the
-        // container's opacity transition (CSS), so removing the custom
-        // properties here would make the glow vanish instantly instead
-        // of fading out with it.
       }
     }
     setGlowColor(playingRef.current, targetColors)
 
     const onResize = (): void => {
       const el = containerRef.current
-      if (!el) return
+      if (!el || !gl) return
       const w = el.clientWidth
       const h = el.clientHeight
-      renderer.setSize(w, h)
-      uniforms.vScreenSize.value.set(w, h)
+      canvas.style.width = w + 'px'
+      canvas.style.height = h + 'px'
+      canvas.width = Math.floor(w * dpr)
+      canvas.height = Math.floor(h * dpr)
+      gl.viewport(0, 0, canvas.width, canvas.height)
+      screenSize[0] = w
+      screenSize[1] = h
+      gl.uniform2fv(uScreenSize, screenSize)
     }
     window.addEventListener('resize', onResize)
     onResize()
+
+    gl.clearColor(0, 0, 0, 0)
 
     let lastTime = performance.now()
     let animationFrameId: number
@@ -661,7 +681,6 @@ function PlasmaWave({ playing = false, getFrequencyBands, energy = 0.6, trackHue
         setGlowColor(false, targetColors)
       }
 
-      // Check if preset changed while playing
       if (lastPreset !== currentPreset) {
         lastPreset = currentPreset
         if (isPlaying) {
@@ -673,7 +692,8 @@ function PlasmaWave({ playing = false, getFrequencyBands, energy = 0.6, trackHue
       prevPlaying = isPlaying
 
       const speed = isPlaying ? energyRef.current : 0.2
-      uniforms.vTime.value += dt * speed * 0.5
+      time += dt * speed * 0.5
+      gl.uniform1f(uTime, time)
 
       const bands = isPlaying ? getFrequencyBandsRef.current?.(BAND_COUNT) : null
       if (bands) {
@@ -688,17 +708,17 @@ function PlasmaWave({ playing = false, getFrequencyBands, energy = 0.6, trackHue
       } else {
         audioLow = 0; audioMid = 0; audioHigh = 0
       }
-      uniforms.uAudio0.value = audioLow
-      uniforms.uAudio1.value = audioMid
-      uniforms.uAudio2.value = audioHigh
+      gl.uniform1f(uAudio[0], audioLow)
+      gl.uniform1f(uAudio[1], audioMid)
+      gl.uniform1f(uAudio[2], audioHigh)
 
       const reactDecay = dt * 1000 / 600
       reactLow = Math.max(0, reactLow - reactDecay)
       reactMid = Math.max(0, reactMid - reactDecay)
       reactHigh = Math.max(0, reactHigh - reactDecay)
-      uniforms.uReact0.value = reactLow
-      uniforms.uReact1.value = reactMid
-      uniforms.uReact2.value = reactHigh
+      gl.uniform1f(uReact[0], reactLow)
+      gl.uniform1f(uReact[1], reactMid)
+      gl.uniform1f(uReact[2], reactHigh)
 
       for (let i = 0; i < 6; i++) {
         currentColors[i][0] += (targetColors[i][0] - currentColors[i][0]) * Math.min(1, dt * 4)
@@ -708,18 +728,20 @@ function PlasmaWave({ playing = false, getFrequencyBands, energy = 0.6, trackHue
       applyColors(currentColors)
       if (isPlaying) setGlowColor(true, currentColors)
 
-      renderer.render(scene, camera)
+      gl.clear(gl.COLOR_BUFFER_BIT)
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
     }
     animationFrameId = requestAnimationFrame(update)
 
     return () => {
       cancelAnimationFrame(animationFrameId)
       window.removeEventListener('resize', onResize)
-      const canvas = renderer.domElement
-      if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas)
-      material.dispose()
-      geometry.dispose()
-      renderer.dispose()
+      if (gl) {
+        gl.deleteProgram(program)
+        gl.deleteBuffer(buffer)
+      }
+      const parent = canvas.parentNode
+      if (parent) parent.removeChild(canvas)
     }
   }, [])
 

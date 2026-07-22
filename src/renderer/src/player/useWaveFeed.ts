@@ -89,7 +89,7 @@ async function fetchCandidates(genre: string): Promise<TrackResult[]> {
   }
 
   const queries = buildQueries(genre)
-  const batches = await Promise.all(queries.map((q) => searchTracksMulti(q).catch(() => [])))
+  const batches = await Promise.all(queries.map((q) => searchTracksMulti(q, ['yandex', 'soundcloud', 'youtube']).catch(() => [])))
   const merged: TrackResult[] = []
   const seen = new Set<string>()
   const max = Math.max(...batches.map((b) => b.length))
