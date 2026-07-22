@@ -18,11 +18,12 @@ export default defineConfig({
     plugins: [react()],
     build: {
       rollupOptions: {
+        input: resolve('src/renderer/index.html'),
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            motion: ['motion'],
-            hls: ['hls.js']
+          manualChunks(id: string) {
+            if (id.includes('react-dom') || id.includes('react/')) return 'vendor'
+            if (id.includes('motion')) return 'motion'
+            if (id.includes('hls.js')) return 'hls'
           }
         }
       }
