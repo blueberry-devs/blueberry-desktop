@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { searchTracksMulti, TrackResult } from '../api/yandexMusic'
+import { searchTracksMulti, searchArtistTracks, TrackResult } from '../api/yandexMusic'
 import { getLikedTracks } from '../store/likes'
 import { getHistory } from '../store/history'
+import { pickCategoryForQuery } from '../data/wavePhrases'
 import { usePlayer } from './PlayerContext'
 
 // How close to the end of the queue we top it up with a fresh batch, so
@@ -25,10 +26,13 @@ function isUsable(t: TrackResult): boolean {
   return !t.duration || t.duration < MAX_DURATION_SECONDS
 }
 
-// Rotates through the listener's taste signal instead of re-rolling one random
-// artist each refill — otherwise a small liked/history pool tends to keep
-// resurfacing the same one or two artists across consecutive batches.
-let rotationCursor = 0
+// Returns true when the query is an artist name (personalised "В духе X" item)
+// rather than a known genre keyword like "rock music" or "electronic music".
+// We detect this by checking whether pickCategoryForQuery returns 'main' —
+// only artist names fall through to that default.
+function isArtistQuery(query: string): boolean {
+  return !query || pickCategoryForQuery(query) === 'main'
+}
 
 // Module-level, not a ref: MoodList/NowPlayingPanel (and this hook with them)
 // unmount every time the user leaves the "Моя волна" tab, while `activeGenre`
@@ -38,11 +42,18 @@ let rotationCursor = 0
 // user was actually playing (e.g. a manually picked search result).
 let lastSeededGenre: string | null = null
 
-// Biases results toward what the listener actually likes: alongside the
-// plain genre search, mix in "<genre> <artist>" queries seeded from both
-// likes and recent play history, and occasionally an artist-only query so
-// the feed can drift beyond the genre keyword into what they actually play.
+// Rotates through the listener's taste signal instead of re-rolling one random
+// artist each refill — otherwise a small liked/history pool tends to keep
+// resurfacing the same one or two artists across consecutive batches.
+let rotationCursor = 0
+
+// For genre keywords: bias results toward what the listener actually likes
+// by mixing "<genre> <artist>" queries from likes/history alongside the
+// bare genre.  For artist queries we skip this — mixing "Disturbed" with
+// "Disturbed Metallica" would pull in unrelated artists.
 function buildQueries(genre: string): string[] {
+  if (isArtistQuery(genre)) return [genre]
+
   const likedArtists = getLikedTracks().map((t) => t.artists[0])
   const historyArtists = getHistory().map((t) => t.artists[0])
   const artists = Array.from(new Set([...likedArtists, ...historyArtists].filter(Boolean)))
@@ -67,6 +78,16 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 async function fetchCandidates(genre: string): Promise<TrackResult[]> {
+  // Artist query → fetch the artist's actual top tracks from Yandex.
+  // This is much more reliable than a text search for "Disturbed" which
+  // can return tracks from completely unrelated artists.
+  if (isArtistQuery(genre)) {
+    const results = await searchArtistTracks(genre).catch(() => [] as TrackResult[])
+    const usable = results.filter(isUsable)
+    if (usable.length > 0) return shuffle(usable)
+    // Fallback to multi-source text search if artist endpoint fails
+  }
+
   const queries = buildQueries(genre)
   const batches = await Promise.all(queries.map((q) => searchTracksMulti(q).catch(() => [])))
   const merged: TrackResult[] = []

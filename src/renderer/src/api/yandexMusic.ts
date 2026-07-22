@@ -66,6 +66,10 @@ export function searchTracksYandex(query: string): Promise<TrackResult[]> {
   return getTrackList(`/api/search?text=${encodeURIComponent(query)}`)
 }
 
+export function searchArtistTracks(artistName: string): Promise<TrackResult[]> {
+  return getTrackList(`/api/artist/tracks?name=${encodeURIComponent(artistName)}`)
+}
+
 export function searchTracksSoundcloud(query: string): Promise<TrackResult[]> {
   return getTrackList(`/api/search/soundcloud?text=${encodeURIComponent(query)}`)
 }
