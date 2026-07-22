@@ -10,7 +10,10 @@ on:
 
 env:
   SOUNDCLOUD_CLIENT_ID: ${{ secrets.SOUNDCLOUD_CLIENT_ID }}
+  YANDEX_TOKEN: ${{ secrets.YANDEX_TOKEN }}
   YANDEX_PROXY_URL: ${{ secrets.YANDEX_PROXY_URL }}
+  SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+  SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
 
 jobs:
   build:
