@@ -11,10 +11,10 @@ updates:
     groups:
       react:
         patterns:
-          - react*
-          - @types/react*
+          - 'react*'
+          - '@types/react*'
       vite:
         patterns:
-          - vite*
-          - electron-vite
+          - 'vite*'
+          - 'electron-vite'
           - '@vitejs/*'
