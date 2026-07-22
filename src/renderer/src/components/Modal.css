@@ -1,0 +1,118 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+  animation: overlay-fadein 0.15s ease-out;
+}
+
+.modal-overlay--closing {
+  animation: overlay-fadeout 0.15s ease-in forwards;
+}
+
+.modal-dialog {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 24px 28px;
+  min-width: 320px;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: modal-fadein 0.15s ease-out;
+}
+
+.modal-dialog--closing {
+  animation: modal-fadeout 0.15s ease-in forwards;
+}
+
+@keyframes modal-fadein {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes modal-fadeout {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes overlay-fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlay-fadeout {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.modal-title {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #f0f0f0;
+}
+
+.modal-message {
+  margin: 0 0 20px;
+  font-size: 0.9rem;
+  color: #aaa;
+  line-height: 1.4;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modal-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.modal-btn--cancel {
+  background: #2a2a2a;
+  color: #ccc;
+}
+
+.modal-btn--cancel:hover {
+  background: #333;
+}
+
+.modal-btn--confirm {
+  background: #c62828;
+  color: #fff;
+}
+
+.modal-btn--confirm:hover {
+  background: #d32f2f;
+}

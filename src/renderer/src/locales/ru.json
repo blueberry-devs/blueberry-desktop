@@ -43,6 +43,7 @@
 
   "history.title": "История",
   "history.clear": "Очистить историю",
+  "history.clearConfirm": "Точно очистить историю прослушивания?",
   "history.empty": "История пуста",
 
   "settings.title": "Настройки",

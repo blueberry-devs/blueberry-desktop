@@ -43,6 +43,7 @@
 
   "history.title": "History",
   "history.clear": "Clear history",
+  "history.clearConfirm": "Delete all listening history?",
   "history.empty": "History is empty",
 
   "settings.title": "Settings",
