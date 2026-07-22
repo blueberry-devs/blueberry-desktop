@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { usePlayer } from '../player/PlayerContext'
+import { usePlayer, usePlayerTime } from '../player/PlayerContext'
 import { useWaveFeed } from '../player/useWaveFeed'
 import { toggleLike, useIsLiked } from '../store/likes'
 import { usePlaylists, addTrackToPlaylist } from '../store/playlists'
@@ -203,6 +203,7 @@ function ColorPresetSubmenu({
 function NowPlayingPanel(): JSX.Element {
   const { t } = useTranslation()
   const { waveTrack, isGenerating, skip } = useWaveFeed()
+  const { currentTime, duration } = usePlayerTime()
   const {
     currentTrack,
     isPlaying,
@@ -215,8 +216,6 @@ function NowPlayingPanel(): JSX.Element {
     openLyrics,
     volume,
     setVolume,
-    currentTime,
-    duration,
     seekTo
   } = usePlayer()
   const displayTrack = currentTrack ?? waveTrack

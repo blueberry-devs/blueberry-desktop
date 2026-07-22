@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, HeartIcon, Maximize2Icon } from './icons'
-import { usePlayer } from '../player/PlayerContext'
+import { usePlayer, usePlayerTime } from '../player/PlayerContext'
 import { toggleLike, useIsLiked } from '../store/likes'
 import { useTranslation } from '../utils/useTranslation'
 import ServiceBadge from './ServiceBadge'
@@ -15,12 +15,11 @@ function formatTime(sec?: number): string {
 }
 
 function DynamicIsland({ className = '', onExpand }: { className?: string; onExpand?: () => void }): JSX.Element | null {
+  const { currentTime, duration } = usePlayerTime()
   const {
     currentTrack,
     isPlaying,
     isLoading,
-    currentTime,
-    duration,
     togglePlay,
     next,
     previous,

@@ -1,5 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
-import { AnimatePresence } from 'motion/react'
+import { lazy, Suspense, useEffect, useState, useRef } from 'react'
 import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
 import TopBottomNav from './components/TopBottomNav'
@@ -26,6 +25,21 @@ const TrendsView = lazy(() => import('./components/TrendsView'))
 const CollectionView = lazy(() => import('./components/CollectionView'))
 const SettingsView = lazy(() => import('./components/SettingsView'))
 const HistoryView = lazy(() => import('./components/HistoryView'))
+
+function AnimatePresenceLazy({ children }: { children: React.ReactNode }) {
+  const APRef = useRef<React.ComponentType<{ children: React.ReactNode }> | null>(null)
+  const [, forceRender] = useState(0)
+  useEffect(() => {
+    if (!APRef.current) {
+      import('motion/react').then(m => {
+        APRef.current = m.AnimatePresence
+        forceRender(n => n + 1)
+      })
+    }
+  }, [])
+  const AP = APRef.current
+  return AP ? <AP>{children}</AP> : <>{children}</>
+}
 
 export type Tab = 'wave' | 'search' | 'trends' | 'collection' | 'history' | 'settings'
 
@@ -170,9 +184,9 @@ function AppInner(): JSX.Element {
 
       {showMiniPlayer && currentTrack && <DynamicIsland onExpand={() => setActiveTab('wave')} />}
       <ToastNotification />
-      <AnimatePresence>
+      <AnimatePresenceLazy>
         {isLyricsOpen && <NowPlayingFullscreen />}
-      </AnimatePresence>
+      </AnimatePresenceLazy>
     </div>
   )
 }

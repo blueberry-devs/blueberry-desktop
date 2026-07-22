@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { usePlayer } from '../player/PlayerContext'
+import { usePlayer, usePlayerTime } from '../player/PlayerContext'
 import { useTranslation } from '../utils/useTranslation'
 import { activeLineIndex } from '../utils/lrc'
 import { toggleLike, useIsLiked } from '../store/likes'
@@ -25,6 +25,7 @@ import './NowPlayingFullscreen.css'
 const _clipCache = new Map<string, string | null>()
 
 function NowPlayingFullscreen(): JSX.Element | null {
+  const { currentTime, duration } = usePlayerTime()
   const {
     currentTrack,
     closeLyrics,
@@ -32,8 +33,6 @@ function NowPlayingFullscreen(): JSX.Element | null {
     lyrics,
     lyricsPlain,
     lyricsLoading,
-    currentTime,
-    duration,
     isPlaying,
     isLoading,
     togglePlay,

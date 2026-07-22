@@ -8,7 +8,7 @@ import {
   useState,
   ReactNode
 } from 'react'
-import Hls from 'hls.js'
+import type Hls from 'hls.js'
 import { resolveStream, TrackResult } from '../api/yandexMusic'
 import { parseLrc, LrcLine } from '../utils/lrc'
 import { getLyrics } from '../services/lyricsCache'
@@ -67,6 +67,13 @@ interface PlayerState {
 }
 
 const PlayerContext = createContext<PlayerState | null>(null)
+const PlayerTimeContext = createContext<{ currentTime: number; duration: number } | null>(null)
+
+export function usePlayerTime(): { currentTime: number; duration: number } {
+  const ctx = useContext(PlayerTimeContext)
+  if (!ctx) throw new Error('usePlayerTime must be used within PlayerProvider')
+  return ctx
+}
 
 export function PlayerProvider({ children }: { children: ReactNode }): JSX.Element {
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -83,6 +90,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
   const shadowAudioRef = useRef<HTMLAudioElement | null>(null)
   const shadowHlsRef = useRef<Hls | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
   const freqDataRef = useRef<Uint8Array | null>(null)
   const bandsCacheRef = useRef<Float32Array>(new Float32Array(0))
 
@@ -140,7 +148,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       })
   }, [])
 
-  const attachSource = useCallback((kind: 'progressive' | 'hls', url: string) => {
+  const attachSource = useCallback(async (kind: 'progressive' | 'hls', url: string) => {
     const audio = audioRef.current
     if (!audio) return
 
@@ -149,53 +157,55 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
     shadowHlsRef.current?.destroy()
     shadowHlsRef.current = null
 
-    if (kind === 'hls' && Hls.isSupported()) {
-      const hls = new Hls()
+    if (kind === 'hls') {
+      const HlsModule = await import('hls.js')
+      const HlsClass = HlsModule.default
+      if (!HlsClass.isSupported()) {
+        audio.src = url
+        audio.play().catch(() => {})
+        return
+      }
+      const hls = new HlsClass()
       hls.loadSource(url)
       hls.attachMedia(audio)
-      hls.on(Hls.Events.MANIFEST_PARSED, () => audio.play().catch(() => {}))
-      hls.on(Hls.Events.ERROR, (_event, data) => {
+      hls.on(HlsClass.Events.MANIFEST_PARSED, () => audio.play().catch(() => {}))
+      hls.on(HlsClass.Events.ERROR, (_event, data) => {
         if (!data.fatal) return
         switch (data.type) {
-          case Hls.ErrorTypes.NETWORK_ERROR:
+          case HlsClass.ErrorTypes.NETWORK_ERROR:
             setTimeout(() => hls.startLoad(), 1000)
             break
-          case Hls.ErrorTypes.MEDIA_ERROR:
+          case HlsClass.ErrorTypes.MEDIA_ERROR:
             hls.recoverMediaError()
             break
-          // default: non-recoverable, let the audio element fire ended naturally
         }
       })
       hlsRef.current = hls
-    } else {
-      audio.src = url
-      audio.play().catch(() => {})
-    }
 
-    // Mirror the same stream into the silent shadow element for the
-    // analyser — most SoundCloud tracks are HLS-only these days, so this
-    // has to be mirrored too, not just progressive, or the analyser almost
-    // never gets real data.
-    const shadow = shadowAudioRef.current
-    if (shadow) {
-      if (kind === 'hls' && Hls.isSupported()) {
-        const shadowHls = new Hls()
+      const shadow = shadowAudioRef.current
+      if (shadow) {
+        const shadowHls = new HlsClass()
         shadowHls.loadSource(url)
         shadowHls.attachMedia(shadow)
-        shadowHls.on(Hls.Events.MANIFEST_PARSED, () => shadow.play().catch(() => {}))
-        shadowHls.on(Hls.Events.ERROR, (_event, data) => {
+        shadowHls.on(HlsClass.Events.MANIFEST_PARSED, () => shadow.play().catch(() => {}))
+        shadowHls.on(HlsClass.Events.ERROR, (_event, data) => {
           if (!data.fatal) return
           switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
+            case HlsClass.ErrorTypes.NETWORK_ERROR:
               setTimeout(() => shadowHls.startLoad(), 1000)
               break
-            case Hls.ErrorTypes.MEDIA_ERROR:
+            case HlsClass.ErrorTypes.MEDIA_ERROR:
               shadowHls.recoverMediaError()
               break
           }
         })
         shadowHlsRef.current = shadowHls
-      } else {
+      }
+    } else {
+      audio.src = url
+      audio.play().catch(() => {})
+      const shadow = shadowAudioRef.current
+      if (shadow) {
         shadow.src = url
         shadow.play().catch(() => {})
       }
@@ -307,20 +317,20 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
     shadow.crossOrigin = 'anonymous'
     shadowAudioRef.current = shadow
 
+    const audioCtxRefLocal = { current: null as AudioContext | null }
     const setupAnalyser = (): void => {
       if (analyserRef.current) return
       try {
         const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
         const ctx = new AudioCtx()
+        audioCtxRefLocal.current = ctx
+        audioCtxRef.current = ctx
         const source = ctx.createMediaElementSource(shadow)
         const analyser = ctx.createAnalyser()
         analyser.fftSize = 1024
         analyser.smoothingTimeConstant = 0.5
         const silentGain = ctx.createGain()
         silentGain.gain.value = 0
-        // Routed all the way to destination (not just left dangling) so the
-        // graph actually gets pulled/processed — the zero-gain node is what
-        // guarantees no audible output, not just relying on element muting.
         source.connect(analyser)
         analyser.connect(silentGain)
         silentGain.connect(ctx.destination)
@@ -337,6 +347,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
     const onDuration = (): void => setDuration(audio.duration || 0)
     const onPlay = (): void => {
       setIsPlaying(true)
+      audioCtxRef.current?.resume().catch(() => {})
       if (!shadow.paused) return
       shadow.currentTime = audio.currentTime
       shadow.play().catch(() => {})
@@ -345,6 +356,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
     }
     const onPause = (): void => {
       setIsPlaying(false)
+      audioCtxRef.current?.suspend().catch(() => {})
       shadow.pause()
       const t = currentTrackRef.current
       if (t) updateDiscordPresence(t, audio.currentTime, false)
@@ -375,6 +387,9 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       shadow.pause()
       hlsRef.current?.destroy()
       shadowHlsRef.current?.destroy()
+      const ctx = audioCtxRefLocal.current
+      if (ctx) ctx.close().catch(() => {})
+      audioCtxRef.current = null
     }
   }, [advanceQueue])
 
@@ -626,7 +641,13 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
     ]
   )
 
-  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>
+  return (
+    <PlayerContext.Provider value={value}>
+      <PlayerTimeContext.Provider value={{ currentTime, duration }}>
+        {children}
+      </PlayerTimeContext.Provider>
+    </PlayerContext.Provider>
+  )
 }
 
 export function usePlayer(): PlayerState {

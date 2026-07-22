@@ -82,17 +82,22 @@ export function searchPlaylists(query: string): Promise<PlaylistResult[]> {
   return getJson(`/api/search/playlists?text=${encodeURIComponent(query)}`)
 }
 
-// Searches all sources (Yandex → SoundCloud → YouTube), deduped by
+// Searches all selected sources (Yandex → SoundCloud → YouTube), deduped by
 // title+artist. Each source handles its own failure gracefully.
-export async function searchTracksMulti(query: string): Promise<TrackResult[]> {
-  const [yandex, sc, yt] = await Promise.all([
-    searchTracksYandex(query).catch(() => []),
-    searchTracksSoundcloud(query).catch(() => []),
-    searchTracksYoutube(query).catch(() => [])
+// Pass `sources` to restrict which services are queried; defaults to all three.
+export async function searchTracksMulti(
+  query: string,
+  sources?: TrackSource[]
+): Promise<TrackResult[]> {
+  const active = sources ?? ['yandex', 'soundcloud', 'youtube']
+  const results = await Promise.all([
+    active.includes('yandex') ? searchTracksYandex(query).catch(() => []) : [],
+    active.includes('soundcloud') ? searchTracksSoundcloud(query).catch(() => []) : [],
+    active.includes('youtube') ? searchTracksYoutube(query).catch(() => []) : []
   ])
   const seen = new Set<string>()
   const merged: TrackResult[] = []
-  for (const t of [...yandex, ...sc, ...yt]) {
+  for (const t of results.flat()) {
     const sig = `${t.artists[0] ?? ''}::${t.title}`.toLowerCase()
     if (seen.has(sig)) continue
     seen.add(sig)
