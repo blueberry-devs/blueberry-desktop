@@ -1,0 +1,325 @@
+.auth-view {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'CustomFont', 'YS Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+}
+
+.auth-view__bg {
+  position: absolute;
+  inset: 0;
+  background: url('/auth-bg.avif') center / cover no-repeat;
+}
+
+.auth-view {
+  animation: authViewFadeIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.auth-view--closing {
+  animation: authViewFadeOut 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes authViewFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes authViewFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.auth-view__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.auth-view__skip {
+  position: absolute;
+  top: 20px;
+  right: 60px;
+  z-index: 10;
+  font-family: 'YS Text', 'Segoe UI', -apple-system, sans-serif;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.auth-view__skip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.auth-view__loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.auth-view__spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: authSpin 0.7s linear infinite;
+}
+
+@keyframes authSpin {
+  to { transform: rotate(360deg); }
+}
+
+.auth-card {
+  position: relative;
+  z-index: 5;
+  width: 100%;
+  max-width: 400px;
+  margin: 20px;
+  background: rgba(20, 20, 25, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 40px 32px 32px;
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
+  animation: authCardEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.auth-card--closing {
+  animation: authCardExit 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes authCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes authCardExit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+}
+
+.auth-card__close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.auth-card__close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.auth-card__header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.auth-card__title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+
+.auth-card__subtitle {
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-family: 'YS Text', 'Segoe UI', -apple-system, sans-serif;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.auth-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-form__label {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.auth-form__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-form__icon {
+  position: absolute;
+  left: 14px;
+  color: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
+.auth-form__input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px 0 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 0.92rem;
+  font-family: 'YS Text', 'Segoe UI', -apple-system, sans-serif;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.auth-form__input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.auth-form__input:focus {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.auth-form__input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px rgba(30, 30, 40, 0.95) inset !important;
+  -webkit-text-fill-color: #fff !important;
+  caret-color: #fff;
+}
+
+.auth-form__toggle-vis {
+  position: absolute;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: color 0.16s ease;
+}
+
+.auth-form__toggle-vis:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.auth-form__error {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 70, 70, 0.12);
+  border: 1px solid rgba(255, 70, 70, 0.25);
+  color: #ff6b6b;
+  font-size: 0.82rem;
+  font-family: 'YS Text', 'Segoe UI', -apple-system, sans-serif;
+  line-height: 1.35;
+}
+
+.auth-form__submit {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.16s ease, transform 0.12s ease;
+  margin-top: 4px;
+}
+
+.auth-form__submit:hover {
+  opacity: 0.9;
+}
+
+.auth-form__submit:active {
+  transform: scale(0.97);
+}
+
+.auth-form__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auth-form__spinner-sm {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: var(--accent-contrast);
+  border-radius: 50%;
+  animation: authSpin 0.6s linear infinite;
+}
+
+.auth-card__footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.auth-card__link {
+  font-family: 'YS Text', 'Segoe UI', -apple-system, sans-serif;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.16s ease;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+}
+
+.auth-card__link:hover {
+  color: #fff;
+}
+
+.auth-card__switch {
+  font-family: 'YS Text', 'Segoe UI', -apple-system, sans-serif;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.35);
+}

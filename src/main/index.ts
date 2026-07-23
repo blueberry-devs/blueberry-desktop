@@ -1,5 +1,7 @@
-import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, session } from 'electron'
 import https from 'https'
+
+app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled')
 
 if (!is.dev) {
   app.commandLine.appendSwitch('enable-accelerated-video-decode')
@@ -256,6 +258,10 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
+
+  mainWindow.webContents.setUserAgent(
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
+  )
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
