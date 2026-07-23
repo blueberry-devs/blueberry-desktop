@@ -1,6 +1,6 @@
 {
   "name": "blueberry-desktop",
-  "version": "1.201.0",
+  "version": "1.300.0",
   "description": "Яндекс Музыка",
   "main": "./out/main/index.js",
   "author": "torusov",
