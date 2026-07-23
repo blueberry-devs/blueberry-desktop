@@ -10,11 +10,13 @@ import SplashScreen from './components/SplashScreen'
 // exit animation — closing it would flash back to fullscreen for a frame
 // before actually disappearing.
 import NowPlayingFullscreen from './components/NowPlayingFullscreen'
+import AuthView from './components/AuthView'
 import { PlayerProvider, usePlayer } from './player/PlayerContext'
 import { usePendingSearch } from './store/searchQuery'
 import { useDominantColor } from './hooks/useDominantColor'
 import { useProfile } from './store/profile'
 import { toggleLike } from './store/likes'
+import { isAuthenticated } from './store/auth'
 import './App.css'
 
 const MoodList = lazy(() => import('./components/MoodList'))
@@ -53,6 +55,8 @@ function rgbToHue(r: number, g: number, b: number): number {
 function AppInner(): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('wave')
   const [appReady, setAppReady] = useState(false)
+  const [showAuth, setShowAuth] = useState(false)
+  const [authClosing, setAuthClosing] = useState(false)
   const { isPlaying, isLyricsOpen, currentTrack, getFrequencyBands, togglePlay, next, previous, closeLyrics } = usePlayer()
   const pendingSearch = usePendingSearch()
   const coverColor = useDominantColor(currentTrack?.cover)
@@ -71,6 +75,12 @@ function AppInner(): JSX.Element {
       clearTimeout(timeout)
     }
   }, [])
+
+  useEffect(() => {
+    if (appReady && !isAuthenticated()) {
+      setShowAuth(true)
+    }
+  }, [appReady])
 
   // Listen for tray commands (play/pause, next, prev)
   useEffect(() => {
@@ -184,6 +194,19 @@ function AppInner(): JSX.Element {
 
       {showMiniPlayer && currentTrack && <DynamicIsland onExpand={() => setActiveTab('wave')} />}
       <ToastNotification />
+      {showAuth && (
+        <AuthView
+          closing={authClosing}
+          onClose={() => {
+            setAuthClosing(true)
+            setTimeout(() => {
+              setShowAuth(false)
+              setAuthClosing(false)
+            }, 280)
+          }}
+        />
+      )}
+
       <AnimatePresenceLazy>
         {isLyricsOpen && <NowPlayingFullscreen />}
       </AnimatePresenceLazy>
