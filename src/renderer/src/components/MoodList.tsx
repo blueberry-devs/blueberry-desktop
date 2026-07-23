@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useId } from 'react'
 import AnimatedList, { AnimatedListItem } from './AnimatedList'
 import { usePlayer } from '../player/PlayerContext'
 import { useLikedTracks } from '../store/likes'
@@ -59,6 +59,7 @@ const shapePaths: Record<GenreItem['shape'], string> = {
 }
 
 function GenreIcon({ color, shape, cover }: { color: MoodColor; shape: GenreItem['shape']; cover?: string | null }): JSX.Element {
+  const uid = useId()
   if (cover) {
     return (
       <span className="mood-icon mood-icon--cover">
@@ -66,10 +67,26 @@ function GenreIcon({ color, shape, cover }: { color: MoodColor; shape: GenreItem
       </span>
     )
   }
+  const d = shapePaths[shape]
   return (
     <span className={`mood-icon mood-icon--${color}`}>
       <svg width="52" height="52" viewBox="0 0 46 46">
-        <path d={shapePaths[shape]} fill="currentColor" />
+        <defs>
+          <filter id={`b-${uid}`}>
+            <feGaussianBlur in="SourceGraphic" stdDeviation="11" />
+          </filter>
+          <linearGradient id={`g-${uid}`} x1="1" y1="0" x2="0.25" y2="0.85">
+            <stop offset="0%" stopColor="white" />
+            <stop offset="35%" stopColor="white" />
+            <stop offset="100%" stopColor="black" />
+          </linearGradient>
+          <mask id={`m-${uid}`}>
+            <rect x="0" y="0" width="46" height="46" fill={`url(#g-${uid})`} />
+          </mask>
+        </defs>
+        <path d={d} fill="currentColor" />
+        <path d={d} fill="currentColor" filter={`url(#b-${uid})`} mask={`url(#m-${uid})`} />
+        <path d={d} fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth="2.5" strokeDasharray="65 200" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </span>
   )
