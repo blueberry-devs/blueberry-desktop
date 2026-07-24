@@ -21,6 +21,7 @@ export default defineConfig({
       }
     },
     plugins: [react()],
+    base: './',
     build: {
       rollupOptions: {
         input: resolve('src/renderer/index.html'),
