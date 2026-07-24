@@ -120,6 +120,24 @@ function scheduleRestart(): void {
   }, delay)
 }
 
+function loadEnvFile(dir: string): Record<string, string> {
+  const envPath = join(dir, '.env')
+  try {
+    const raw = readFileSync(envPath, 'utf-8')
+    const vars: Record<string, string> = {}
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const eqIdx = trimmed.indexOf('=')
+      if (eqIdx === -1) continue
+      vars[trimmed.slice(0, eqIdx).trim()] = trimmed.slice(eqIdx + 1).trim()
+    }
+    return vars
+  } catch {
+    return {}
+  }
+}
+
 function startSidecar(): void {
   // Prevent old sidecar's exit from triggering restart while we intentionally replace it
   if (restartTimer) {
@@ -156,7 +174,14 @@ function startSidecar(): void {
 
   killExistingSidecar()
 
-  const env = { ...process.env, SIDECAR_PORT: String(SIDECAR_PORT) }
+  const env = {
+    ...process.env,
+    SIDECAR_PORT: String(SIDECAR_PORT),
+    YANDEX_TOKEN: process.env.YANDEX_TOKEN || '',
+    YANDEX_PROXY_URL: process.env.YANDEX_PROXY_URL || '',
+    SOUNDCLOUD_CLIENT_ID: process.env.SOUNDCLOUD_CLIENT_ID || '',
+    ...loadEnvFile(serverDir),
+  }
   const child = spawn(entry, [], {
     cwd: serverDir,
     env: { ...env, RUST_LOG: 'info,tower_http=info' },
