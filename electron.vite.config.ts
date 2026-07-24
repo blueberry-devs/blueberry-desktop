@@ -4,7 +4,12 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()]
+    plugins: [externalizeDepsPlugin()],
+    define: {
+      'process.env.YANDEX_TOKEN': JSON.stringify(process.env.YANDEX_TOKEN || ''),
+      'process.env.YANDEX_PROXY_URL': JSON.stringify(process.env.YANDEX_PROXY_URL || ''),
+      'process.env.SOUNDCLOUD_CLIENT_ID': JSON.stringify(process.env.SOUNDCLOUD_CLIENT_ID || '')
+    }
   },
   preload: {
     plugins: [externalizeDepsPlugin()]
