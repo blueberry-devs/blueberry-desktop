@@ -3,23 +3,6 @@ import { Mail, Lock, Eye, EyeOff, UserPlus, LogIn, X, ChevronLeft } from 'lucide
 import { login, register, tryRestoreSession } from '../store/auth'
 import './AuthView.css'
 
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (container: HTMLElement, opts: {
-        sitekey: string
-        callback: (token: string) => void
-        'expired-callback'?: () => void
-        theme?: 'light' | 'dark' | 'auto'
-      }) => string
-      execute: (widgetId: string) => void
-      remove: (widgetId: string) => void
-    }
-  }
-}
-
-const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ''
-
 type Mode = 'login' | 'register'
 
 interface AuthViewProps {
@@ -37,8 +20,6 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
-  const [turnstileReady, setTurnstileReady] = useState(!TURNSTILE_SITE_KEY)
-  const turnstileWidgetId = useRef<string | undefined>(undefined)
   const emailRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -51,19 +32,6 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
   useEffect(() => {
     emailRef.current?.focus()
   }, [mode])
-
-  useEffect(() => {
-    if (!TURNSTILE_SITE_KEY) return
-
-    const check = (): void => {
-      if (window.turnstile) {
-        setTurnstileReady(true)
-      } else {
-        setTimeout(check, 100)
-      }
-    }
-    check()
-  }, [])
 
   const switchMode = useCallback(() => {
     setMode((m) => (m === 'login' ? 'register' : 'login'))
@@ -94,34 +62,10 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
 
       setLoading(true)
 
-      let token: string | null = null
-      if (TURNSTILE_SITE_KEY && window.turnstile) {
-        try {
-          token = await new Promise<string>((resolve) => {
-            const container = document.createElement('div')
-            container.style.cssText = 'position:absolute;width:0;height:0'
-            document.body.appendChild(container)
-            const id = window.turnstile!.render(container, {
-              sitekey: TURNSTILE_SITE_KEY,
-              callback: (t: string) => {
-                container.remove()
-                resolve(t)
-              },
-            })
-            turnstileWidgetId.current = id
-            window.turnstile!.execute(id)
-          })
-        } catch {
-          setError('Ошибка проверки безопасности')
-          setLoading(false)
-          return
-        }
-      }
-
       const err =
         mode === 'login'
-          ? await login(email.trim(), password, token)
-          : await register(email.trim(), password, token)
+          ? await login(email.trim(), password, null)
+          : await register(email.trim(), password, null)
       setLoading(false)
 
       if (err) {
@@ -242,7 +186,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
           <button
             type="submit"
             className="auth-form__submit"
-            disabled={loading || !turnstileReady}
+            disabled={loading}
           >
             {loading ? (
               <div className="auth-form__spinner-sm" />
