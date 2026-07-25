@@ -13,7 +13,6 @@ import NowPlayingFullscreen from './components/NowPlayingFullscreen'
 import AuthView from './components/AuthView'
 import { PlayerProvider, usePlayer } from './player/PlayerContext'
 import { usePendingSearch } from './store/searchQuery'
-import { useDominantColor } from './hooks/useDominantColor'
 import { useProfile } from './store/profile'
 import { toggleLike } from './store/likes'
 import { isAuthenticated } from './store/auth'
@@ -45,13 +44,6 @@ function AnimatePresenceLazy({ children }: { children: React.ReactNode }) {
 
 export type Tab = 'wave' | 'search' | 'trends' | 'collection' | 'history' | 'settings'
 
-function rgbToHue(r: number, g: number, b: number): number {
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
-  if (d === 0) return -1
-  let h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4
-  return (h / 6) * 360
-}
-
 function AppInner(): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('wave')
   const [appReady, setAppReady] = useState(false)
@@ -59,8 +51,6 @@ function AppInner(): JSX.Element {
   const [authClosing, setAuthClosing] = useState(false)
   const { isPlaying, isLyricsOpen, currentTrack, getFrequencyBands, togglePlay, next, previous, closeLyrics } = usePlayer()
   const pendingSearch = usePendingSearch()
-  const coverColor = useDominantColor(currentTrack?.cover)
-  const trackHue = coverColor ? rgbToHue(coverColor[0], coverColor[1], coverColor[2]) : -1
   const profile = useProfile()
 
   useEffect(() => {
@@ -160,7 +150,7 @@ function AppInner(): JSX.Element {
 
       <Suspense fallback={null}>
         <div className="app__glow-layer">
-          <PlasmaWave playing={isPlaying} getFrequencyBands={getFrequencyBands} trackHue={trackHue} coverColor={coverColor?.join(',')} colorPreset={profile.waveColorPreset} />
+          <PlasmaWave playing={isPlaying} getFrequencyBands={getFrequencyBands} currentTrackId={currentTrack?.id} colorPreset={profile.waveColorPreset} />
         </div>
       </Suspense>
 

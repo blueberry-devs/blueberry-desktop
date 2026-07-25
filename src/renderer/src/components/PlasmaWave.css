@@ -18,28 +18,28 @@
 }
 
 .plasmawave-container canvas {
-  height: 100vw !important;
-  width: 100vw !important;
+  height: 120vw !important;
+  width: 120vw !important;
 }
 
 @media only screen and (max-width: 1600px) {
-  .plasmawave-container canvas {
-    height: 120vw !important;
-    width: 120vw !important;
-  }
-}
-
-@media only screen and (max-width: 1366px) {
   .plasmawave-container canvas {
     height: 140vw !important;
     width: 140vw !important;
   }
 }
 
+@media only screen and (max-width: 1366px) {
+  .plasmawave-container canvas {
+    height: 160vw !important;
+    width: 160vw !important;
+  }
+}
+
 @media only screen and (max-width: 1024px) {
   .plasmawave-container canvas {
-    height: 120vh !important;
-    width: 120vh !important;
+    height: 130vh !important;
+    width: 130vh !important;
   }
 }
 
@@ -89,5 +89,5 @@
 }
 
 .plasmawave-container--playing .plasmawave-container--shadow {
-  opacity: 0.65;
+  opacity: 0.85;
 }

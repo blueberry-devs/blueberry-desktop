@@ -9,7 +9,7 @@
 :root {
   /* Shared layout tokens — keep sidebar-dependent components in sync as the window resizes. */
   --sidebar-width: clamp(198px, 15vw, 230px);
-  --mood-list-width: clamp(320px, 34vw, 470px);
+  --mood-list-width: clamp(320px, 40vw, 560px);
 
   /* Black (default) */
   --bg: #000000;

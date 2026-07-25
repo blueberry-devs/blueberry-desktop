@@ -16,26 +16,20 @@
 }
 
 .mood-list .animated-list {
-  /* The wheel curve (MoodList.tsx) recedes rows up to WHEEL_RADIUS*(1-cos
-     MAX_ANGLE) (~163px) to the right via transform. Overflow-y:auto on this
-     element forces overflow-x to compute as 'auto' too per spec (can't opt
-     out with overflow-x:visible while overflow-y isn't visible) — so
-     without this padding, receded rows get silently clipped instead of
-     curling into view. */
   padding-left: 20px;
-  padding-right: 190px;
+  padding-right: 140px;
 }
 
 .mood-list__item {
-  margin-bottom: 44px;
+  margin-bottom: clamp(18px, 4vh, 52px);
 }
 
 .mood-list__row {
   display: flex;
   align-items: center;
-  gap: 18px;
-  height: 110px;
-  padding: 0 12px;
+  gap: clamp(12px, 2.5vw, 28px);
+  height: clamp(70px, 12vh, 130px);
+  padding: 0 clamp(8px, 1vw, 16px);
   border-radius: 12px;
   transition: background 0.12s ease;
   will-change: transform;

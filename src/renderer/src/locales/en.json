@@ -209,6 +209,7 @@
   "settings.audioHifi": "Hi-Fi",
   "settings.adaptiveEQ": "Adaptive Equalizer",
   "settings.adaptiveEQHint": "Automatically adjusts EQ per track for balanced sound.",
+  "settings.waveColors": "Wave Colors",
   "settings.hotkeysTitle": "Hotkeys",
   "settings.aboutTitle": "About",
   "settings.player": "Player",

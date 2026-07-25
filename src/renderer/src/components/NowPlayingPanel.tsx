@@ -5,8 +5,7 @@ import { useWaveFeed } from '../player/useWaveFeed'
 import { toggleLike, useIsLiked } from '../store/likes'
 import { usePlaylists, addTrackToPlaylist } from '../store/playlists'
 import { useTranslation } from '../utils/useTranslation'
-import { useProfile, setWaveColorPreset } from '../store/profile'
-import { COLOR_PRESETS } from './PlasmaWave'
+import { useProfile } from '../store/profile'
 import { Volume2Icon, Mic2Icon, Maximize2Icon } from './icons'
 import heartIcon from '../assets/heart.png'
 import heartSlashIcon from '../assets/heart-slash.png'
@@ -132,75 +131,6 @@ function PlaylistSubmenu({
   )
 }
 
-function ColorPresetSubmenu({
-  show,
-  profile,
-  setShowMenu,
-  setShowColorPresets,
-}: {
-  show: boolean
-  profile: { waveColorPreset: string }
-  setShowMenu: (v: boolean) => void
-  setShowColorPresets: React.Dispatch<React.SetStateAction<boolean>>
-}): JSX.Element {
-  const { t } = useTranslation()
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const subRef = useRef<HTMLDivElement>(null)
-  const [posData, setPosData] = useState({ cls: '', maxHeight: 0 })
-
-  useEffect(() => {
-    if (!show) { setPosData({ cls: '', maxHeight: 0 }); return }
-    requestAnimationFrame(() => requestAnimationFrame(() =>
-      setPosData(formatSubmenuPos(subRef, btnRef, true))
-    ))
-  }, [show])
-
-  const scrollCls = posData.maxHeight > 0 ? ' now-playing__dropdown-sub--scroll' : ''
-  const currentLabel = COLOR_PRESETS.find(p => p.id === profile.waveColorPreset)?.id
-  const currentLabelKey = currentLabel ? `wave.preset.${currentLabel}` : ''
-
-  return (
-    <div className="now-playing__dropdown-item-wrap" ref={wrapRef}>
-      <button
-        ref={btnRef}
-        className="now-playing__dropdown-item"
-        onClick={() => setShowColorPresets((v) => !v)}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <circle cx="3" cy="3" r="2" fill="currentColor" opacity="0.3" />
-          <circle cx="13" cy="3" r="2" fill="currentColor" opacity="0.5" />
-          <circle cx="8" cy="6" r="2" fill="currentColor" opacity="0.7" />
-          <circle cx="3" cy="11" r="2" fill="currentColor" opacity="0.9" />
-          <circle cx="13" cy="11" r="2" fill="currentColor" />
-          <circle cx="8" cy="14" r="2" fill="currentColor" opacity="0.5" />
-        </svg>
-        <span className="now-playing__dropdown-item-label">{currentLabelKey ? t(currentLabelKey) : 'Цвета волны'}</span>
-        <svg className="now-playing__dropdown-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M4.5 2l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      {show && (
-        <div ref={subRef} className={`now-playing__dropdown-sub${posData.cls}${scrollCls}`} style={posData.maxHeight > 0 ? { maxHeight: posData.maxHeight } : undefined}>
-          {COLOR_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              className={`now-playing__dropdown-subitem${preset.id === profile.waveColorPreset ? ' now-playing__dropdown-subitem--active' : ''}`}
-              onClick={() => {
-                setWaveColorPreset(preset.id)
-                setShowColorPresets(false)
-                setShowMenu(false)
-              }}
-            >
-              {t(`wave.preset.${preset.id}`)}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 function AudioQualitySubmenu({
   show,
   quality,
@@ -292,7 +222,6 @@ function NowPlayingPanel(): JSX.Element {
   const [hoveringBar, setHoveringBar] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showPlaylists, setShowPlaylists] = useState(false)
-  const [showColorPresets, setShowColorPresets] = useState(false)
   const [showAudioQuality, setShowAudioQuality] = useState(false)
   const [menuPosCls, setMenuPosCls] = useState('')
   const menuDropRef = useRef<HTMLDivElement>(null)
@@ -324,7 +253,6 @@ function NowPlayingPanel(): JSX.Element {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowMenu(false)
         setShowPlaylists(false)
-        setShowColorPresets(false)
         setShowAudioQuality(false)
       }
     }
@@ -497,12 +425,6 @@ function NowPlayingPanel(): JSX.Element {
                   addTrackToPlaylist={addTrackToPlaylist}
                   setShowMenu={setShowMenu}
                   setShowPlaylists={setShowPlaylists}
-                />
-                <ColorPresetSubmenu
-                  show={showColorPresets}
-                  profile={profile}
-                  setShowMenu={setShowMenu}
-                  setShowColorPresets={setShowColorPresets}
                 />
                 <AudioQualitySubmenu
                   show={showAudioQuality}

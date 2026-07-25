@@ -1,7 +1,8 @@
 import { useTranslation } from '../utils/useTranslation'
-import { useProfile, setAllowExplicit, setVideoBackground, setNavbarPosition, setLanguage, type NavbarPosition, type AudioQuality } from '../store/profile'
+import { useProfile, setAllowExplicit, setVideoBackground, setNavbarPosition, setWaveColorPreset, setLanguage, type NavbarPosition, type AudioQuality } from '../store/profile'
 import { usePlayer } from '../player/PlayerContext'
 import { useAppVersion } from '../hooks/useAppVersion'
+import { COLOR_PRESETS } from './waveColors'
 import { ShieldIcon, InfoIcon, PlayIcon, Maximize2Icon, Volume2Icon } from './icons'
 import './SettingsView.css'
 
@@ -103,6 +104,22 @@ function SettingsView(): JSX.Element {
             <div className="settings-view__row-hint">{t('settings.adaptiveEQHint')}</div>
           </div>
           <Toggle checked={adaptiveEQ} onChange={setAdaptiveEQ} />
+        </div>
+        <div className="settings-view__row">
+          <div className="settings-view__row-text">
+            <div className="settings-view__row-label">{t('settings.waveColors')}</div>
+          </div>
+          <select
+            className="settings-view__select"
+            value={profile.waveColorPreset}
+            onChange={(e) => setWaveColorPreset(e.target.value)}
+          >
+            {COLOR_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {t(`wave.preset.${preset.id}`)}
+              </option>
+            ))}
+          </select>
         </div>
       </section>
 

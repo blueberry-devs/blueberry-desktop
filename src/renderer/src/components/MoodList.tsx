@@ -47,10 +47,10 @@ function detectGenres(liked: TrackResult[]): CategoryId[] {
     .map(([cat]) => cat)
 }
 
-const WHEEL_RADIUS = 480
-const MAX_ANGLE = 0.85
+const WHEEL_RADIUS = 720
+const MAX_ANGLE = 0.65
 
-function applyWave(scrollEl: HTMLElement): void {
+function applyParens(scrollEl: HTMLElement): void {
   const centerY = window.innerHeight / 2
   const rows = scrollEl.querySelectorAll<HTMLElement>('[data-wave-index]')
   rows.forEach((row) => {
@@ -59,10 +59,8 @@ function applyWave(scrollEl: HTMLElement): void {
     const dist = rowCenter - centerY
     const angle = Math.max(-MAX_ANGLE, Math.min(MAX_ANGLE, dist / WHEEL_RADIUS))
     const recede = WHEEL_RADIUS * (1 - Math.cos(angle))
-    const scale = 0.82 + 0.18 * Math.cos(angle)
-    const opacity = 0.55 + 0.45 * Math.cos(angle)
-    row.style.transform = `translateX(${recede}px) scale(${scale})`
-    row.style.opacity = String(opacity)
+    row.style.transform = `translateX(${recede}px)`
+    row.style.opacity = ''
   })
 }
 
@@ -164,10 +162,10 @@ function MoodList() {
     const maybeScrollEl = root.querySelector<HTMLElement>('.animated-list')
     if (!maybeScrollEl) return
     const scrollEl: HTMLElement = maybeScrollEl
-    applyWave(scrollEl)
+    applyParens(scrollEl)
     function schedule(): void {
       cancelAnimationFrame(rafRef.current)
-      rafRef.current = requestAnimationFrame(() => applyWave(scrollEl))
+      rafRef.current = requestAnimationFrame(() => applyParens(scrollEl))
     }
     scrollEl.addEventListener('scroll', schedule, { passive: true })
     const resizeObserver = new ResizeObserver(schedule)

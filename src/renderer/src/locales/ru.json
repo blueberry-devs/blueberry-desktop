@@ -209,6 +209,7 @@
   "settings.audioHifi": "Hi-Fi",
   "settings.adaptiveEQ": "Adaptive Equalizer",
   "settings.adaptiveEQHint": "Автоматически подстраивает эквалайзер под каждый трек для сбалансированного звучания.",
+  "settings.waveColors": "Цвета волны",
   "settings.hotkeysTitle": "Горячие клавиши",
   "settings.aboutTitle": "О программе",
   "settings.player": "Плеер",
