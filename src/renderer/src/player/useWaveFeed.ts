@@ -4,7 +4,6 @@ import { getLikedTracks } from '../store/likes'
 import { getHistory } from '../store/history'
 import { pickCategoryForQuery } from '../data/wavePhrases'
 import { phraseToKeyword } from '../data/moodPhrases'
-import { getTopGenres } from '../store/genreStats'
 import { usePlayer } from './PlayerContext'
 import log from 'electron-log/renderer'
 
@@ -151,27 +150,6 @@ export function useWaveFeed(): {
   const seenSigsRef = useRef<Set<string>>(new Set())
   const requestTokenRef = useRef(0)
   const refillingRef = useRef(false)
-
-  const initedRef = useRef(false)
-  useEffect(() => {
-    if (activeGenre || initedRef.current) return
-    initedRef.current = true
-    const liked = getLikedTracks()
-    if (liked.length === 0) return
-    const topGenres = getTopGenres(3)
-    if (topGenres.length > 0) {
-      const topGenre = topGenres[Math.floor(Math.random() * topGenres.length)]
-      setActiveGenre(topGenre.query)
-      return
-    }
-    const freq = new Map<string, number>()
-    for (const t of liked) {
-      const a = t.artists[0]
-      if (a) freq.set(a, (freq.get(a) ?? 0) + 1)
-    }
-    const top = [...freq.entries()].sort((a, b) => b[1] - a[1])[0]
-    if (top) setActiveGenre(top[0])
-  }, [activeGenre, setActiveGenre])
 
   const seedGenre = useCallback(
     (genre: string, autoplay: boolean) => {
