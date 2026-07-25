@@ -52,6 +52,9 @@ export function isAuthenticated(): boolean {
 export function setAuth(state: AuthState): void {
   cache = state
   emit()
+  if (state.accessToken) {
+    startTokenRefresh()
+  }
 }
 
 export function clearAuth(): void {
@@ -175,32 +178,77 @@ export async function refreshProfile(): Promise<void> {
     return
   }
 
-  // Token might be expired — try refresh
-  if (!state.refreshToken) return
-  const result = await apiRefresh(state.refreshToken)
-  if (!result.success || !result.accessToken) {
-    clearAuth()
-    return
-  }
-
-  cache = {
-    accessToken: result.accessToken,
-    refreshToken: result.refreshToken ?? state.refreshToken,
-    user: state.user,
-  }
-  emit()
+  // Token might be expired — try refresh (uses shared lock, no race)
+  const refreshed = await doRefresh()
+  if (!refreshed) return
 
   // Retry profile fetch with new token
-  user = await getMe(result.accessToken)
+  user = await getMe(cache.accessToken!)
   if (user) {
     cache = { ...cache, user }
     lastProfileFetch = now
     emit()
   }
 }
+  }
+}
 
 export function logout(): void {
   clearAuth()
+}
+
+// ---------- Periodic token refresh ----------
+let refreshInterval: ReturnType<typeof setInterval> | null = null
+const REFRESH_INTERVAL_MS = 10 * 60 * 1000
+let isRefreshing = false
+
+async function doRefresh(): Promise<boolean> {
+  if (isRefreshing) return false
+  isRefreshing = true
+  try {
+    const state = getAuth()
+    if (!state.refreshToken) return false
+    const result = await apiRefresh(state.refreshToken)
+    if (result.success && result.accessToken) {
+      cache = {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken ?? state.refreshToken,
+        user: state.user,
+      }
+      emit()
+      return true
+    }
+    clearAuth()
+    return false
+  } finally {
+    isRefreshing = false
+  }
+}
+
+function stopTokenRefresh(): void {
+  if (refreshInterval !== null) {
+    clearInterval(refreshInterval)
+    refreshInterval = null
+  }
+}
+
+function startTokenRefresh(): void {
+  stopTokenRefresh()
+  refreshInterval = setInterval(() => {
+    doRefresh()
+  }, REFRESH_INTERVAL_MS)
+}
+
+// Patch clearAuth to stop refresh on logout
+const origClearAuth = clearAuth
+clearAuth = (): void => {
+  stopTokenRefresh()
+  origClearAuth()
+}
+
+// Start refresh on init if already logged in
+if (cache.accessToken) {
+  startTokenRefresh()
 }
 
 export function useAuth(): AuthState {
