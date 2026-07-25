@@ -242,24 +242,25 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
   }, [currentTrack])
 
   const updateAudioChain = useCallback((quality: AudioQuality) => {
+    const source = enhancementSourceRef.current
+    const ctx = enhancementCtxRef.current
     const compressor = enhancementCompressorRef.current
     const gain = enhancementGainRef.current
     const sub = enhancementSubRef.current
     const bass = enhancementBassRef.current
     const presence = enhancementPresenceRef.current
-    if (!compressor || !gain || !sub || !bass || !presence) return
+    if (!source || !ctx || !compressor || !gain || !sub || !bass || !presence) return
+
+    if (quality === 'normal') {
+      source.disconnect()
+      source.connect(ctx.destination)
+      return
+    }
+
+    source.disconnect()
+    source.connect(compressor)
 
     switch (quality) {
-      case 'normal': {
-        compressor.threshold.value = 0
-        compressor.ratio.value = 1
-        compressor.knee.value = 0
-        sub.gain.value = 0
-        bass.gain.value = 0
-        presence.gain.value = 0
-        gain.gain.value = 1
-        break
-      }
       case 'enhanced': {
         compressor.threshold.value = -26
         compressor.ratio.value = 4

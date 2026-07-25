@@ -1,9 +1,9 @@
 {
   "name": "blueberry-desktop",
-  "version": "1.300.0",
+  "version": "1.400.0",
   "description": "Яндекс Музыка",
   "main": "./out/main/index.js",
-  "author": "torusov",
+  "author": "blueberry team",
   "license": "GPL-3.0",
   "scripts": {
     "dev": "concurrently -n server,app -c yellow,cyan \"pnpm run dev:server\" \"electron-vite dev\"",

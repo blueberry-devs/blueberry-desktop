@@ -3,10 +3,6 @@ import { motion } from 'motion/react'
 import { useTranslation } from '../utils/useTranslation'
 import './Sidebar.css'
 import type { Tab } from '../App'
-import logo from '../assets/icon.png'
-import logoText1 from '../assets/text1.png'
-import logoText2 from '../assets/text2.png'
-import waveIcon from '../assets/mywave.png'
 
 const COLLAPSED_WIDTH = 72
 const EXPANDED_WIDTH = 230
@@ -29,13 +25,10 @@ export function NavIcon({ type }: { type: string }): JSX.Element {
         </svg>
       )
     case 'wave':
-      // mywave.png is already a transparent-background spark — masked so it
-      // picks up currentColor like the other icons (gray when inactive,
-      // white on the active tab) instead of staying baked-in white.
       return (
         <span
           className="sidebar__nav-icon-spark"
-          style={{ maskImage: `url(${waveIcon})`, WebkitMaskImage: `url(${waveIcon})` }}
+          style={{ maskImage: 'url(/icon-transparent.png)', WebkitMaskImage: 'url(/icon-transparent.png)' }}
         />
       )
     case 'note':
@@ -114,10 +107,10 @@ function Sidebar({ activeTab, onSelectTab }: Props): JSX.Element {
       onMouseLeave={() => setOpen(false)}
     >
       <div className="sidebar__logo">
-        <img src={logo} alt="" className="sidebar__spark" />
+        <img src="/icon-transparent.png" alt="" className="sidebar__logo-icon" />
         <div className="sidebar__logo-text">
-          <img src={logoText1} alt="Яндекс" className="sidebar__logo-text1" />
-          <img src={logoText2} alt="Музыка" className="sidebar__logo-text2" />
+          <span className="sidebar__logo-title">Blueberry</span>
+          <span className="sidebar__logo-sub">Desktop</span>
         </div>
       </div>
 

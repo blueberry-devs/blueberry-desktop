@@ -145,8 +145,8 @@
 .dyn-island__ctrl-btn--play {
   width: 34px;
   height: 34px;
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: #ffdb4d;
+  color: #000000;
 }
 
 .dyn-island__ctrl-btn--play:hover {

@@ -3,6 +3,8 @@ import { searchTracksMulti, searchArtistTracks, TrackResult } from '../api/yande
 import { getLikedTracks } from '../store/likes'
 import { getHistory } from '../store/history'
 import { pickCategoryForQuery } from '../data/wavePhrases'
+import { phraseToKeyword } from '../data/moodPhrases'
+import { getTopGenres } from '../store/genreStats'
 import { usePlayer } from './PlayerContext'
 import log from 'electron-log/renderer'
 
@@ -81,20 +83,37 @@ function shuffle<T>(arr: T[]): T[] {
 
 async function fetchCandidates(genre: string): Promise<TrackResult[]> {
   const start = Date.now()
-  if (isArtistQuery(genre)) {
-    log.info(`[Wave] Analyzing favourites... searching "${genre}"`)
-    const results = await searchArtistTracks(genre).catch(() => [] as TrackResult[])
-    const usable = results.filter(isUsable)
-    if (usable.length > 0) {
-      log.info(`[Wave] Found ${usable.length} tracks for "${genre}" in ${Date.now() - start}ms`)
-      return shuffle(usable)
+
+  // Convert mood phrase to search keyword (e.g. "Энергичный рок" → "rock music")
+  const keyword = phraseToKeyword(genre) ?? genre
+
+  if (isArtistQuery(keyword)) {
+    log.info(`[Wave] Analysing favourites... searching artist "${keyword}"`)
+    const [artistResults, genreResults] = await Promise.all([
+      searchArtistTracks(keyword).catch(() => [] as TrackResult[]),
+      searchTracksMulti(`${keyword} music`, ['yandex', 'soundcloud', 'youtube']).catch(() => [] as TrackResult[]),
+    ])
+    const seen = new Set<string>()
+    const merged: TrackResult[] = []
+    for (const batch of [artistResults, genreResults]) {
+      for (const t of batch) {
+        if (!t || !isUsable(t)) continue
+        const sig = trackSignature(t)
+        if (seen.has(sig)) continue
+        seen.add(sig)
+        merged.push(t)
+      }
     }
-    log.info(`[Wave] No artist tracks found for "${genre}", returning empty`)
+    if (merged.length > 0) {
+      log.info(`[Wave] Found ${merged.length} tracks for artist "${keyword}" in ${Date.now() - start}ms`)
+      return shuffle(merged)
+    }
+    log.info(`[Wave] No tracks found for "${keyword}", returning empty`)
     return []
   }
 
-  const queries = buildQueries(genre)
-  log.info(`[Wave] Analyzing favourites... ${queries.length} queries for "${genre}"`)
+  const queries = buildQueries(keyword)
+  log.info(`[Wave] Analysing favourites... ${queries.length} queries for "${genre}" → "${keyword}"`)
   queries.forEach((q) => log.info(`  query: ${q}`))
 
   // Search sequentially so we can return early — don't wait for all queries
@@ -139,6 +158,12 @@ export function useWaveFeed(): {
     initedRef.current = true
     const liked = getLikedTracks()
     if (liked.length === 0) return
+    const topGenres = getTopGenres(3)
+    if (topGenres.length > 0) {
+      const topGenre = topGenres[Math.floor(Math.random() * topGenres.length)]
+      setActiveGenre(topGenre.query)
+      return
+    }
     const freq = new Map<string, number>()
     for (const t of liked) {
       const a = t.artists[0]

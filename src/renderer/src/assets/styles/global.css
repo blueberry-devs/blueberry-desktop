@@ -1,6 +1,6 @@
 @font-face {
-  font-family: 'YS Headline';
-  src: url('/font.ttf') format('truetype');
+  font-family: 'Druk Wide';
+  src: url('/fonts/font.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -20,8 +20,8 @@
   --text-primary: #ffffff;
   --text-secondary: rgba(255, 255, 255, 0.5);
   --text-tertiary: rgba(255, 255, 255, 0.3);
-  --accent: #ffdb4d;
-  --accent-contrast: #000000;
+  --accent: #3b82f6;
+  --accent-contrast: #ffffff;
   --sidebar-bg: #000000;
   --titlebar-bg: transparent;
   --settings-bg: #0f0f0f;
@@ -36,7 +36,7 @@
   --text-primary: #14141a;
   --text-secondary: rgba(20, 20, 26, 0.6);
   --text-tertiary: rgba(20, 20, 26, 0.4);
-  --accent: #d69e00;
+  --accent: #2563eb;
   --accent-contrast: #ffffff;
   --sidebar-bg: #ffffff;
   --titlebar-bg: transparent;

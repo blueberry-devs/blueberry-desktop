@@ -31,6 +31,39 @@ const EN: Record<CategoryId, string[]> = {
   mix: ['Music for night', 'Daily soundtrack', 'Main character', 'Tracks with chills', 'Atmosphere of the moment', 'Music in the rain', 'For the long road', 'When you want to think', 'When you want to dance', 'Just good sound', 'Discover something new', 'My new music']
 }
 
+const CATEGORY_TO_KEYWORD: Record<CategoryId, string> = {
+  pop: 'pop music',
+  rock: 'rock music',
+  metal: 'metal music',
+  hiphop: 'hip hop music',
+  edm: 'electronic dance music',
+  chill: 'chill music',
+  jazz: 'jazz music',
+  classical: 'classical music',
+  indie: 'indie music',
+  folk: 'folk music',
+  workout: 'energetic workout music',
+  mix: 'popular music',
+}
+
+let phraseToKeywordCache: Record<string, string> | null = null
+
+function buildPhraseToKeywordCache(): Record<string, string> {
+  const cache: Record<string, string> = {}
+  for (const cat of CATEGORIES) {
+    const kw = CATEGORY_TO_KEYWORD[cat]
+    if (!kw) continue
+    for (const p of RU[cat]) cache[p.toLowerCase()] = kw
+    for (const p of EN[cat]) cache[p.toLowerCase()] = kw
+  }
+  return cache
+}
+
+export function phraseToKeyword(phrase: string): string | null {
+  if (!phraseToKeywordCache) phraseToKeywordCache = buildPhraseToKeywordCache()
+  return phraseToKeywordCache[phrase.toLowerCase().trim()] ?? null
+}
+
 export function getMoodPhrases(language: string): Record<CategoryId, string[]> {
   return language === 'en' ? EN : RU
 }

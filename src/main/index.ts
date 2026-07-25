@@ -270,7 +270,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     frame: false,
-    title: 'Яндекс Музыка',
+    title: 'Blueberry Desktop',
     backgroundColor: '#000000',
     icon: join(__dirname, `../../resources/${iconName}`),
     webPreferences: {
@@ -333,7 +333,7 @@ function createTray(mainWindow: BrowserWindow): void {
   const iconName = process.platform === 'win32' ? (is.dev ? 'icon-dev.ico' : 'icon.ico') : (is.dev ? 'icon-dev.png' : 'icon.png')
   const iconPath = join(__dirname, `../../resources/${iconName}`)
   tray = new Tray(nativeImage.createFromPath(iconPath))
-  tray.setToolTip('Яндекс Музыка')
+  tray.setToolTip('Blueberry Desktop')
 
   trayMenuTemplate = [
     { id: 'play-pause', label: 'Play', click: () => mainWindow.webContents.send('tray-command', 'togglePlay') },
@@ -671,7 +671,7 @@ function checkDevUpdate(): void {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.blueberry.desktop')
-  app.name = 'Яндекс Музыка'
+  app.name = 'Blueberry Desktop'
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
