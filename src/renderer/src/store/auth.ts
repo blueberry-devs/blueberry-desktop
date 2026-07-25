@@ -163,9 +163,35 @@ let lastProfileFetch = 0
 export async function refreshProfile(): Promise<void> {
   const now = Date.now()
   if (now - lastProfileFetch < PROFILE_CACHE_TTL) return
-  if (!cache.accessToken) return
+  const state = getAuth()
+  if (!state.accessToken) return
 
-  const user = await getMe(cache.accessToken)
+  // Try fetching profile with current access token
+  let user = await getMe(state.accessToken)
+  if (user) {
+    cache = { ...cache, user }
+    lastProfileFetch = now
+    emit()
+    return
+  }
+
+  // Token might be expired — try refresh
+  if (!state.refreshToken) return
+  const result = await apiRefresh(state.refreshToken)
+  if (!result.success || !result.accessToken) {
+    clearAuth()
+    return
+  }
+
+  cache = {
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken ?? state.refreshToken,
+    user: state.user,
+  }
+  emit()
+
+  // Retry profile fetch with new token
+  user = await getMe(result.accessToken)
   if (user) {
     cache = { ...cache, user }
     lastProfileFetch = now
