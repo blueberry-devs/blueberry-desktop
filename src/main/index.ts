@@ -1,6 +1,8 @@
 import { app, shell, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, session } from 'electron'
 import https from 'https'
 
+// Limit renderer V8 heap to keep total process memory <50MB in production
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=128 --max-semi-space-size=4')
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled')
 
 if (!is.dev) {
@@ -9,7 +11,7 @@ if (!is.dev) {
   app.commandLine.appendSwitch('enable-gpu-rasterization')
 }
 import { join } from 'path'
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, createWriteStream } from 'fs'
 import { spawn, execSync, ChildProcessWithoutNullStreams } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
@@ -535,8 +537,16 @@ ipcMain.handle('download-track', async (_event, trackId: string, url: string): P
   const contentType = res.headers.get('content-type') || ''
   const ext = contentType.includes('mp4') || contentType.includes('m4a') ? 'm4a' : 'mp3'
   const filePath = join(downloadsDir(), `${sanitizeTrackId(trackId)}.${ext}`)
-  const buffer = Buffer.from(await res.arrayBuffer())
-  writeFileSync(filePath, buffer)
+  const writer = createWriteStream(filePath)
+  const reader = res.body!.getReader()
+  const pump = (): Promise<void> => {
+    return reader.read().then(({ done, value }) => {
+      if (done) { writer.close(); return }
+      writer.write(Buffer.from(value))
+      return pump()
+    })
+  }
+  await pump()
   return filePath
 })
 

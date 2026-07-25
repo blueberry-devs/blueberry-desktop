@@ -15,6 +15,7 @@ import { getLyrics } from '../services/lyricsCache'
 import { pushHistory } from '../store/history'
 import { recordPlay } from '../store/playCount'
 import { getDownloadPath } from '../store/downloads'
+import { type AudioQuality, getProfile, setAudioQuality as setProfileAudioQuality, setAdaptiveEQ as setProfileAdaptiveEQ } from '../store/profile'
 
 function updateDiscordPresence(track: TrackResult, elapsed: number, playing: boolean): void {
   window.api.discordUpdatePresence({
@@ -49,6 +50,10 @@ interface PlayerState {
   activeGenre: string | null
   crossfade: boolean
   setCrossfade: (v: boolean) => void
+  audioQuality: AudioQuality
+  setAudioQuality: (v: AudioQuality) => void
+  adaptiveEQ: boolean
+  setAdaptiveEQ: (v: boolean) => void
   play: (track: TrackResult, preferSource?: TrackResult['source']) => void
   playWithSource: (source: TrackResult['source']) => void
   playQueue: (tracks: TrackResult[], startIndex: number) => void
@@ -118,6 +123,191 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
   const [activeGenre, setActiveGenreState] = useState<string | null>(null)
   const [crossfade, setCrossfadeState] = useState(false)
   const crossfadeRef = useRef(false)
+
+  const [audioQuality, setAudioQualityState] = useState<AudioQuality>(getProfile().audioQuality)
+  const audioQualityRef = useRef<AudioQuality>(getProfile().audioQuality)
+  const [adaptiveEQ, setAdaptiveEQState] = useState(getProfile().adaptiveEQ)
+  const adaptiveEQRef = useRef(getProfile().adaptiveEQ)
+  const eqAnalyzingRef = useRef(false)
+  const eqCacheRef = useRef<Map<string, number[]>>(new Map())
+  const eqAnalysisTimerRef = useRef<number | null>(null)
+
+  const enhancementCtxRef = useRef<AudioContext | null>(null)
+  const enhancementSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
+  const enhancementCompressorRef = useRef<DynamicsCompressorNode | null>(null)
+  const enhancementGainRef = useRef<GainNode | null>(null)
+  const enhancementSubRef = useRef<BiquadFilterNode | null>(null)
+  const enhancementBassRef = useRef<BiquadFilterNode | null>(null)
+  const enhancementPresenceRef = useRef<BiquadFilterNode | null>(null)
+  const eqFiltersRef = useRef<BiquadFilterNode[]>([])
+
+  const EQ_BANDS = [
+    { freq: 50,  Q: 1.2, label: 'sub' },
+    { freq: 200, Q: 1.0, label: 'bass' },
+    { freq: 800, Q: 0.8, label: 'lowmid' },
+    { freq: 3500, Q: 0.9, label: 'highmid' },
+    { freq: 10000, Q: 0.7, label: 'air' },
+  ]
+
+  function eqCacheSet(key: string, val: number[]): void {
+    const map = eqCacheRef.current
+    map.set(key, val)
+    if (map.size > 150) {
+      const first = map.keys().next()
+      if (!first.done) map.delete(first.value)
+    }
+  }
+
+  function analyzeTrackEQ(): void {
+    const analyser = analyserRef.current
+    if (!analyser) return
+    const data = new Uint8Array(analyser.frequencyBinCount)
+    const sampleRate = analyser.context.sampleRate
+    const fftSize = analyser.fftSize
+
+    const samples: number[][] = []
+    let collected = 0
+    const maxSamples = 8
+    let cancelled = false
+
+    const collect = (): void => {
+      if (cancelled || !eqAnalyzingRef.current) return
+      analyser.getByteFrequencyData(data)
+      const bandEnergies = EQ_BANDS.map((band) => {
+        let sum = 0, count = 0
+        for (let i = 0; i < data.length; i++) {
+          const freq = (i * sampleRate) / fftSize
+          if (freq >= band.freq / 3 && freq <= band.freq * 3) {
+            sum += data[i]
+            count++
+          }
+        }
+        return count > 0 ? sum / count : 0
+      })
+      samples.push(bandEnergies)
+      collected++
+      if (collected < maxSamples) {
+        eqAnalysisTimerRef.current = window.setTimeout(collect, 80)
+      } else {
+        const avg = samples[0].map((_, bi) =>
+          samples.reduce((a, s) => a + s[bi], 0) / samples.length
+        )
+        const totalAvg = avg.reduce((a, b) => a + b, 0) / avg.length
+        const adjustments = avg.map((e) => {
+          if (totalAvg === 0) return 0
+          const delta = Math.log2(e / totalAvg) * 2.5
+          return Math.max(-5, Math.min(5, -delta))
+        })
+        applyEQProfile(adjustments)
+        const ct = currentTrackRef.current
+        if (ct) eqCacheSet(ct.id, adjustments)
+        eqAnalyzingRef.current = false
+      }
+    }
+    eqAnalysisTimerRef.current = window.setTimeout(collect, 200)
+  }
+
+  function applyEQProfile(adjustments: number[]): void {
+    const filters = eqFiltersRef.current
+    for (let i = 0; i < filters.length && i < adjustments.length; i++) {
+      filters[i].gain.value = adjustments[i]
+    }
+    log.info('[eq] adaptive profile applied:', adjustments.map((g) => g.toFixed(1)).join(' '))
+  }
+
+  function clearEQProfile(): void {
+    for (const f of eqFiltersRef.current) f.gain.value = 0
+  }
+
+  const setAdaptiveEQ = useCallback((v: boolean) => {
+    adaptiveEQRef.current = v
+    setAdaptiveEQState(v)
+    setProfileAdaptiveEQ(v)
+    if (!v) {
+      if (eqAnalysisTimerRef.current !== null) {
+        clearTimeout(eqAnalysisTimerRef.current)
+        eqAnalysisTimerRef.current = null
+      }
+      eqAnalyzingRef.current = false
+      clearEQProfile()
+    } else if (currentTrack) {
+      const cached = eqCacheRef.current.get(currentTrack.id)
+      if (cached) {
+        applyEQProfile(cached)
+      } else if (!eqAnalyzingRef.current) {
+        eqAnalyzingRef.current = true
+        setTimeout(analyzeTrackEQ, 100)
+      }
+    }
+  }, [currentTrack])
+
+  const updateAudioChain = useCallback((quality: AudioQuality) => {
+    const compressor = enhancementCompressorRef.current
+    const gain = enhancementGainRef.current
+    const sub = enhancementSubRef.current
+    const bass = enhancementBassRef.current
+    const presence = enhancementPresenceRef.current
+    if (!compressor || !gain || !sub || !bass || !presence) return
+
+    switch (quality) {
+      case 'normal': {
+        compressor.threshold.value = 0
+        compressor.ratio.value = 1
+        compressor.knee.value = 0
+        sub.gain.value = 0
+        bass.gain.value = 0
+        presence.gain.value = 0
+        gain.gain.value = 1
+        break
+      }
+      case 'enhanced': {
+        compressor.threshold.value = -26
+        compressor.ratio.value = 4
+        compressor.knee.value = 6
+        compressor.attack.value = 0.005
+        compressor.release.value = 0.2
+        sub.gain.value = 0
+        bass.gain.value = 6
+        bass.frequency.value = 110
+        bass.type = 'lowshelf'
+        bass.Q.value = 0.7
+        presence.gain.value = 2.5
+        presence.frequency.value = 7000
+        presence.type = 'highshelf'
+        presence.Q.value = 0.7
+        gain.gain.value = 1
+        break
+      }
+      case 'hifi': {
+        compressor.threshold.value = -40
+        compressor.ratio.value = 12
+        compressor.knee.value = 16
+        compressor.attack.value = 0.001
+        compressor.release.value = 0.06
+        sub.gain.value = 8
+        sub.frequency.value = 50
+        sub.type = 'lowshelf'
+        sub.Q.value = 0.5
+        bass.gain.value = 5
+        bass.frequency.value = 120
+        bass.type = 'lowshelf'
+        bass.Q.value = 0.7
+        presence.gain.value = 4
+        presence.frequency.value = 9000
+        presence.type = 'highshelf'
+        presence.Q.value = 0.7
+        gain.gain.value = 1
+        break
+      }
+    }
+  }, [])
+
+  const setAudioQuality = useCallback((v: AudioQuality) => {
+    audioQualityRef.current = v
+    setAudioQualityState(v)
+    setProfileAudioQuality(v)
+    updateAudioChain(v)
+  }, [updateAudioChain])
 
   const setCrossfade = useCallback((v: boolean) => {
     crossfadeRef.current = v
@@ -247,6 +437,13 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
         return
       }
 
+      // Cancel any in-flight EQ analysis when switching tracks
+      if (eqAnalysisTimerRef.current !== null) {
+        clearTimeout(eqAnalysisTimerRef.current)
+        eqAnalysisTimerRef.current = null
+      }
+      eqAnalyzingRef.current = false
+
       const token = ++playTokenRef.current
       pushHistory(track)
       recordPlay(track.id)
@@ -288,6 +485,17 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
 
       // Prefetch lyrics in parallel so the panel is ready instantly.
       loadLyrics(track, token)
+
+      // Adaptive EQ: start analyzing if enabled, no cached profile yet.
+      if (adaptiveEQRef.current) {
+        const cached = eqCacheRef.current.get(track.id)
+        if (cached) {
+          applyEQProfile(cached)
+        } else if (!eqAnalyzingRef.current) {
+          eqAnalyzingRef.current = true
+          setTimeout(analyzeTrackEQ, 100)
+        }
+      }
     },
     [currentTrack, attachSource, loadLyrics]
   )
@@ -306,6 +514,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
 
   useEffect(() => {
     const audio = new Audio()
+    audio.crossOrigin = 'anonymous'
     audioRef.current = audio
 
     // Shadow element: silent (muted + zero volume), never inserted in the
@@ -342,6 +551,58 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       }
     }
     shadow.addEventListener('play', setupAnalyser)
+
+    const setupEnhancement = (): void => {
+      if (enhancementCtxRef.current) return
+      try {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        const enhCtx = new AudioCtx()
+        const enhSource = enhCtx.createMediaElementSource(audio)
+        const enhCompressor = enhCtx.createDynamicsCompressor()
+
+        // Adaptive EQ filters (peaking): inserted after compressor
+        const eqFilters = EQ_BANDS.map((band) => {
+          const f = enhCtx.createBiquadFilter()
+          f.type = 'peaking'
+          f.frequency.value = band.freq
+          f.Q.value = band.Q
+          f.gain.value = 0
+          return f
+        })
+        eqFiltersRef.current = eqFilters
+
+        const enhSub = enhCtx.createBiquadFilter()
+        const enhBass = enhCtx.createBiquadFilter()
+        const enhPresence = enhCtx.createBiquadFilter()
+        const enhGain = enhCtx.createGain()
+
+        // Chain: comp → EQ1→EQ2→EQ3→EQ4→EQ5 → sub → bass → presence → gain
+        let prev: AudioNode = enhCompressor
+        enhSource.connect(enhCompressor)
+        for (const f of eqFilters) {
+          prev.connect(f)
+          prev = f
+        }
+        prev.connect(enhSub)
+        enhSub.connect(enhBass)
+        enhBass.connect(enhPresence)
+        enhPresence.connect(enhGain)
+        enhGain.connect(enhCtx.destination)
+
+        enhancementCtxRef.current = enhCtx
+        enhancementSourceRef.current = enhSource
+        enhancementCompressorRef.current = enhCompressor
+        enhancementSubRef.current = enhSub
+        enhancementBassRef.current = enhBass
+        enhancementPresenceRef.current = enhPresence
+        enhancementGainRef.current = enhGain
+        updateAudioChain(audioQualityRef.current)
+        log.info('[enhancement] connected — comp + 5-band EQ + sub + bass + presence')
+      } catch (e) {
+        log.warn('[enhancement] Web Audio enhancement unavailable:', e)
+      }
+    }
+    audio.addEventListener('play', setupEnhancement)
 
     const onTime = (): void => setCurrentTime(audio.currentTime)
     const onDuration = (): void => setDuration(audio.duration || 0)
@@ -383,6 +644,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       audio.removeEventListener('pause', onPause)
       audio.removeEventListener('ended', onEnded)
       shadow.removeEventListener('play', setupAnalyser)
+      audio.removeEventListener('play', setupEnhancement)
       audio.pause()
       shadow.pause()
       hlsRef.current?.destroy()
@@ -390,6 +652,9 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       const ctx = audioCtxRefLocal.current
       if (ctx) ctx.close().catch(() => {})
       audioCtxRef.current = null
+      const enhCtx = enhancementCtxRef.current
+      if (enhCtx) enhCtx.close().catch(() => {})
+      enhancementCtxRef.current = null
     }
   }, [advanceQueue])
 
@@ -588,6 +853,10 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       activeGenre,
       crossfade,
       setCrossfade,
+      audioQuality,
+      setAudioQuality,
+      adaptiveEQ,
+      setAdaptiveEQ,
       play,
       playWithSource,
       playQueue: playQueueFn,
@@ -624,6 +893,10 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       activeGenre,
       crossfade,
       setCrossfade,
+      audioQuality,
+      setAudioQuality,
+      adaptiveEQ,
+      setAdaptiveEQ,
       play,
       playWithSource,
       playQueueFn,

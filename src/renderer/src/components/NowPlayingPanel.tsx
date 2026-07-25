@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { usePlayer, usePlayerTime } from '../player/PlayerContext'
+import type { AudioQuality } from '../store/profile'
 import { useWaveFeed } from '../player/useWaveFeed'
 import { toggleLike, useIsLiked } from '../store/likes'
 import { usePlaylists, addTrackToPlaylist } from '../store/playlists'
@@ -200,6 +201,71 @@ function ColorPresetSubmenu({
   )
 }
 
+function AudioQualitySubmenu({
+  show,
+  quality,
+  setQuality,
+  setShowMenu,
+}: {
+  show: boolean
+  quality: AudioQuality
+  setQuality: (v: AudioQuality) => void
+  setShowMenu: React.Dispatch<React.SetStateAction<boolean>>
+}): JSX.Element {
+  const { t } = useTranslation()
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const subRef = useRef<HTMLDivElement>(null)
+  const [posData, setPosData] = useState({ cls: '', maxHeight: 0 })
+
+  useEffect(() => {
+    if (!show) { setPosData({ cls: '', maxHeight: 0 }); return }
+    requestAnimationFrame(() => requestAnimationFrame(() =>
+      setPosData(formatSubmenuPos(subRef, btnRef, true))
+    ))
+  }, [show])
+
+  const scrollCls = posData.maxHeight > 0 ? ' now-playing__dropdown-sub--scroll' : ''
+  const labels: AudioQuality[] = ['normal', 'enhanced', 'hifi']
+
+  return (
+    <div className="now-playing__dropdown-item-wrap" ref={wrapRef}>
+      <button
+        ref={btnRef}
+        className="now-playing__dropdown-item"
+        onClick={() => setShowMenu((v) => !v)}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 5v6h3l4 4V1L5 5H2z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M11 4.5a5 5 0 010 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          <path d="M12.5 2.5a8 8 0 010 11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </svg>
+        <span className="now-playing__dropdown-item-label">{t('settings.audioQuality')}</span>
+        <span className="now-playing__dropdown-item-badge">{t('settings.audio' + quality.charAt(0).toUpperCase() + quality.slice(1))}</span>
+        <svg className="now-playing__dropdown-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M4.5 2l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {show && (
+        <div ref={subRef} className={`now-playing__dropdown-sub${posData.cls}${scrollCls}`} style={posData.maxHeight > 0 ? { maxHeight: posData.maxHeight } : undefined}>
+          {labels.map((q) => (
+            <button
+              key={q}
+              className={`now-playing__dropdown-subitem${q === quality ? ' now-playing__dropdown-subitem--active' : ''}`}
+              onClick={() => {
+                setQuality(q)
+                setShowMenu(false)
+              }}
+            >
+              {t('settings.audio' + q.charAt(0).toUpperCase() + q.slice(1))}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function NowPlayingPanel(): JSX.Element {
   const { t } = useTranslation()
   const { waveTrack, isGenerating, skip } = useWaveFeed()
@@ -216,7 +282,9 @@ function NowPlayingPanel(): JSX.Element {
     openLyrics,
     volume,
     setVolume,
-    seekTo
+    seekTo,
+    audioQuality,
+    setAudioQuality
   } = usePlayer()
   const displayTrack = currentTrack ?? waveTrack
   const liked = useIsLiked(displayTrack?.id)
@@ -225,6 +293,7 @@ function NowPlayingPanel(): JSX.Element {
   const [showMenu, setShowMenu] = useState(false)
   const [showPlaylists, setShowPlaylists] = useState(false)
   const [showColorPresets, setShowColorPresets] = useState(false)
+  const [showAudioQuality, setShowAudioQuality] = useState(false)
   const [menuPosCls, setMenuPosCls] = useState('')
   const menuDropRef = useRef<HTMLDivElement>(null)
   const volRef = useRef<HTMLDivElement>(null)
@@ -256,6 +325,7 @@ function NowPlayingPanel(): JSX.Element {
         setShowMenu(false)
         setShowPlaylists(false)
         setShowColorPresets(false)
+        setShowAudioQuality(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -433,6 +503,12 @@ function NowPlayingPanel(): JSX.Element {
                   profile={profile}
                   setShowMenu={setShowMenu}
                   setShowColorPresets={setShowColorPresets}
+                />
+                <AudioQualitySubmenu
+                  show={showAudioQuality}
+                  quality={audioQuality}
+                  setQuality={setAudioQuality}
+                  setShowMenu={setShowAudioQuality}
                 />
                 
                 <button

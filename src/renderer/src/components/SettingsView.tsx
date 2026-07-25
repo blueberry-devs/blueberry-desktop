@@ -1,8 +1,8 @@
 import { useTranslation } from '../utils/useTranslation'
-import { useProfile, setAllowExplicit, setVideoBackground, setNavbarPosition, setLanguage, type NavbarPosition } from '../store/profile'
+import { useProfile, setAllowExplicit, setVideoBackground, setNavbarPosition, setLanguage, type NavbarPosition, type AudioQuality } from '../store/profile'
 import { usePlayer } from '../player/PlayerContext'
 import { useAppVersion } from '../hooks/useAppVersion'
-import { ShieldIcon, InfoIcon, PlayIcon, Maximize2Icon } from './icons'
+import { ShieldIcon, InfoIcon, PlayIcon, Maximize2Icon, Volume2Icon } from './icons'
 import './SettingsView.css'
 
 const NAVBAR_OPTIONS: { value: NavbarPosition; label: string }[] = [
@@ -26,7 +26,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 function SettingsView(): JSX.Element {
   const profile = useProfile()
-  const { crossfade, setCrossfade } = usePlayer()
+  const { crossfade, setCrossfade, audioQuality, setAudioQuality, adaptiveEQ, setAdaptiveEQ } = usePlayer()
   const version = useAppVersion()
   const { t } = useTranslation()
 
@@ -76,6 +76,33 @@ function SettingsView(): JSX.Element {
             <div className="settings-view__row-hint">{t('settings.crossfadeHint')}</div>
           </div>
           <Toggle checked={crossfade} onChange={setCrossfade} />
+        </div>
+        <div className="settings-view__row">
+          <div className="settings-view__row-text">
+            <div className="settings-view__row-label">
+              <Volume2Icon size={14} />
+              {' '}{t('settings.audioQuality')}
+            </div>
+            <div className="settings-view__row-hint">{t('settings.audioQualityHint')}</div>
+          </div>
+          <div className="settings-view__segmented">
+            {(['normal', 'enhanced', 'hifi'] as AudioQuality[]).map((q) => (
+              <button
+                key={q}
+                className={`settings-view__segmented-item${audioQuality === q ? ' settings-view__segmented-item--active' : ''}`}
+                onClick={() => setAudioQuality(q)}
+              >
+                {t('settings.audio' + q.charAt(0).toUpperCase() + q.slice(1))}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="settings-view__row">
+          <div className="settings-view__row-text">
+            <div className="settings-view__row-label">{t('settings.adaptiveEQ')}</div>
+            <div className="settings-view__row-hint">{t('settings.adaptiveEQHint')}</div>
+          </div>
+          <Toggle checked={adaptiveEQ} onChange={setAdaptiveEQ} />
         </div>
       </section>
 

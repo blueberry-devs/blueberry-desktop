@@ -188,6 +188,13 @@
   "mood.genre.диско": "Диско",
   "mood.genre.синти-поп": "Синти-поп",
 
+  "settings.audioQuality": "Качество звука",
+  "settings.audioQualityHint": "Улучшение звука через Web Audio (компрессор + усиление). Влияет на громкость и насыщенность.",
+  "settings.audioNormal": "Стандарт",
+  "settings.audioEnhanced": "Улучшенный",
+  "settings.audioHifi": "Hi-Fi",
+  "settings.adaptiveEQ": "Adaptive Equalizer",
+  "settings.adaptiveEQHint": "Автоматически подстраивает эквалайзер под каждый трек для сбалансированного звучания.",
   "settings.hotkeysTitle": "Горячие клавиши",
   "settings.aboutTitle": "О программе",
   "settings.player": "Плеер",

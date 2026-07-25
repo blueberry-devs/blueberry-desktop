@@ -5,6 +5,13 @@ import { searchTracksSoundcloud } from '../api/yandexMusic'
 // multiple views (CollectionView, TrendsView) look up the same names.
 const cache = new Map<string, string | null>()
 const inFlight = new Set<string>()
+function cacheSet(name: string, url: string | null): void {
+  cache.set(name, url)
+  if (cache.size > 200) {
+    const first = cache.keys().next()
+    if (!first.done) cache.delete(first.value)
+  }
+}
 
 /**
  * Resolves a real artist photo for names that don't already have one — e.g.
@@ -38,12 +45,12 @@ export function useArtistCovers(missing: { name: string; trackTitle: string }[])
           .then((results) => {
             const match = results.find((r) => r.artistCover) ?? null
             if (match?.artistCover) {
-              cache.set(m.name, match.artistCover)
+              cacheSet(m.name, match.artistCover)
               return
             }
-            return fetchArtistPhoto(m.name).then((url) => cache.set(m.name, url))
+            return fetchArtistPhoto(m.name).then((url) => cacheSet(m.name, url))
           })
-          .catch(() => fetchArtistPhoto(m.name).then((url) => cache.set(m.name, url)))
+          .catch(() => fetchArtistPhoto(m.name).then((url) => cacheSet(m.name, url)))
           .finally(() => inFlight.delete(m.name))
       )
     ).then(() => forceRender((n) => n + 1))

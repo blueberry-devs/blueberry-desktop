@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { fetchTrends, searchTracksMulti, TrackResult } from '../api/yandexMusic'
+import { fetchTrendsMonthly, searchTracksMulti, searchTracksSoundcloud, searchArtistTracks, TrackResult } from '../api/yandexMusic'
 import { usePlayer } from '../player/PlayerContext'
 import { useLikedTracks } from '../store/likes'
 import { useHistory } from '../store/history'
@@ -10,11 +10,8 @@ import TrackRow from './TrackRow'
 import './TrendsView.css'
 
 type TopTab = 'foryou' | 'trends'
-type AiSetFilter = 'top' | 'genre' | 'mood' | 'activity'
+type MoodFilter = 'mood' | 'activity' | 'genre'
 
-// Plain-keyword search (SoundCloud/YouTube) barely understands single
-// Cyrillic genre words — "Рок" mostly matches whatever happens to contain
-// that substring. English genre + "music" qualifier actually hits genre tags.
 const STYLE_CHIPS: { label: string; query: string }[] = [
   { label: 'Рок', query: 'rock music' },
   { label: 'Хип-хоп', query: 'hip hop music' },
@@ -43,10 +40,11 @@ const EXPLORE_GENRES = [
 
 function TrendsView(): JSX.Element {
   const [topTab, setTopTab] = useState<TopTab>('foryou')
-  const [aiSetFilter, setAiSetFilter] = useState<AiSetFilter>('top')
-  const [trends, setTrends] = useState<TrackResult[]>([])
+  const [moodFilter, setMoodFilter] = useState<MoodFilter>('mood')
+  const [monthlyTrends, setMonthlyTrends] = useState<TrackResult[]>([])
   const [styleChip, setStyleChip] = useState(STYLE_CHIPS[0].label)
   const [styleTracks, setStyleTracks] = useState<TrackResult[]>([])
+  const [recommended, setRecommended] = useState<TrackResult[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { play, playQueue } = usePlayer()
@@ -54,49 +52,75 @@ function TrendsView(): JSX.Element {
   const history = useHistory()
   const { t } = useTranslation()
 
-  const aiSetFilters: { id: AiSetFilter; label: string }[] = [
-    { id: 'top', label: t('trends.aiTop') },
-    { id: 'genre', label: t('trends.aiGenre') },
-    { id: 'mood', label: t('trends.aiMood') },
-    { id: 'activity', label: t('trends.aiActivity') }
-  ]
-
-  const aiSetCards: Record<AiSetFilter, { kicker: string; label: string; query: string }[]> = {
-    top: [
-      { kicker: 'Ai · ' + t('trends.aiActivity'), label: 'Бег', query: 'running workout' },
-      { kicker: 'Ai · ' + t('trends.aiMood'), label: 'Энергичное', query: 'energetic hype' },
-      { kicker: 'Ai · ' + t('trends.aiActivity'), label: 'Тренируюсь', query: 'gym workout' }
-    ],
-    genre: [
-      { kicker: 'Ai · ' + t('trends.aiGenre'), label: 'Рок', query: 'рок' },
-      { kicker: 'Ai · ' + t('trends.aiGenre'), label: 'Хип-хоп', query: 'хип-хоп' },
-      { kicker: 'Ai · ' + t('trends.aiGenre'), label: 'Электроника', query: 'электроника' }
-    ],
+  // Mood-based preset cards
+  const moodCards: Record<MoodFilter, { kicker: string; label: string; query: string }[]> = {
     mood: [
-      { kicker: 'Ai · ' + t('trends.aiMood'), label: 'Энергичное', query: 'energetic' },
-      { kicker: 'Ai · Artist', label: 'Slipknot', query: 'Slipknot' },
-      { kicker: 'Ai · ' + t('trends.aiMood'), label: 'Крутое', query: 'badass rock' }
+      { kicker: 'Настроение', label: 'Энергичное', query: 'energetic hype' },
+      { kicker: 'Настроение', label: 'Спокойное', query: 'chill instrumental' },
+      { kicker: 'Настроение', label: 'Вдохновляющее', query: 'inspirational epic' }
     ],
     activity: [
-      { kicker: 'Ai · ' + t('trends.aiActivity'), label: 'Бег', query: 'running' },
-      { kicker: 'Ai · ' + t('trends.aiActivity'), label: 'Работа', query: 'focus instrumental' },
-      { kicker: 'Ai · ' + t('trends.aiActivity'), label: 'Вечеринка', query: 'party hits' }
+      { kicker: 'Активность', label: 'Бег', query: 'running workout' },
+      { kicker: 'Активность', label: 'Работа', query: 'focus instrumental' },
+      { kicker: 'Активность', label: 'Вечеринка', query: 'party hits' }
+    ],
+    genre: [
+      { kicker: 'Жанр', label: 'Рок', query: 'рок' },
+      { kicker: 'Жанр', label: 'Хип-хоп', query: 'хип-хоп' },
+      { kicker: 'Жанр', label: 'Электроника', query: 'электроника' }
     ]
   }
 
+  // Fetch monthly chart
   useEffect(() => {
-    fetchTrends()
-      .then(setTrends)
+    fetchTrendsMonthly()
+      .then(setMonthlyTrends)
       .catch(() => setError(t('trends.error')))
       .finally(() => setLoading(false))
   }, [])
 
+  // Fetch style chips
   useEffect(() => {
     const query = STYLE_CHIPS.find((c) => c.label === styleChip)?.query ?? styleChip
     searchTracksMulti(query, ['yandex', 'soundcloud', 'youtube'])
       .then((res) => setStyleTracks(shuffle(res).slice(0, 10)))
       .catch(() => setStyleTracks([]))
   }, [styleChip])
+
+  // Build recommended section from liked tracks
+  useEffect(() => {
+    if (liked.length === 0) return
+    const artistCount = new Map<string, number>()
+    for (const t of liked) {
+      const name = t.artists[0]
+      if (name) artistCount.set(name, (artistCount.get(name) ?? 0) + 1)
+    }
+    const topArtists = Array.from(artistCount.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name]) => name)
+    if (topArtists.length === 0) return
+
+    Promise.all(
+      topArtists.map((name) =>
+        searchArtistTracks(name)
+          .catch(() => searchTracksSoundcloud(name))
+          .catch(() => [] as TrackResult[])
+      )
+    ).then((results) => {
+      const seen = new Set<string>()
+      const merged: TrackResult[] = []
+      for (const tracks of results) {
+        for (const t of tracks) {
+          const sig = `${t.artists[0] ?? ''}::${t.title}`.toLowerCase()
+          if (seen.has(sig)) continue
+          seen.add(sig)
+          merged.push(t)
+        }
+      }
+      setRecommended(shuffle(merged).slice(0, 20))
+    })
+  }, [liked])
 
   const metArtistTracks = useMemo(() => {
     const map = new Map<string, { name: string; cover: string | null; trackTitle: string }>()
@@ -111,8 +135,6 @@ function TrendsView(): JSX.Element {
     metArtistTracks.filter((a) => !a.cover).map((a) => ({ name: a.name, trackTitle: a.trackTitle }))
   )
 
-  // Not memoized: resolvedArtistCovers is a mutable module-level cache that
-  // fills in asynchronously — recompute each render to reflect it.
   const metArtists = metArtistTracks.map((a) => ({
     name: a.name,
     cover: a.cover ?? resolvedArtistCovers.get(a.name) ?? null
@@ -215,21 +237,47 @@ function TrendsView(): JSX.Element {
             </button>
           </div>
 
+          {recommended.length > 0 && (
+            <section className="trends-view__section">
+              <h2 className="trends-view__section-title">Рекомендовано для вас</h2>
+              <div className="trends-view__style-grid">
+                {recommended.slice(0, 10).map((t) => (
+                  <button key={t.id} className="trends-view__style-card" onClick={() => play(t)}>
+                    <span className="trends-view__style-cover">
+                      {t.cover ? <img src={t.cover} alt="" /> : null}
+                    </span>
+                    <span className="trends-view__style-title">{t.title}</span>
+                    <span className="trends-view__style-artist">{t.artists.join(', ')}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {recommended.length === 0 && liked.length === 0 && (
+            <section className="trends-view__section">
+              <h2 className="trends-view__section-title">Попробуйте нажать сердечко</h2>
+              <p className="trends-view__hint">
+                Добавляйте треки в любимые, чтобы мы могли подбирать рекомендации на основе вашего вкуса
+              </p>
+            </section>
+          )}
+
           <section className="trends-view__section">
-            <h2 className="trends-view__section-title">{t('trends.aiSet')}</h2>
+            <h2 className="trends-view__section-title">Настроение и активность</h2>
             <div className="trends-view__pills">
-              {aiSetFilters.map((f) => (
+              {(['mood', 'activity', 'genre'] as MoodFilter[]).map((id) => (
                 <button
-                  key={f.id}
-                  className={`trends-view__pill${aiSetFilter === f.id ? ' trends-view__pill--active' : ''}`}
-                  onClick={() => setAiSetFilter(f.id)}
+                  key={id}
+                  className={`trends-view__pill${moodFilter === id ? ' trends-view__pill--active' : ''}`}
+                  onClick={() => setMoodFilter(id)}
                 >
-                  {f.label}
+                  {id === 'mood' ? 'Настроение' : id === 'activity' ? 'Активность' : 'Жанр'}
                 </button>
               ))}
             </div>
             <div className="trends-view__ai-cards">
-              {aiSetCards[aiSetFilter].map((card) => (
+              {moodCards[moodFilter].map((card) => (
                 <button key={card.label} className="trends-view__ai-card" onClick={() => playMood(card.query)}>
                   <span className="trends-view__ai-kicker">{card.kicker}</span>
                   <span className="trends-view__ai-label">
@@ -294,11 +342,11 @@ function TrendsView(): JSX.Element {
         </>
       )}
 
-      {topTab === 'trends' && trends.length > 0 && (
+      {topTab === 'trends' && monthlyTrends.length > 0 && (
         <section className="trends-view__section">
-          <h2 className="trends-view__section-title">Новые релизы</h2>
+          <h2 className="trends-view__section-title">Чарт за месяц</h2>
           <div className="trends-view__release-row">
-            {trends.slice(0, 6).map((t) => (
+            {monthlyTrends.slice(0, 6).map((t) => (
               <div key={t.id} className="trends-view__release-card">
                 <span className="trends-view__release-avatar">
                   {t.cover ? <img src={t.cover} alt="" /> : null}
@@ -328,12 +376,12 @@ function TrendsView(): JSX.Element {
         </section>
       )}
 
-      {topTab === 'trends' && trends.length > 8 && (
+      {topTab === 'trends' && monthlyTrends.length > 8 && (
         <section className="trends-view__section">
           <h2 className="trends-view__section-title">Премьера</h2>
           <div className="trends-view__premiere-grid">
-            {trends.slice(6, 14).map((t, i) => (
-              <TrackRow key={t.id} track={t} queue={trends.slice(6, 14)} index={i} onArtistClick={requestArtistSearch} />
+            {monthlyTrends.slice(6, 14).map((t, i) => (
+              <TrackRow key={t.id} track={t} queue={monthlyTrends.slice(6, 14)} index={i} onArtistClick={requestArtistSearch} />
             ))}
           </div>
         </section>

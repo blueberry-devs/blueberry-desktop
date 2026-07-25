@@ -446,3 +446,11 @@
   text-overflow: ellipsis;
   max-width: 100%;
 }
+
+.trends-view__hint {
+  color: var(--text-muted, #888);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 8px 0 24px;
+  max-width: 400px;
+}

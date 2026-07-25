@@ -115,6 +115,10 @@ export function fetchTrends(): Promise<TrackResult[]> {
   return getTrackList('/api/trends')
 }
 
+export function fetchTrendsMonthly(): Promise<TrackResult[]> {
+  return getTrackList('/api/trends/monthly')
+}
+
 function parseNativeId(trackId: string): { source: TrackSource; nativeId: string } {
   const [source, ...rest] = trackId.split(':')
   return { source: source as TrackSource, nativeId: rest.join(':') }

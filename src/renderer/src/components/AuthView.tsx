@@ -1,7 +1,74 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Mail, Lock, Eye, EyeOff, UserPlus, LogIn, X, ChevronLeft } from 'lucide-react'
 import { login, register, tryRestoreSession } from '../store/auth'
 import './AuthView.css'
+
+interface IconProps { size: number; className?: string }
+function MailIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M22 4L12 13 2 4" />
+    </svg>
+  )
+}
+function LockIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0110 0v4" />
+    </svg>
+  )
+}
+function EyeIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+function EyeOffIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M14.12 14.12a3 3 0 11-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  )
+}
+function UserPlusIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+      <circle cx="8.5" cy="7" r="4" />
+      <line x1="20" y1="8" x2="20" y2="14" />
+      <line x1="23" y1="11" x2="17" y2="11" />
+    </svg>
+  )
+}
+function LogInIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" />
+      <polyline points="10 17 15 12 10 7" />
+      <line x1="15" y1="12" x2="3" y2="12" />
+    </svg>
+  )
+}
+function XIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
+function ChevronLeftIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  )
+}
 
 type Mode = 'login' | 'register'
 
@@ -100,7 +167,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
 
       <div className={`auth-card${closing ? ' auth-card--closing' : ''}`}>
         <button className="auth-card__close" onClick={onClose} type="button" aria-label="Закрыть">
-          <X size={20} />
+          <XIcon size={20} />
         </button>
 
         <div className="auth-card__header">
@@ -118,7 +185,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
           <div className="auth-form__field">
             <label className="auth-form__label">Email</label>
             <div className="auth-form__input-wrap">
-              <Mail size={16} className="auth-form__icon" />
+              <MailIcon size={16} className="auth-form__icon" />
               <input
                 ref={emailRef}
                 type="email"
@@ -134,7 +201,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
           <div className="auth-form__field">
             <label className="auth-form__label">Пароль</label>
             <div className="auth-form__input-wrap">
-              <Lock size={16} className="auth-form__icon" />
+              <LockIcon size={16} className="auth-form__icon" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 className="auth-form__input"
@@ -150,7 +217,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                 tabIndex={-1}
                 aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
               >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
               </button>
             </div>
           </div>
@@ -159,7 +226,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
             <div className="auth-form__field">
               <label className="auth-form__label">Подтвердите пароль</label>
               <div className="auth-form__input-wrap">
-                <Lock size={16} className="auth-form__icon" />
+                <LockIcon size={16} className="auth-form__icon" />
                 <input
                   type={showConfirm ? 'text' : 'password'}
                   className="auth-form__input"
@@ -175,7 +242,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                   tabIndex={-1}
                   aria-label={showConfirm ? 'Скрыть пароль' : 'Показать пароль'}
                 >
-                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showConfirm ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
                 </button>
               </div>
             </div>
@@ -191,9 +258,9 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
             {loading ? (
               <div className="auth-form__spinner-sm" />
             ) : mode === 'login' ? (
-              <><LogIn size={16} /> Войти</>
+              <><LogInIcon size={16} /> Войти</>
             ) : (
-              <><UserPlus size={16} /> Зарегистрироваться</>
+              <><UserPlusIcon size={16} /> Зарегистрироваться</>
             )}
           </button>
         </form>
@@ -219,7 +286,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
             <div className="auth-card__switch">
               Уже есть аккаунт?{' '}
               <button type="button" className="auth-card__link" onClick={switchMode}>
-                <ChevronLeft size={14} /> Войти
+                <ChevronLeftIcon size={14} /> Войти
               </button>
             </div>
           )}

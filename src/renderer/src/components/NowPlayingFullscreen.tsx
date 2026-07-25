@@ -23,6 +23,13 @@ import {
 import './NowPlayingFullscreen.css'
 
 const _clipCache = new Map<string, string | null>()
+function _clipCacheSet(id: string, url: string | null): void {
+  _clipCache.set(id, url)
+  if (_clipCache.size > 100) {
+    const first = _clipCache.keys().next()
+    if (!first.done) _clipCache.delete(first.value)
+  }
+}
 
 function NowPlayingFullscreen(): JSX.Element | null {
   const { currentTime, duration } = usePlayerTime()
@@ -60,10 +67,43 @@ function NowPlayingFullscreen(): JSX.Element | null {
   const [clipUrl, setClipUrl] = useState<string | null>(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showPlaylists, setShowPlaylists] = useState(false)
+  const [menuFixedStyle, setMenuFixedStyle] = useState<React.CSSProperties>({})
   const menuRef = useRef<HTMLDivElement>(null)
+  const menuBtnRef = useRef<HTMLButtonElement>(null)
   const playlists = usePlaylists()
   const profile = useProfile()
   const { t } = useTranslation()
+
+  useEffect(() => {
+    if (!showMenu) {
+      setMenuFixedStyle({})
+      return
+    }
+    const btn = menuBtnRef.current
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    const popupW = 260
+    const popupH = 320
+    const gap = 8
+
+    let top: number
+    const spaceBelow = window.innerHeight - rect.bottom - gap
+    const spaceAbove = rect.top - gap
+    if (popupH > spaceBelow && spaceAbove > spaceBelow) {
+      top = rect.top - gap - popupH
+    } else {
+      top = rect.bottom + gap
+    }
+
+    let left: number
+    if (rect.right + popupW > window.innerWidth) {
+      left = window.innerWidth - popupW - gap
+    } else {
+      left = rect.right - popupW
+    }
+
+    setMenuFixedStyle({ position: 'fixed', top, left, zIndex: 9999 })
+  }, [showMenu])
 
   useEffect(() => {
     if (!showMenu) return
@@ -92,7 +132,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
     fetchVideoClip(currentTrack.title, currentTrack.artists[0] ?? '')
       .then((url) => {
         if (cancelled) return
-        _clipCache.set(trackId, url)
+        _clipCacheSet(trackId, url)
         if (url) {
           log.debug('[100%] Video background ready: %s', url.slice(0, 60))
         } else {
@@ -306,56 +346,17 @@ function NowPlayingFullscreen(): JSX.Element | null {
               </div>
 
               <div className="np-fullscreen__utils">
-                <div className="np-fullscreen__menu-wrap" ref={menuRef}>
-                  <button
-                    className="np-fullscreen__icon-btn"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowMenu((v) => !v)
-                    }}
-                    title={t('common.more')}
-                  >
-                    <MoreHorizontalIcon size={17} />
-                  </button>
-                  {showMenu && (
-                    <div className="np-fullscreen__queue-popup" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="np-fullscreen__queue-item np-fullscreen__queue-item--action"
-                        onClick={() => setShowPlaylists((v) => !v)}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                          <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                        </svg>
-                        {t('wave.addToPlaylist')}
-                      </button>
-                      {showPlaylists && (
-                        <div className="np-fullscreen__queue-sub">
-                          {playlists.length === 0 ? (
-                            <div className="np-fullscreen__queue-empty">{t('wave.noPlaylists')}</div>
-                          ) : (
-                            playlists.map((p) => (
-                              <button
-                                key={p.id}
-                                className="np-fullscreen__queue-item"
-                                onClick={() => {
-                                  addTrackToPlaylist(p.id, currentTrack)
-                                  setShowMenu(false)
-                                  setShowPlaylists(false)
-                                }}
-                              >
-                                {p.cover && (
-                                  <span className="np-fullscreen__queue-item-cover" style={{ backgroundImage: `url(${p.cover})` }} />
-                                )}
-                                <span className="np-fullscreen__queue-item-title">{p.name}</span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <button
+                  ref={menuBtnRef}
+                  className="np-fullscreen__icon-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowMenu((v) => !v)
+                  }}
+                  title={t('common.more')}
+                >
+                  <MoreHorizontalIcon size={17} />
+                </button>
                 <button
                   className={`np-fullscreen__icon-btn${showLyrics ? ' np-fullscreen__icon-btn--active' : ''}`}
                   onClick={(e) => {
@@ -435,10 +436,54 @@ function NowPlayingFullscreen(): JSX.Element | null {
               )}
           </motion.div>
           )}
-        </AnimatePresence>
-      </div>
-    </motion.div>
-  )
-}
+          </AnimatePresence>
+        </div>
 
-export default NowPlayingFullscreen
+        {showMenu && (
+          <div
+            ref={menuRef}
+            className="np-fullscreen__queue-popup"
+            style={menuFixedStyle}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="np-fullscreen__queue-item np-fullscreen__queue-item--action"
+              onClick={() => setShowPlaylists((v) => !v)}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+              {t('wave.addToPlaylist')}
+            </button>
+            {showPlaylists && (
+              <div className="np-fullscreen__queue-sub">
+                {playlists.length === 0 ? (
+                  <div className="np-fullscreen__queue-empty">{t('wave.noPlaylists')}</div>
+                ) : (
+                  playlists.map((p) => (
+                    <button
+                      key={p.id}
+                      className="np-fullscreen__queue-item"
+                      onClick={() => {
+                        addTrackToPlaylist(p.id, currentTrack)
+                        setShowMenu(false)
+                        setShowPlaylists(false)
+                      }}
+                    >
+                      {p.cover && (
+                        <span className="np-fullscreen__queue-item-cover" style={{ backgroundImage: `url(${p.cover})` }} />
+                      )}
+                      <span className="np-fullscreen__queue-item-title">{p.name}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </motion.div>
+    )
+  }
+
+  export default NowPlayingFullscreen
