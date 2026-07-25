@@ -49,7 +49,7 @@
     },
     "win": {
       "artifactName": "Yandex-Music-Setup.${version}.exe",
-      "icon": "resources/icon.ico"
+      "icon": "resources/icon.png"
     },
     "linux": {
       "artifactName": "Yandex-Music-${version}.AppImage",
