@@ -325,3 +325,29 @@
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.35);
 }
+
+.auth-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+  text-align: center;
+}
+
+.auth-confirm__text {
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+  font-family: 'YS Text', 'Segoe UI', -apple-system, sans-serif;
+}
+
+.auth-confirm__hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: 'YS Text', 'Segoe UI', -apple-system, sans-serif;
+}
+
+.auth-confirm .auth-form__submit {
+  padding: 0 40px;
+}

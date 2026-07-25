@@ -3,7 +3,8 @@ import { useProfile, setAllowExplicit, setVideoBackground, setNavbarPosition, se
 import { usePlayer } from '../player/PlayerContext'
 import { useAppVersion } from '../hooks/useAppVersion'
 import { COLOR_PRESETS } from './waveColors'
-import { ShieldIcon, InfoIcon, PlayIcon, Maximize2Icon, Volume2Icon } from './icons'
+import { ShieldIcon, InfoIcon, PlayIcon, Maximize2Icon, Volume2Icon, UserIcon, LogOutIcon } from './icons'
+import { useAuth, logout, openAuth } from '../store/auth'
 import './SettingsView.css'
 
 const NAVBAR_OPTIONS: { value: NavbarPosition; label: string }[] = [
@@ -27,6 +28,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 function SettingsView(): JSX.Element {
   const profile = useProfile()
+  const auth = useAuth()
   const { crossfade, setCrossfade, audioQuality, setAudioQuality, adaptiveEQ, setAdaptiveEQ } = usePlayer()
   const version = useAppVersion()
   const { t } = useTranslation()
@@ -34,6 +36,27 @@ function SettingsView(): JSX.Element {
   return (
     <div className="settings-view view-enter">
       <h1 className="settings-view__title">{t('settings.title')}</h1>
+
+      <section className="settings-view__section">
+        <h2 className="settings-view__section-title">
+          <span className="settings-view__section-icon"><UserIcon size={14} /></span>
+          Аккаунт
+        </h2>
+        <div className="settings-view__about">
+          <div className="settings-view__about-row">
+            <span>{auth.user?.email || 'Не авторизован'}</span>
+            {auth.user ? (
+              <button className="settings-view__account-btn" onClick={logout}>
+                <LogOutIcon size={14} /> Выйти
+              </button>
+            ) : (
+              <button className="settings-view__account-btn settings-view__account-btn--primary" onClick={openAuth}>
+                <UserIcon size={14} /> Войти
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
 
       <section className="settings-view__section">
         <h2 className="settings-view__section-title">

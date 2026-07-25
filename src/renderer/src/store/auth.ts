@@ -62,9 +62,8 @@ export function clearAuth(): void {
 export async function login(
   email: string,
   password: string,
-  turnstileToken: string | null,
 ): Promise<string | null> {
-  const result = await apiLogin(email, password, turnstileToken)
+  const result = await apiLogin(email, password)
   if (result.success && result.accessToken) {
     setAuth({
       accessToken: result.accessToken,
@@ -76,21 +75,30 @@ export async function login(
   return result.error ?? 'Login failed'
 }
 
+export interface RegisterResult {
+  error: string | null
+  emailConfirmationRequired: boolean
+}
+
 export async function register(
   email: string,
   password: string,
-  turnstileToken: string | null,
-): Promise<string | null> {
-  const result = await apiRegister(email, password, turnstileToken)
-  if (result.success && result.accessToken) {
-    setAuth({
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      user: result.user,
-    })
-    return null
+): Promise<RegisterResult> {
+  const result = await apiRegister(email, password)
+  if (result.success) {
+    if (result.emailConfirmationRequired) {
+      return { error: null, emailConfirmationRequired: true }
+    }
+    if (result.accessToken) {
+      setAuth({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        user: result.user,
+      })
+    }
+    return { error: null, emailConfirmationRequired: false }
   }
-  return result.error ?? 'Registration failed'
+  return { error: result.error ?? 'Registration failed', emailConfirmationRequired: false }
 }
 
 export async function tryRestoreSession(): Promise<boolean> {
@@ -117,6 +125,39 @@ export async function tryRestoreSession(): Promise<boolean> {
 
   clearAuth()
   return false
+}
+
+// ---------- Auth dialog trigger (open from anywhere) ----------
+let authDialogOpen = false
+const dialogListeners = new Set<(open: boolean) => void>()
+
+export function openAuth(): void {
+  authDialogOpen = true
+  dialogListeners.forEach((l) => l(true))
+}
+
+export function closeAuthDialog(): void {
+  authDialogOpen = false
+  dialogListeners.forEach((l) => l(false))
+}
+
+export function subscribeAuthDialog(cb: (open: boolean) => void): () => void {
+  dialogListeners.add(cb)
+  return () => dialogListeners.delete(cb)
+}
+
+export function useAuthDialog(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      dialogListeners.add(cb as unknown as (open: boolean) => void)
+      return () => dialogListeners.delete(cb as unknown as (open: boolean) => void)
+    },
+    () => authDialogOpen,
+  )
+}
+
+export function logout(): void {
+  clearAuth()
 }
 
 export function useAuth(): AuthState {

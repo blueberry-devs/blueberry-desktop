@@ -15,7 +15,7 @@ import { PlayerProvider, usePlayer } from './player/PlayerContext'
 import { usePendingSearch } from './store/searchQuery'
 import { useProfile } from './store/profile'
 import { toggleLike } from './store/likes'
-import { isAuthenticated } from './store/auth'
+import { isAuthenticated, subscribeAuthDialog, closeAuthDialog } from './store/auth'
 import './App.css'
 
 const MoodList = lazy(() => import('./components/MoodList'))
@@ -71,6 +71,15 @@ function AppInner(): JSX.Element {
       setShowAuth(true)
     }
   }, [appReady])
+
+  // Listen for openAuth() calls from anywhere (e.g. Settings account button)
+  useEffect(() => {
+    const unsub = subscribeAuthDialog(() => {
+      setAuthClosing(false)
+      setShowAuth(true)
+    })
+    return unsub
+  }, [])
 
   // Listen for tray commands (play/pause, next, prev)
   useEffect(() => {
@@ -190,6 +199,7 @@ function AppInner(): JSX.Element {
         <AuthView
           closing={authClosing}
           onClose={() => {
+            closeAuthDialog()
             setAuthClosing(true)
             setTimeout(() => {
               setShowAuth(false)

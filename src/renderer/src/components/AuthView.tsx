@@ -87,6 +87,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
+  const [registeredEmail, setRegisteredEmail] = useState('')
   const emailRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -129,16 +130,21 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
 
       setLoading(true)
 
-      const err =
-        mode === 'login'
-          ? await login(email.trim(), password, null)
-          : await register(email.trim(), password, null)
-      setLoading(false)
-
-      if (err) {
-        setError(err)
+      if (mode === 'login') {
+        const err = await login(email.trim(), password)
+        setLoading(false)
+        if (err) setError(err)
+        else onClose()
       } else {
-        onClose()
+        const result = await register(email.trim(), password)
+        setLoading(false)
+        if (result.error) {
+          setError(result.error)
+        } else if (result.emailConfirmationRequired) {
+          setRegisteredEmail(email.trim())
+        } else {
+          onClose()
+        }
       }
     },
     [email, password, confirmPassword, mode, onClose],
@@ -170,18 +176,45 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
           <XIcon size={20} />
         </button>
 
-        <div className="auth-card__header">
-          <h1 className="auth-card__title">
-            {mode === 'login' ? 'Войти' : 'Регистрация'}
-          </h1>
-          <p className="auth-card__subtitle">
-            {mode === 'login'
-              ? 'Войдите в свой аккаунт'
-              : 'Создайте новый аккаунт'}
-          </p>
-        </div>
+        {registeredEmail ? (
+          <>
+            <div className="auth-card__header">
+              <h1 className="auth-card__title">Подтвердите почту</h1>
+              <p className="auth-card__subtitle">
+                Мы отправили письмо на <strong>{registeredEmail}</strong>
+              </p>
+            </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+            <div className="auth-confirm">
+              <p className="auth-confirm__text">
+                Перейдите по ссылке в письме, чтобы подтвердить email, затем войдите в аккаунт.
+              </p>
+              <p className="auth-confirm__hint">
+                Не пришло? Проверьте папку «Спам» или повторите регистрацию.
+              </p>
+              <button
+                type="button"
+                className="auth-form__submit"
+                onClick={() => setRegisteredEmail('')}
+              >
+                <LogInIcon size={16} /> Войти
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="auth-card__header">
+              <h1 className="auth-card__title">
+                {mode === 'login' ? 'Войти' : 'Регистрация'}
+              </h1>
+              <p className="auth-card__subtitle">
+                {mode === 'login'
+                  ? 'Войдите в свой аккаунт'
+                  : 'Создайте новый аккаунт'}
+              </p>
+            </div>
+
+            <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-form__field">
             <label className="auth-form__label">Email</label>
             <div className="auth-form__input-wrap">
@@ -265,32 +298,36 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
           </button>
         </form>
 
-        <div className="auth-card__footer">
-          {mode === 'login' ? (
-            <>
-              <button
-                type="button"
-                className="auth-card__link"
-                onClick={() => setError('Функция восстановления пароля скоро появится')}
-              >
-                Забыли пароль?
-              </button>
+          <div className="auth-card__footer">
+            {mode === 'login' ? (
+              <>
+                <button
+                  type="button"
+                  className="auth-card__link"
+                  onClick={() => setError('Функция восстановления пароля скоро появится')}
+                >
+                  Забыли пароль?
+                </button>
+                <div className="auth-card__switch">
+                  Нет аккаунта?{' '}
+                  <button type="button" className="auth-card__link" onClick={switchMode}>
+                    Зарегистрироваться
+                  </button>
+                </div>
+              </>
+            ) : (
               <div className="auth-card__switch">
-                Нет аккаунта?{' '}
+                Уже есть аккаунт?{' '}
                 <button type="button" className="auth-card__link" onClick={switchMode}>
-                  Зарегистрироваться
+                  <ChevronLeftIcon size={14} /> Войти
                 </button>
               </div>
-            </>
-          ) : (
-            <div className="auth-card__switch">
-              Уже есть аккаунт?{' '}
-              <button type="button" className="auth-card__link" onClick={switchMode}>
-                <ChevronLeftIcon size={14} /> Войти
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+          </>
+
+        )}
+
       </div>
     </div>
   )
