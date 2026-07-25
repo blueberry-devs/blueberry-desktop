@@ -156,6 +156,23 @@ export function useAuthDialog(): boolean {
   )
 }
 
+// ---------- Profile refresh with cache ----------
+const PROFILE_CACHE_TTL = 5 * 60 * 1000 // 5 min
+let lastProfileFetch = 0
+
+export async function refreshProfile(): Promise<void> {
+  const now = Date.now()
+  if (now - lastProfileFetch < PROFILE_CACHE_TTL) return
+  if (!cache.accessToken) return
+
+  const user = await getMe(cache.accessToken)
+  if (user) {
+    cache = { ...cache, user }
+    lastProfileFetch = now
+    emit()
+  }
+}
+
 export function logout(): void {
   clearAuth()
 }

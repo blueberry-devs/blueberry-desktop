@@ -1,8 +1,13 @@
-import { useAuth, logout, openAuth } from '../store/auth'
+import { useEffect } from 'react'
+import { useAuth, logout, openAuth, refreshProfile } from '../store/auth'
 import './AccountView.css'
 
 export default function AccountView(): JSX.Element {
   const auth = useAuth()
+
+  useEffect(() => {
+    refreshProfile()
+  }, [])
 
   return (
     <div className="account-view view-enter">
