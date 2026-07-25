@@ -136,8 +136,10 @@
   z-index: 1;
 }
 
-.sidebar__nav-item--settings {
+.sidebar__bottom-nav {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar__nav-icon {

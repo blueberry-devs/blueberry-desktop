@@ -26,6 +26,7 @@ const TrendsView = lazy(() => import('./components/TrendsView'))
 const CollectionView = lazy(() => import('./components/CollectionView'))
 const SettingsView = lazy(() => import('./components/SettingsView'))
 const HistoryView = lazy(() => import('./components/HistoryView'))
+const AccountView = lazy(() => import('./components/AccountView'))
 
 function AnimatePresenceLazy({ children }: { children: React.ReactNode }) {
   const APRef = useRef<React.ComponentType<{ children: React.ReactNode }> | null>(null)
@@ -42,7 +43,7 @@ function AnimatePresenceLazy({ children }: { children: React.ReactNode }) {
   return AP ? <AP>{children}</AP> : <>{children}</>
 }
 
-export type Tab = 'wave' | 'search' | 'trends' | 'collection' | 'history' | 'settings'
+export type Tab = 'wave' | 'search' | 'trends' | 'collection' | 'history' | 'settings' | 'account'
 
 function AppInner(): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('wave')
@@ -187,6 +188,7 @@ function AppInner(): JSX.Element {
           {activeTab === 'collection' && <Suspense fallback={null}><CollectionView /></Suspense>}
           {activeTab === 'history' && <Suspense fallback={null}><HistoryView /></Suspense>}
           {activeTab === 'settings' && <Suspense fallback={null}><SettingsView /></Suspense>}
+          {activeTab === 'account' && <Suspense fallback={null}><AccountView /></Suspense>}
         </div>
       </div>
       {profile.navbarPosition === 'bottom' && (

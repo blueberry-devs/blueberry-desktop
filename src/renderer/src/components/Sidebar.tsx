@@ -74,6 +74,13 @@ export function NavIcon({ type }: { type: string }): JSX.Element {
           <circle cx="9" cy="9" r="2.3" stroke="currentColor" strokeWidth="1.3" />
         </svg>
       )
+    case 'user':
+      return (
+        <svg width="21" height="21" viewBox="0 0 18 18" fill="none">
+          <path d="M14 15.5v-1a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <circle cx="9" cy="6" r="3" stroke="currentColor" strokeWidth="1.6" />
+        </svg>
+      )
     default:
       return <span />
   }
@@ -137,9 +144,29 @@ function Sidebar({ activeTab, onSelectTab }: Props): JSX.Element {
         ))}
       </nav>
 
+      <div className="sidebar__bottom-nav">
+
+      <button
+        onClick={() => onSelectTab('account')}
+        className={`sidebar__nav-item${activeTab === 'account' ? ' sidebar__nav-item--active' : ''}`}
+        title={open ? undefined : 'Аккаунт'}
+      >
+        {activeTab === 'account' && (
+          <motion.span
+            layoutId="sidebar-active-pill"
+            className="sidebar__nav-pill"
+            transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
+          />
+        )}
+        <span className="sidebar__nav-icon">
+          <NavIcon type="user" />
+        </span>
+        <span className="sidebar__nav-label">Аккаунт</span>
+      </button>
+
       <button
         onClick={() => onSelectTab('settings')}
-        className={`sidebar__nav-item sidebar__nav-item--settings${activeTab === 'settings' ? ' sidebar__nav-item--active' : ''}`}
+        className={`sidebar__nav-item${activeTab === 'settings' ? ' sidebar__nav-item--active' : ''}`}
         title={open ? undefined : t('sidebar.settings')}
       >
         {activeTab === 'settings' && (
@@ -154,6 +181,8 @@ function Sidebar({ activeTab, onSelectTab }: Props): JSX.Element {
         </span>
         <span className="sidebar__nav-label">{t('sidebar.settings')}</span>
       </button>
+
+      </div>
     </motion.div>
   )
 }
