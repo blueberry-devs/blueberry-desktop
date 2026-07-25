@@ -190,8 +190,6 @@ export async function refreshProfile(): Promise<void> {
     emit()
   }
 }
-  }
-}
 
 export function logout(): void {
   clearAuth()
