@@ -29,8 +29,8 @@
     "react-dom": "^19.2.8"
   },
   "build": {
-    "appId": "com.yandex.music.clone",
-    "productName": "Yandex-Music",
+    "appId": "com.blueberry.desktop",
+    "productName": "Blueberry-Desktop",
     "icon": "resources/icon.png",
     "extraResources": [
       {
@@ -48,18 +48,18 @@
       "repo": "blueberry-desktop"
     },
     "win": {
-      "artifactName": "Yandex-Music-Setup.${version}.exe",
+      "artifactName": "Blueberry-Desktop-Setup.${version}.exe",
       "icon": "resources/icon.png"
     },
     "linux": {
-      "artifactName": "Yandex-Music-${version}.AppImage",
+      "artifactName": "Blueberry-Desktop-${version}.AppImage",
       "icon": "resources/icon.png"
     },
     "mac": {
       "target": [
         "zip"
       ],
-      "artifactName": "Yandex-Music-${version}-${arch}.zip",
+      "artifactName": "Blueberry-Desktop-${version}-${arch}.zip",
       "icon": "resources/icon-mac.png"
     }
   },

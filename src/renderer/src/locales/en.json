@@ -1,5 +1,5 @@
 {
-  "app.title": "Yandex Music",
+  "app.title": "Blueberry Desktop",
   "app.loading": "Loading…",
 
   "sidebar.search": "Search",
@@ -32,7 +32,7 @@
   "trends.style": "In style of",
   "trends.metInWave": "Met in My Wave",
   "trends.explore": "Explore",
-  "trends.error": "Failed to connect to Yandex Music server",
+  "trends.error": "Failed to connect to Blueberry Desktop server",
 
   "collection.title": "Collection",
   "collection.playlists": "My Playlists",
