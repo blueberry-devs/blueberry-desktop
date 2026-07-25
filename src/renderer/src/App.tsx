@@ -177,8 +177,10 @@ function AppInner(): JSX.Element {
         <div className={`app__content${showMiniPlayer && currentTrack ? ' app__content--with-player' : ''}`}>
           {activeTab === 'wave' && (
             <Suspense fallback={null}>
-              <MoodList />
-              <NowPlayingPanel />
+              <div className="wave-content">
+                <MoodList />
+                <NowPlayingPanel />
+              </div>
             </Suspense>
           )}
           {activeTab === 'search' && <Suspense fallback={null}><SearchView /></Suspense>}

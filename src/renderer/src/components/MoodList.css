@@ -2,11 +2,10 @@
   position: relative;
   z-index: 5;
   width: var(--mood-list-width);
-  min-width: 650px;
-  flex-shrink: 0;
+  flex-shrink: 1;
   height: 100%;
-  margin-left: clamp(-70px, -6vw, -30px);
-  padding: 4px 0 0 clamp(90px, 11vw, 140px);
+  margin-left: clamp(-20px, -1vw, 30px);
+  padding: 4px 0 0 0;
   overflow: visible;
   pointer-events: none;
 }
@@ -27,11 +26,15 @@
   padding-right: 190px;
 }
 
+.mood-list__item {
+  margin-bottom: 44px;
+}
+
 .mood-list__row {
   display: flex;
   align-items: center;
-  gap: 22px;
-  height: 102px;
+  gap: 18px;
+  height: 110px;
   padding: 0 12px;
   border-radius: 12px;
   transition: background 0.12s ease;
@@ -39,40 +42,21 @@
 }
 
 .mood-list__label {
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
 }
 
-.mood-icon {
-  position: relative;
-  width: 52px;
-  height: 52px;
+.mood-list__icon {
+  width: 80px;
+  height: 80px;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mood-icon--red {
-  color: #e8394f;
-}
-
-.mood-icon--blue {
-  color: #4a6ee0;
-}
-
-.mood-icon--purple {
-  color: #8a5cf6;
-}
-
-.mood-icon--cover {
-  border-radius: 50%;
+  border-radius: 16px;
   overflow: hidden;
 }
 
-.mood-icon--cover img {
+.mood-list__icon img {
   width: 100%;
   height: 100%;
   object-fit: cover;

@@ -404,7 +404,7 @@ function NowPlayingPanel(): JSX.Element {
     <div className="now-playing">
       <div className="now-playing__inner">
         <h1 className={`now-playing__artist${ARTIST_SPLASHES[displayTrack?.artists[0]?.toLowerCase() ?? ''] ? ' now-playing__artist--splash' : ''}`}>
-          {displayTrack?.artists.join(', ') ?? (isGenerating ? <span className="skeleton skeleton-np" /> : t('sidebar.wave'))}
+          {displayTrack ? (displayTrack.artists.join(', ').length > 15 ? displayTrack.artists.join(', ').slice(0, 12) + '...' : displayTrack.artists.join(', ')) : (isGenerating ? <span className="skeleton skeleton-np" /> : t('sidebar.wave'))}
         </h1>
 
         {coverEl}

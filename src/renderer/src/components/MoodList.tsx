@@ -1,99 +1,57 @@
-import { useEffect, useMemo, useRef, useId } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import AnimatedList, { AnimatedListItem } from './AnimatedList'
 import { usePlayer } from '../player/PlayerContext'
 import { useLikedTracks } from '../store/likes'
 import { useHistory } from '../store/history'
 import { TrackResult } from '../api/yandexMusic'
+import { useProfile } from '../store/profile'
 import { useTranslation } from '../utils/useTranslation'
+import { CATEGORIES, CategoryId, getMoodPhrases } from '../data/moodPhrases'
+import log from 'electron-log/renderer'
 import './MoodList.css'
 
-type MoodColor = 'red' | 'blue' | 'purple'
-
-interface GenreItem {
-  label: string
-  // What actually gets searched — SoundCloud/YouTube search is a plain
-  // keyword match, not genre-aware, so searching the raw Cyrillic label
-  // (e.g. "Рок") mostly matches tracks whose title/tags happen to contain
-  // that substring, not tracks that are actually rock. English genre terms
-  // (plus a "music"/"mix" qualifier) match real genre tags instead.
-  query: string
-  color: MoodColor
-  shape: 'burst' | 'flag' | 'arrow' | 'chevron'
-  // Set only for the personalized "В духе <artist>" entries — an actual
-  // artist photo/cover pulled from a liked or recently played track, shown
-  // instead of the generic shape icon.
-  cover?: string | null
+const GENRE_KEYWORDS: Record<CategoryId, string[]> = {
+  pop: ['pop', 'поп', 'britney', 'taylor', 'swift', 'bieber', 'gaga', 'katy', 'perry', 'rihanna', 'bruno', 'mars', 'ariana', 'grande', 'billie', 'eilish', 'dua', 'lipa', 'weeknd', 'pink', 'shakira', 'мадонна', 'малина'],
+  rock: ['rock', 'рок', 'nirvana', 'pearl jam', 'foo fighters', 'guns n roses', 'ac/dc', 'led zeppelin', 'pink floyd', 'queen', 'rolling stones', 'green day', 'linkin park', 'imagine dragons', 'radiohead', 'кактус'],
+  metal: ['metal', 'метал', 'металлика', 'metallica', 'slipknot', 'iron maiden', 'megadeth', 'pantera', 'system of a down', 'rammstein', 'disturbed', 'korn', 'avenged sevenfold', 'judas priest', 'black sabbath', 'motorhead', 'слот'],
+  hiphop: ['hip hop', 'hip-hop', 'хип хоп', 'хип-хоп', 'eminem', 'kanye', 'kendrick', 'lamar', 'drake', 'j. cole', 'travis scott', 'lil', 'cardi b', 'nicki minaj', 'baby', 'future', '21 savage', 'баста', 'тимати', 'oxy'],
+  edm: ['edm', 'электро', 'электроника', 'david guetta', 'avicii', 'martin garrix', 'kygo', 'calvin harris', 'swedish house', 'tiesto', 'dj', 'skrillex', 'deadmau5', 'hardwell', 'alok', 'zhu'],
+  chill: ['chill', 'чилл', 'lo-fi', 'lofi', 'low fi', 'ambient', 'эмбиент', 'relax', 'релакс', 'chillstep', 'sleep', 'meditation', 'медитация', 'cafe', 'coffee', 'rain'],
+  jazz: ['jazz', 'джаз', 'soul', 'соул', 'rnb', 'r&b', 'blues', 'блюз', 'funk', 'фанк', 'miles davis', 'louis armstrong', 'ella fitzgerald', 'john coltrane', 'thelonious', 'macy gray'],
+  classical: ['classical', 'классика', 'классическая', 'beethoven', 'bach', 'моцарт', 'mozart', 'chopin', 'шопен', 'vivaldi', 'чайковский', 'tchaikovsky', 'debussy', 'rachmaninoff', 'orchestra', 'симфония', 'symphony', 'piano', 'пианино'],
+  indie: ['indie', 'инди', 'arcade fire', 'arctic monkeys', 'tame impala', 'mac demarco', 'vampire weekend', 'the strokes', 'modest mouse', 'pixies', 'sufjan stevens', 'bon iver', 'alt-j', 'glass animals', 'the neighbourhood'],
+  folk: ['folk', 'фолк', 'акустика', 'acoustic', 'country', 'кантри', 'king of leon', 'mumford', 'sons', 'lumineers', 'hozier', 'ed sheeran', 'vance joy', 'iron & wine', 'james taylor', 'simon garfunkel'],
+  workout: ['workout', 'тренировка', 'exercise', 'rocky', 'eye of tiger', 'survivor', 'eminem lose yourself', 'dmx', 'rage machine', 'hard rock', 'heavy', 'мощный'],
+  mix: ['mix', 'микс', 'разное', 'random', 'chill', 'electronic', 'электро', 'альтернатива', 'modern', 'современный', 'новинка', 'popular', 'популярный'],
 }
 
-const genres: GenreItem[] = [
-  { label: 'Рок', query: 'rock music', color: 'red', shape: 'burst' },
-  { label: 'Поп', query: 'pop music', color: 'blue', shape: 'flag' },
-  { label: 'Джаз', query: 'jazz music', color: 'purple', shape: 'burst' },
-  { label: 'Электроника', query: 'electronic music', color: 'blue', shape: 'arrow' },
-  { label: 'Хип-хоп', query: 'hip hop music', color: 'red', shape: 'burst' },
-  { label: 'Метал', query: 'metal music', color: 'red', shape: 'burst' },
-  { label: 'Инди', query: 'indie music', color: 'purple', shape: 'chevron' },
-  { label: 'Классика', query: 'classical music', color: 'purple', shape: 'chevron' },
-  { label: 'R&B', query: 'r&b music', color: 'blue', shape: 'flag' },
-  { label: 'Регги', query: 'reggae music', color: 'blue', shape: 'burst' },
-  { label: 'Кантри', query: 'country music', color: 'red', shape: 'arrow' },
-  { label: 'Фолк', query: 'folk music', color: 'purple', shape: 'burst' },
-  { label: 'Панк', query: 'punk rock music', color: 'red', shape: 'chevron' },
-  { label: 'Соул', query: 'soul music', color: 'blue', shape: 'flag' },
-  { label: 'Блюз', query: 'blues music', color: 'purple', shape: 'arrow' },
-  { label: 'Латино', query: 'latin music', color: 'red', shape: 'burst' },
-  { label: 'К-поп', query: 'k-pop music', color: 'blue', shape: 'flag' },
-  { label: 'Эмбиент', query: 'ambient music', color: 'purple', shape: 'chevron' },
-  { label: 'Транс', query: 'trance music', color: 'blue', shape: 'burst' },
-  { label: 'Хаус', query: 'house music', color: 'red', shape: 'arrow' },
-  { label: 'Диско', query: 'disco music', color: 'blue', shape: 'flag' },
-  { label: 'Синти-поп', query: 'synth pop music', color: 'purple', shape: 'burst' }
-]
-
-const shapePaths: Record<GenreItem['shape'], string> = {
-  burst:
-    'M24 2 L28 16 L40 12 L30 22 L44 26 L28 28 L32 44 L22 32 L14 44 L14 30 L2 34 L12 22 L2 10 L18 14 Z',
-  flag: 'M8 4 L36 4 L20 20 L36 22 L8 44 L14 26 L4 24 Z',
-  arrow: 'M6 30 L24 4 L26 20 L44 14 L24 34 L22 20 Z',
-  chevron: 'M4 24 L24 4 L44 24 L30 22 L24 44 L18 22 Z'
-}
-
-function GenreIcon({ color, shape, cover }: { color: MoodColor; shape: GenreItem['shape']; cover?: string | null }): JSX.Element {
-  const uid = useId()
-  if (cover) {
-    return (
-      <span className="mood-icon mood-icon--cover">
-        <img src={cover} alt="" />
-      </span>
-    )
+function detectGenres(liked: TrackResult[]): CategoryId[] {
+  if (liked.length === 0) return []
+  const scores = new Map<CategoryId, number>()
+  for (const cat of CATEGORIES) scores.set(cat, 0)
+  for (const track of liked) {
+    const text = (track.title + ' ' + track.artists.join(' ')).toLowerCase()
+    for (const cat of CATEGORIES) {
+      for (const kw of GENRE_KEYWORDS[cat]) {
+        if (text.includes(kw)) {
+          scores.set(cat, (scores.get(cat) ?? 0) + 1)
+          break
+        }
+      }
+    }
   }
-  const d = shapePaths[shape]
-  return (
-    <span className={`mood-icon mood-icon--${color}`}>
-      <svg width="52" height="52" viewBox="0 0 46 46">
-        <path d={d} fill="currentColor" />
-        <path d={d} fill="none" stroke="currentColor" strokeWidth="2.5" opacity="0.25" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </span>
-  )
+  return [...scores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .filter(([, s]) => s > 0)
+    .slice(0, 3)
+    .map(([cat]) => cat)
 }
 
-// Wheel layout: rows sit on the rim of a large circle whose center is off
-// to the right, so the list reads as the LEFT-facing arc of that wheel
-// rather than a flat column. The row nearest the WINDOW's vertical center
-// (not the list's own box) sits closest to the viewer (no recession); rows
-// above and below curl away to the right and shrink/fade, same as a picker
-// wheel viewed edge-on.
 const WHEEL_RADIUS = 480
-// Past this angle a row is basically edge-on to the wheel — clamp instead
-// of letting cos() run past the point where the curve would double back.
-// Caps recession at ~163px (must stay under MoodList.css's horizontal
-// clipping buffer).
 const MAX_ANGLE = 0.85
 
 function applyWave(scrollEl: HTMLElement): void {
   const centerY = window.innerHeight / 2
-
   const rows = scrollEl.querySelectorAll<HTMLElement>('[data-wave-index]')
   rows.forEach((row) => {
     const rowRect = row.getBoundingClientRect()
@@ -108,15 +66,7 @@ function applyWave(scrollEl: HTMLElement): void {
   })
 }
 
-// Top artists from what's actually been liked/played, most-listened first —
-// likes count double since an explicit like is a stronger signal than one play.
-// Carries along a cover image from whichever track it was first seen on, so
-// the mood row can show the artist's actual art instead of a shape icon.
-function topArtists(
-  liked: TrackResult[],
-  history: TrackResult[],
-  count: number
-): { artist: string; cover: string | null }[] {
+function topArtists(liked: TrackResult[], history: TrackResult[], count: number): { artist: string; cover: string | null }[] {
   const freq = new Map<string, number>()
   const cover = new Map<string, string | null>()
   for (const t of [...liked, ...history]) {
@@ -138,69 +88,72 @@ function topArtists(
     .map(([artist]) => ({ artist, cover: cover.get(artist) ?? null }))
 }
 
-function MoodList(): JSX.Element {
+function MoodList() {
   const { t } = useTranslation()
+  const { language } = useProfile()
   const { setActiveGenre } = usePlayer()
   const containerRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number>(0)
   const liked = useLikedTracks()
   const history = useHistory()
+  const phrases = getMoodPhrases(language)
 
-  const genreLabel: Record<string, string> = {
-    'Рок': t('mood.genre.рок'),
-    'Поп': t('mood.genre.поп'),
-    'Джаз': t('mood.genre.джаз'),
-    'Электроника': t('mood.genre.электроника'),
-    'Хип-хоп': t('mood.genre.хип-хоп'),
-    'Метал': t('mood.genre.метал'),
-    'Инди': t('mood.genre.инди'),
-    'Классика': t('mood.genre.классика'),
-    'R&B': t('mood.genre.рэб'),
-    'Регги': t('mood.genre.регги'),
-    'Кантри': t('mood.genre.кантри'),
-    'Фолк': t('mood.genre.фолк'),
-    'Панк': t('mood.genre.панк'),
-    'Соул': t('mood.genre.соул'),
-    'Блюз': t('mood.genre.блюз'),
-    'Латино': t('mood.genre.латино'),
-    'К-поп': t('mood.genre.к-поп'),
-    'Эмбиент': t('mood.genre.эмбиент'),
-    'Транс': t('mood.genre.транс'),
-    'Хаус': t('mood.genre.хаус'),
-    'Диско': t('mood.genre.диско'),
-    'Синти-поп': t('mood.genre.синти-поп'),
-  }
-
-  const personalItems: GenreItem[] = useMemo(() => {
+  const personalItems = useMemo(() => {
     const artists = topArtists(liked, history, 4)
-    if (artists.length === 0) return []
-    const shapes: GenreItem['shape'][] = ['burst', 'flag', 'arrow', 'chevron']
-    const colors: MoodColor[] = ['red', 'blue', 'purple']
-    const favorite: GenreItem = {
+    if (artists.length === 0) return [] as { key: string; label: string; query: string; icon: string }[]
+    const items: { key: string; label: string; query: string; icon: string }[] = []
+    items.push({
+      key: 'personal-fav',
       label: t('mood.inSpiritOf'),
       query: artists[0].artist,
-      color: colors[0],
-      shape: shapes[0],
-      cover: artists[0].cover
+      icon: artists[0].cover ?? '/moods/mood_01.png'
+    })
+    for (const { artist, cover } of artists.slice(1)) {
+      items.push({
+        key: `personal-${artist}`,
+        label: t('mood.inSpiritOfArtist').replace('{artist}', artist),
+        query: artist,
+        icon: cover ?? '/moods/mood_01.png'
+      })
     }
-    const rest: GenreItem[] = artists.slice(1).map(({ artist, cover: artistCover }, i) => ({
-      label: t('mood.inSpiritOfArtist').replace('{artist}', artist),
-      query: artist,
-      color: colors[(i + 1) % colors.length],
-      shape: shapes[(i + 1) % shapes.length],
-      cover: artistCover
-    }))
-    return [favorite, ...rest]
+    return items
   }, [liked, history, t])
 
-  const allItems = useMemo(() => [...personalItems, ...genres], [personalItems])
+  const moodItems = useMemo(() => {
+    const detected = detectGenres(liked)
+    log.info(`[Mood] liked tracks: ${liked.length}, detected genres: ${detected.length > 0 ? detected.join(', ') : 'none (random fallback)'}`)
+    const active = detected.length > 0 ? detected : CATEGORIES
+    const pool: { key: string; label: string; query: string }[] = []
+    for (const cat of active) {
+      const catPhrases = phrases[cat]
+      if (!catPhrases) continue
+      catPhrases.forEach((phrase, i) => {
+        pool.push({ key: `${cat}-${i}`, label: phrase, query: phrase })
+      })
+    }
+    const shuffled = pool.sort(() => Math.random() - 0.5)
+    const count = 5 + Math.floor(Math.random() * 6)
+    const picked = shuffled.slice(0, count)
+    // Shuffle all 48 icon indices, take one per item without replacement
+    const icons = Array.from({ length: 48 }, (_, i) => i + 1).sort(() => Math.random() - 0.5)
+    const result = picked.map((item, i) => ({
+      ...item,
+      icon: `/moods/mood_${String(icons[i]).padStart(2, '0')}.png`
+    }))
+    log.info(`[Mood] showing ${count} items from ${active.length} categories, unique icons`)
+    return result
+  }, [phrases, liked])
 
-  const items: AnimatedListItem[] = allItems.map((genre, index) => ({
-    key: `${genre.label}-${index}`,
+  const allItems = useMemo(() => [...personalItems, ...moodItems], [personalItems, moodItems])
+
+  const items: AnimatedListItem[] = allItems.map((item, index) => ({
+    key: item.key,
     content: (
       <div className="mood-list__row" data-wave-index={index}>
-        <GenreIcon color={genre.color} shape={genre.shape} cover={genre.cover} />
-        <span className="mood-list__label">{genreLabel[genre.label] ?? genre.label}</span>
+        <span className="mood-list__icon">
+          <img src={item.icon} alt="" />
+        </span>
+        <span className="mood-list__label">{item.label}</span>
       </div>
     )
   }))
@@ -211,19 +164,15 @@ function MoodList(): JSX.Element {
     const maybeScrollEl = root.querySelector<HTMLElement>('.animated-list')
     if (!maybeScrollEl) return
     const scrollEl: HTMLElement = maybeScrollEl
-
     applyWave(scrollEl)
-
     function schedule(): void {
       cancelAnimationFrame(rafRef.current)
       rafRef.current = requestAnimationFrame(() => applyWave(scrollEl))
     }
-
     scrollEl.addEventListener('scroll', schedule, { passive: true })
     const resizeObserver = new ResizeObserver(schedule)
     resizeObserver.observe(scrollEl)
     window.addEventListener('resize', schedule)
-
     return () => {
       cancelAnimationFrame(rafRef.current)
       scrollEl.removeEventListener('scroll', schedule)
@@ -233,8 +182,8 @@ function MoodList(): JSX.Element {
   }, [])
 
   const handleSelect = (_item: AnimatedListItem, index: number): void => {
-    const genre = allItems[index]
-    if (genre) setActiveGenre(genre.query)
+    const item = allItems[index]
+    if (item) setActiveGenre(item.query)
   }
 
   return (

@@ -678,6 +678,15 @@ app.whenReady().then(() => {
   })
 
   log.initialize()
+  const { writeFn } = log.transports.console
+  log.transports.console.writeFn = (args) => {
+    const text = args.message.data.join(' ')
+    if (text.includes('[Wave]')) {
+      process.stdout.write(`\x1b[38;5;210m${text}\x1b[0m\n`)
+    } else {
+      writeFn(args)
+    }
+  }
   startSidecar()
   createWindow()
   setupAutoUpdater()

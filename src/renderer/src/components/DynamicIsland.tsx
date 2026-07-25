@@ -111,7 +111,7 @@ function DynamicIsland({ className = '', onExpand }: { className?: string; onExp
               {isLoading ? <span className="skeleton skeleton-dyn__line" style={{ display: 'block', width: 80 }} /> : currentTrack.title}
             </div>
             <div className="dyn-island__artist">
-              {isLoading ? <span className="skeleton skeleton-dyn__line--artist" style={{ display: 'block', width: 60 }} /> : currentTrack.artists.join(', ')}
+              {isLoading ? <span className="skeleton skeleton-dyn__line--artist" style={{ display: 'block', width: 60 }} /> : (currentTrack.artists.join(', ').length > 15 ? currentTrack.artists.join(', ').slice(0, 12) + '...' : currentTrack.artists.join(', '))}
             </div>
           </div>
 

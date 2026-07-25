@@ -2,7 +2,7 @@ import ru from '../locales/ru.json'
 import en from '../locales/en.json'
 import { useProfile } from '../store/profile'
 
-const dicts: Record<string, Record<string, string>> = { ru, en }
+const dicts: Record<string, Record<string, string>> = { ru, en } as any
 
 export function useTranslation(): { t: (key: string) => string } {
   const { language } = useProfile()

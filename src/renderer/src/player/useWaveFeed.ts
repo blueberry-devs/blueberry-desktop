@@ -4,6 +4,7 @@ import { getLikedTracks } from '../store/likes'
 import { getHistory } from '../store/history'
 import { pickCategoryForQuery } from '../data/wavePhrases'
 import { usePlayer } from './PlayerContext'
+import log from 'electron-log/renderer'
 
 // How close to the end of the queue we top it up with a fresh batch, so
 // Next/Previous always have somewhere real to go instead of a queue of one.
@@ -56,15 +57,16 @@ function buildQueries(genre: string): string[] {
 
   const likedArtists = getLikedTracks().map((t) => t.artists[0])
   const historyArtists = getHistory().map((t) => t.artists[0])
-  const artists = Array.from(new Set([...likedArtists, ...historyArtists].filter(Boolean)))
-  if (artists.length === 0) return [genre]
+  const allArtists = Array.from(new Set([...likedArtists, ...historyArtists].filter(Boolean)))
+  if (allArtists.length === 0) return [genre]
 
-  const a = artists[rotationCursor % artists.length]
-  const b = artists.length > 1 ? artists[(rotationCursor + 1) % artists.length] : null
-  rotationCursor++
+  const queries: string[] = [genre]
+  for (let i = 0; i < Math.min(4, allArtists.length); i++) {
+    const a = allArtists[(rotationCursor + i) % allArtists.length]
+    queries.push(`${genre} ${a}`)
+  }
+  rotationCursor = (rotationCursor + 1) % allArtists.length
 
-  const queries = [genre, `${genre} ${a}`]
-  if (b) queries.push(historyArtists.includes(b) ? b : `${genre} ${b}`)
   return queries
 }
 
@@ -78,34 +80,43 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 async function fetchCandidates(genre: string): Promise<TrackResult[]> {
-  // Artist query → fetch the artist's actual top tracks from Yandex.
-  // This is much more reliable than a text search for "Disturbed" which
-  // can return tracks from completely unrelated artists.
+  const start = Date.now()
   if (isArtistQuery(genre)) {
+    log.info(`[Wave] Analyzing favourites... searching "${genre}"`)
     const results = await searchArtistTracks(genre).catch(() => [] as TrackResult[])
     const usable = results.filter(isUsable)
-    if (usable.length > 0) return shuffle(usable)
-    // Fallback to multi-source text search if artist endpoint fails
+    if (usable.length > 0) {
+      log.info(`[Wave] Found ${usable.length} tracks for "${genre}" in ${Date.now() - start}ms`)
+      return shuffle(usable)
+    }
+    log.info(`[Wave] No artist tracks found for "${genre}", returning empty`)
+    return []
   }
 
   const queries = buildQueries(genre)
-  const batches = await Promise.all(queries.map((q) => searchTracksMulti(q, ['yandex', 'soundcloud', 'youtube']).catch(() => [])))
+  log.info(`[Wave] Analyzing favourites... ${queries.length} queries for "${genre}"`)
+  queries.forEach((q) => log.info(`  query: ${q}`))
+
+  // Search sequentially so we can return early — don't wait for all queries
   const merged: TrackResult[] = []
   const seen = new Set<string>()
-  const max = Math.max(...batches.map((b) => b.length))
-  for (let i = 0; i < max; i++) {
-    for (const batch of batches) {
-      const t = batch[i]
+  for (const q of queries) {
+    const batch = await searchTracksMulti(q, ['yandex', 'soundcloud', 'youtube']).catch(() => [] as TrackResult[])
+    log.info(`[Wave]   "${q}" returned ${batch.length} raw results`)
+    for (const t of batch) {
       if (!t || !isUsable(t)) continue
       const sig = trackSignature(t)
       if (seen.has(sig)) continue
       seen.add(sig)
       merged.push(t)
+      if (merged.length >= 10) {
+        log.info(`[Wave] Got ${merged.length} candidates in ${Date.now() - start}ms (early exit)`)
+        return shuffle(merged)
+      }
     }
   }
-  // Search results come back in the same order every time for the same
-  // query — without this, picking the same mood twice in a row (or a
-  // refill mid-session) hands back the exact same lead track.
+
+  log.info(`[Wave] Got ${merged.length} unique candidates in ${Date.now() - start}ms`)
   return shuffle(merged)
 }
 
@@ -114,13 +125,28 @@ export function useWaveFeed(): {
   isGenerating: boolean
   skip: () => void
 } {
-  const { queue, queueIndex, activeGenre, playQueue, appendToQueue } = usePlayer()
+  const { queue, queueIndex, activeGenre, setActiveGenre, playQueue, appendToQueue } = usePlayer()
   const [waveTrack, setWaveTrack] = useState<TrackResult | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   // Signatures, not raw IDs — see trackSignature above.
   const seenSigsRef = useRef<Set<string>>(new Set())
   const requestTokenRef = useRef(0)
   const refillingRef = useRef(false)
+
+  const initedRef = useRef(false)
+  useEffect(() => {
+    if (activeGenre || initedRef.current) return
+    initedRef.current = true
+    const liked = getLikedTracks()
+    if (liked.length === 0) return
+    const freq = new Map<string, number>()
+    for (const t of liked) {
+      const a = t.artists[0]
+      if (a) freq.set(a, (freq.get(a) ?? 0) + 1)
+    }
+    const top = [...freq.entries()].sort((a, b) => b[1] - a[1])[0]
+    if (top) setActiveGenre(top[0])
+  }, [activeGenre, setActiveGenre])
 
   const seedGenre = useCallback(
     (genre: string, autoplay: boolean) => {
