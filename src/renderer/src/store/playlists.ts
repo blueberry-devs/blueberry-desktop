@@ -3,7 +3,8 @@ import { TrackResult } from '../api/yandexMusic'
 import { markUnsynced } from './playlistSync'
 import { getAuth } from './auth'
 import { setPlaylistVersion } from './playlistVersions'
-import { addTrackToCloudPlaylist as apiAddTrackToCloudPlaylist, removeTrackFromCloudPlaylist as apiRemoveTrackFromCloudPlaylist, deleteCloudPlaylist as apiDeleteCloudPlaylist } from '../services/playlists'
+import { addTrackToCloudPlaylist as apiAddTrackToCloudPlaylist, removeTrackFromCloudPlaylist as apiRemoveTrackFromCloudPlaylist, deleteCloudPlaylist as apiDeleteCloudPlaylist, createCloudPlaylist as apiCreateCloudPlaylist } from '../services/playlists'
+import { removeCloudPlaylist } from './cloudPlaylists'
 
 const STORAGE_KEY = 'ym-clone:playlists'
 
@@ -62,6 +63,22 @@ export function createPlaylist(name: string, cover: string | null = null): Playl
   cache = [playlist, ...cache]
   markUnsynced()
   emit()
+
+  // Fire-and-forget: create on server immediately if authenticated
+  const auth = getAuth()
+  if (auth.accessToken) {
+    apiCreateCloudPlaylist(auth.accessToken, {
+      title: playlist.name,
+      description: null,
+      imageUrl: playlist.cover,
+      isPublic: false,
+    }).then((detail) => {
+      if (!detail) return
+      setPlaylistCloudId(playlist.id, detail.id)
+      setPlaylistVersion(detail.id, detail.version)
+    })
+  }
+
   return playlist
 }
 
@@ -71,8 +88,9 @@ export function deletePlaylist(id: string): void {
   markUnsynced()
   emit()
 
-  // Fire-and-forget: delete from cloud API if playlist is synced
+  // Remove from cloud playlists display and delete from API if synced
   if (pl?.cloudId) {
+    removeCloudPlaylist(pl.cloudId)
     const auth = getAuth()
     if (auth.accessToken) {
       apiDeleteCloudPlaylist(auth.accessToken, pl.cloudId)
