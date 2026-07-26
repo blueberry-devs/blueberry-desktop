@@ -26,6 +26,13 @@ function CollectionView(): JSX.Element {
   const downloadedTracks = useMemo(() => Object.values(downloads), [downloads])
   const favoritePlaylists = useFavoritePlaylists()
   const cloudPlaylists = useCloudPlaylists()
+  const localCloudIds = useMemo(() => new Set(playlists.filter((p) => p.cloudId).map((p) => p.cloudId)), [playlists])
+  const cloudOnlyPlaylists = useMemo(() => cloudPlaylists.filter((pl) => {
+    if (localCloudIds.has(pl.id)) return false
+    // Also filter out if a cloud_ local copy exists (from auth sync newFromCloud)
+    if (playlists.some((p) => p.id === `cloud_${pl.id}`)) return false
+    return true
+  }), [cloudPlaylists, localCloudIds, playlists])
   const [openPlaylistId, setOpenPlaylistId] = useState<string | null>(null)
   const [openRemotePlaylist, setOpenRemotePlaylist] = useState<PlaylistResult | null>(null)
   const [openCloudPlaylist, setOpenCloudPlaylist] = useState<Playlist | null>(null)
@@ -177,7 +184,7 @@ function CollectionView(): JSX.Element {
               <div className="collection-view__playlist-count">{p.tracks.length} треков</div>
             </button>
           ))}
-          {cloudPlaylists.map((pl) => (
+          {cloudOnlyPlaylists.map((pl) => (
             <button
               key={`cloud_${pl.id}`}
               className="collection-view__playlist-card"

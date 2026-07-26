@@ -549,6 +549,23 @@ async function syncMerge(
   for (const detail of cloudDetails) {
     if (handledCloud.has(detail.id)) continue
 
+    const cloudTrackIds = new Set(detail.tracks.map((t) => t.externalId))
+    const alreadyMatchedLocals = new Set(Object.keys(result.cloudIdMap))
+
+    // Try to find a local playlist with the same name AND same tracks (already synced but cloudId lost after re-login)
+    const contentMatch = localPlaylists.find(
+      (p) =>
+        !alreadyMatchedLocals.has(p.id) &&
+        p.name.toLowerCase().trim() === detail.title.toLowerCase().trim() &&
+        p.tracks.length > 0 &&
+        p.tracks.every((t) => cloudTrackIds.has(t.id)),
+    )
+    if (contentMatch) {
+      result.cloudIdMap[contentMatch.id] = detail.id
+      result.versionMap[detail.id] = detail.version
+      continue
+    }
+
     result.newFromCloud.push({
       id: `cloud_${detail.id}`,
       name: detail.title,

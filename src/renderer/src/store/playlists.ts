@@ -204,7 +204,9 @@ export function moveTrackInPlaylist(id: string, fromIndex: number, toIndex: numb
  */
 export function addPlaylistFromCloud(playlist: Playlist): void {
   if (cache.some((p) => p.id === playlist.id)) return
-  cache = [...cache, playlist]
+  // Auto-link cloudId for cloud_ prefixed playlists
+  const cloudId = playlist.id.startsWith('cloud_') ? playlist.id.slice(6) : undefined
+  cache = [...cache, cloudId ? { ...playlist, cloudId } : playlist]
   emit()
 }
 
