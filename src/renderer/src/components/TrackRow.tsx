@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { motion } from 'motion/react'
 import { usePlayer } from '../player/PlayerContext'
 import { resolveStream, TrackResult } from '../api/yandexMusic'
 import { toggleLike, useIsLiked } from '../store/likes'
@@ -33,7 +32,19 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
   const [showArtistPicker, setShowArtistPicker] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  const [ctxClosing, setCtxClosing] = useState(false)
   const ctxRef = useRef<HTMLDivElement>(null)
+  const ctxTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const CTX_ANIM_MS = 120
+
+  const closeCtx = useCallback(() => {
+    if (ctxClosing || !ctxMenu) return
+    setCtxClosing(true)
+    ctxTimerRef.current = setTimeout(() => {
+      setCtxClosing(false)
+      setCtxMenu(null)
+    }, CTX_ANIM_MS)
+  }, [ctxClosing, ctxMenu])
   const downloads = useDownloads()
   const downloaded = !!downloads[track.id]
   const [downloading, setDownloading] = useState(false)
@@ -50,7 +61,7 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
   // Close context menu on outside click or scroll
   useEffect(() => {
     if (!ctxMenu) return
-    const close = (): void => setCtxMenu(null)
+    const close = (): void => closeCtx()
     document.addEventListener('click', close)
     document.addEventListener('scroll', close, true)
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close() })
@@ -58,7 +69,7 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
       document.removeEventListener('click', close)
       document.removeEventListener('scroll', close, true)
     }
-  }, [ctxMenu])
+  }, [ctxMenu, closeCtx])
 
   const handleClick = (): void => {
     if (queue && typeof index === 'number') playQueue(queue, index)
@@ -93,12 +104,12 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
     } else {
       play(track)
     }
-    setCtxMenu(null)
+    closeCtx()
   }, [currentQueue, queueIndex, track, play])
 
   const handleAddToQueueEnd = useCallback((): void => {
     currentQueue.push(track)
-    setCtxMenu(null)
+    closeCtx()
   }, [currentQueue, track])
 
   const handleArtistsClick = (e: React.MouseEvent): void => {
@@ -114,21 +125,21 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
   // Also track artist name for the "Go to artist" context action
   const handleGoToArtist = useCallback((name: string) => {
     onArtistClick?.(name)
-    setCtxMenu(null)
+    closeCtx()
   }, [onArtistClick])
 
   const handleCopyInfo = useCallback((): void => {
     navigator.clipboard.writeText(`${track.artists.join(', ')} — ${track.title}`).catch(() => {})
-    setCtxMenu(null)
+    closeCtx()
   }, [track])
 
   const handlePlayVia = useCallback((source: 'soundcloud' | 'youtube'): void => {
     play(track, source)
-    setCtxMenu(null)
+    closeCtx()
   }, [play, track])
 
   const handleDownloadToggle = useCallback((): void => {
-    setCtxMenu(null)
+    closeCtx()
     if (downloaded) {
       removeDownload(track.id).catch(() => {})
       return
@@ -145,6 +156,11 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
       .catch(() => window.alert('Не удалось скачать трек.'))
       .finally(() => setDownloading(false))
   }, [track, downloaded])
+
+  // Cleanup ctx timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(ctxTimerRef.current)
+  }, [])
 
   return (
     <>
@@ -225,15 +241,11 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
         </div>
       </div>
 
-      {ctxMenu && createPortal(
-        <motion.div
+      {(ctxMenu || ctxClosing) && createPortal(
+        <div
           ref={ctxRef}
-          className="track-row__ctx"
-          style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 9999 }}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.12, ease: 'easeOut' }}
+          className={`track-row__ctx${ctxClosing ? ' track-row__ctx--closing' : ''}`}
+          style={{ position: 'fixed', left: ctxMenu?.x ?? 0, top: ctxMenu?.y ?? 0, zIndex: 9999 }}
         >
           <button className="track-row__ctx-item" onClick={handlePlayNext}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -293,7 +305,7 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
           {onRemoveFromPlaylist && (
             <>
               <div className="track-row__ctx-sep" />
-              <button className="track-row__ctx-item track-row__ctx-item--danger" onClick={() => { setCtxMenu(null); onRemoveFromPlaylist?.() }}>
+              <button className="track-row__ctx-item track-row__ctx-item--danger" onClick={() => { closeCtx(); onRemoveFromPlaylist?.() }}>
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                 </svg>
@@ -301,7 +313,7 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
               </button>
             </>
           )}
-        </motion.div>,
+        </div>,
         document.body
       )}
     </>
