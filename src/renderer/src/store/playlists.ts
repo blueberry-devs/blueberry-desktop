@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { TrackResult } from '../api/yandexMusic'
+import { markUnsynced } from './playlistSync'
 
 const STORAGE_KEY = 'ym-clone:playlists'
 
@@ -9,6 +10,8 @@ export interface Playlist {
   cover: string | null
   tracks: TrackResult[]
   createdAt: number
+  /** Server-side UUID if this playlist has been synced to the cloud */
+  cloudId?: string
 }
 
 let cache: Playlist[] = load()
@@ -54,22 +57,26 @@ export function createPlaylist(name: string, cover: string | null = null): Playl
     createdAt: Date.now()
   }
   cache = [playlist, ...cache]
+  markUnsynced()
   emit()
   return playlist
 }
 
 export function deletePlaylist(id: string): void {
   cache = cache.filter((p) => p.id !== id)
+  markUnsynced()
   emit()
 }
 
 export function renamePlaylist(id: string, name: string): void {
   cache = cache.map((p) => (p.id === id ? { ...p, name: name.trim() || p.name } : p))
+  markUnsynced()
   emit()
 }
 
 export function setPlaylistCover(id: string, cover: string | null): void {
   cache = cache.map((p) => (p.id === id ? { ...p, cover } : p))
+  markUnsynced()
   emit()
 }
 
@@ -77,11 +84,13 @@ export function addTrackToPlaylist(id: string, track: TrackResult): void {
   cache = cache.map((p) =>
     p.id === id && !p.tracks.some((t) => t.id === track.id) ? { ...p, tracks: [...p.tracks, track] } : p
   )
+  markUnsynced()
   emit()
 }
 
 export function removeTrackFromPlaylist(id: string, trackId: string): void {
   cache = cache.map((p) => (p.id === id ? { ...p, tracks: p.tracks.filter((t) => t.id !== trackId) } : p))
+  markUnsynced()
   emit()
 }
 
@@ -94,6 +103,26 @@ export function moveTrackInPlaylist(id: string, fromIndex: number, toIndex: numb
     tracks.splice(toIndex, 0, moved)
     return { ...p, tracks }
   })
+  markUnsynced()
+  emit()
+}
+
+/**
+ * Add a playlist that came from the cloud (no markUnsynced).
+ * Does nothing if a playlist with the same id already exists.
+ */
+export function addPlaylistFromCloud(playlist: Playlist): void {
+  if (cache.some((p) => p.id === playlist.id)) return
+  cache = [...cache, playlist]
+  emit()
+}
+
+/**
+ * Set the cloud playlist UUID for a local playlist.
+ * Does NOT mark as unsynced (this is set during cloud sync).
+ */
+export function setPlaylistCloudId(id: string, cloudId: string): void {
+  cache = cache.map((p) => (p.id === id ? { ...p, cloudId } : p))
   emit()
 }
 

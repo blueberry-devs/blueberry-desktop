@@ -1,5 +1,15 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { login, register, tryRestoreSession } from '../store/auth'
+import { login, register, tryRestoreSession, getAuth } from '../store/auth'
+import { getPlaylists, addTrackToPlaylist, addPlaylistFromCloud, setPlaylistCloudId } from '../store/playlists'
+import { setPlaylistVersion } from '../store/playlistVersions'
+import { markSynced } from '../store/playlistSync'
+import { setCloudPlaylists } from '../store/cloudPlaylists'
+import {
+  syncAfterLogin,
+  fetchCloudPlaylists,
+  type SyncChoice,
+  type CloudPlaylistSummary,
+} from '../services/playlists'
 import './AuthView.css'
 
 interface IconProps { size: number; className?: string }
@@ -90,6 +100,11 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
   const [registeredEmail, setRegisteredEmail] = useState('')
   const emailRef = useRef<HTMLInputElement>(null)
 
+  // Sync-after-auth state
+  const [syncState, setSyncState] = useState<'idle' | 'checking' | 'prompt' | 'syncing'>('idle')
+  const [syncMatchCount, setSyncMatchCount] = useState(0)
+  const cloudSummariesRef = useRef<CloudPlaylistSummary[]>([])
+
   useEffect(() => {
     tryRestoreSession().then((restored) => {
       setCheckingSession(false)
@@ -105,6 +120,60 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
     setMode((m) => (m === 'login' ? 'register' : 'login'))
     setError('')
   }, [])
+
+  const executeSync = useCallback(async (choice: SyncChoice) => {
+    setSyncState('syncing')
+    const token = getAuth().accessToken
+    if (!token) { onClose(); return }
+
+    const localPls = getPlaylists()
+    const result = await syncAfterLogin(token, localPls, choice)
+
+    // Apply merge results: extra tracks from cloud
+    for (const { localId, tracks } of result.extraTracks) {
+      for (const track of tracks) {
+        addTrackToPlaylist(localId, track)
+      }
+    }
+    // New cloud-only playlists → create locally
+    for (const pl of result.newFromCloud) {
+      addPlaylistFromCloud(pl)
+    }
+    // Store cloud IDs and version numbers
+    for (const [localId, cloudId] of Object.entries(result.cloudIdMap)) {
+      setPlaylistCloudId(localId, cloudId)
+    }
+    for (const [cloudId, version] of Object.entries(result.versionMap)) {
+      setPlaylistVersion(cloudId, version)
+    }
+
+    // Refresh cloud playlists for display elsewhere
+    const fresh = await fetchCloudPlaylists(token)
+    setCloudPlaylists(fresh)
+    markSynced()
+    onClose()
+  }, [onClose])
+
+  const startSyncCheck = useCallback(async () => {
+    const token = getAuth().accessToken
+    if (!token) { onClose(); return }
+
+    setSyncState('checking')
+    const summaries = await fetchCloudPlaylists(token)
+    cloudSummariesRef.current = summaries
+
+    const localPls = getPlaylists()
+    const localNames = new Set(localPls.map((p) => p.name.toLowerCase().trim()))
+    const matches = summaries.filter((s) => localNames.has(s.title.toLowerCase().trim()))
+
+    if (matches.length > 0) {
+      setSyncMatchCount(matches.length)
+      setSyncState('prompt')
+    } else {
+      // No title conflicts — auto-merge
+      await executeSync('merge')
+    }
+  }, [executeSync])
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -133,8 +202,16 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
       if (mode === 'login') {
         const err = await login(email.trim(), password)
         setLoading(false)
-        if (err) setError(err)
-        else onClose()
+        if (err) {
+          setError(err)
+        } else {
+          // Check if there are local playlists to sync
+          if (getPlaylists().length > 0) {
+            startSyncCheck()
+          } else {
+            onClose()
+          }
+        }
       } else {
         const result = await register(email.trim(), password)
         setLoading(false)
@@ -143,11 +220,16 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
         } else if (result.emailConfirmationRequired) {
           setRegisteredEmail(email.trim())
         } else {
-          onClose()
+          // Check if there are local playlists to sync
+          if (getPlaylists().length > 0) {
+            startSyncCheck()
+          } else {
+            onClose()
+          }
         }
       }
     },
-    [email, password, confirmPassword, mode, onClose],
+    [email, password, confirmPassword, mode, startSyncCheck],
   )
 
   if (checkingSession) {
@@ -198,6 +280,62 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                 onClick={() => setRegisteredEmail('')}
               >
                 <LogInIcon size={16} /> Войти
+              </button>
+            </div>
+          </>
+        ) : syncState === 'checking' || syncState === 'syncing' ? (
+          <>
+            <div className="auth-card__header">
+              <h1 className="auth-card__title">Синхронизация</h1>
+              <p className="auth-card__subtitle">
+                {syncState === 'checking'
+                  ? 'Проверяем облачные плейлисты…'
+                  : 'Загружаем ваши плейлисты в облако…'}
+              </p>
+            </div>
+            <div className="auth-confirm">
+              <div className="auth-view__loader" style={{ position: 'relative', height: 60 }}>
+                <div className="auth-view__spinner" />
+              </div>
+            </div>
+          </>
+        ) : syncState === 'prompt' ? (
+          <>
+            <div className="auth-card__header">
+              <h1 className="auth-card__title">Найдены совпадения</h1>
+              <p className="auth-card__subtitle">
+                У вас есть локальные плейлисты, названия которых совпадают с облачными ({syncMatchCount} шт.)
+              </p>
+            </div>
+            <div className="auth-sync-prompt">
+              <p className="auth-sync-prompt__text">
+                Хотите объединить их с облачными или загрузить как новые?
+              </p>
+              <div className="auth-sync-prompt__actions">
+                <button
+                  type="button"
+                  className="auth-form__submit auth-sync-btn--merge"
+                  onClick={() => executeSync('merge')}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                  Объединить
+                </button>
+                <button
+                  type="button"
+                  className="auth-form__submit auth-sync-btn--new"
+                  onClick={() => executeSync('upload-new')}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 5v14M5 12h14"/></svg>
+                  Загрузить как новые
+                </button>
+              </div>
+              <button
+                type="button"
+                className="auth-card__link"
+                style={{ marginTop: 12 }}
+                onClick={onClose}
+              >
+                Пропустить
               </button>
             </div>
           </>

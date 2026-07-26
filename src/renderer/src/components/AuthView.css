@@ -351,3 +351,49 @@
 .auth-confirm .auth-form__submit {
   padding: 0 40px;
 }
+
+/* ========== Sync prompt ========== */
+
+.auth-sync-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  text-align: center;
+}
+
+.auth-sync-prompt__text {
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+  font-family: 'YS Text', 'Segoe UI', -apple-system, sans-serif;
+}
+
+.auth-sync-prompt__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.auth-sync-btn--merge,
+.auth-sync-btn--new {
+  width: 100%;
+}
+
+.auth-sync-btn--merge {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.auth-sync-btn--new {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.auth-sync-btn--new:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
