@@ -104,15 +104,17 @@ async function runSync(): Promise<void> {
       const cloudDetail = await fetchCloudPlaylistDetail(token, pl.cloudId)
       if (!cloudDetail) continue
 
-      const storedVersion = getPlaylistVersion(pl.cloudId)
+      let storedVersion = getPlaylistVersion(pl.cloudId)
+      let effectiveVersion = storedVersion
 
       // Apply server changes if version advanced
       if (storedVersion > 0 && storedVersion < cloudDetail.version) {
         const diff = await diffPlaylist(token, pl.cloudId, storedVersion)
         if (diff) {
+          effectiveVersion = diff.currentVersion
           const newTracks: TrackResult[] = []
           for (const action of diff.actions) {
-            if (action.actionType === 'add' && action.trackExternalId) {
+            if (action.actionType === 'add_track' && action.trackExternalId) {
               newTracks.push({
                 id: action.trackExternalId,
                 source:
@@ -146,7 +148,7 @@ async function runSync(): Promise<void> {
         const resp = await syncPlaylist(
           token,
           pl.cloudId,
-          Math.max(storedVersion, 1),
+          Math.max(effectiveVersion, 1),
           localAdds,
         )
         if (resp) {
@@ -155,7 +157,7 @@ async function runSync(): Promise<void> {
           if (resp.serverActions) {
             const newTracks: TrackResult[] = []
             for (const action of resp.serverActions) {
-              if (action.actionType === 'add' && action.trackExternalId) {
+              if (action.actionType === 'add_track' && action.trackExternalId) {
                 newTracks.push({
                   id: action.trackExternalId,
                   source:

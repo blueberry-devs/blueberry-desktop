@@ -21,9 +21,10 @@ interface Props {
   queue?: TrackResult[]
   index?: number
   onArtistClick?: (name: string) => void
+  onRemoveFromPlaylist?: () => void
 }
 
-function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
+function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: Props): JSX.Element {
   const { currentTrack, isPlaying, isLoading, play, playQueue, queue: currentQueue, queueIndex } = usePlayer()
   const liked = useIsLiked(track.id)
   const isCurrent = currentTrack?.id === track.id
@@ -50,11 +51,11 @@ function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
   useEffect(() => {
     if (!ctxMenu) return
     const close = (): void => setCtxMenu(null)
-    document.addEventListener('mousedown', close)
+    document.addEventListener('click', close)
     document.addEventListener('scroll', close, true)
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close() })
     return () => {
-      document.removeEventListener('mousedown', close)
+      document.removeEventListener('click', close)
       document.removeEventListener('scroll', close, true)
     }
   }, [ctxMenu])
@@ -67,15 +68,23 @@ function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
   const handleContextMenu = useCallback((e: React.MouseEvent): void => {
     e.preventDefault()
     e.stopPropagation()
-    const menuWidth = 200
-    const menuHeight = 220
+    const ITEM_H = 36
+    const SEP_H = 9
     const pad = 8
+    let h = ITEM_H * 2 + SEP_H // play next + add to queue + sep
+    if (onArtistClick) h += ITEM_H * track.artists.length
+    h += SEP_H + ITEM_H       // sep + download
+    h += SEP_H + ITEM_H * 2   // sep + soundcloud + youtube
+    h += SEP_H + ITEM_H       // sep + copy
+    if (onRemoveFromPlaylist) h += SEP_H + ITEM_H // sep + remove
+    const menuWidth = 200
     let x = e.clientX
     let y = e.clientY
     if (x + menuWidth + pad > window.innerWidth) x = window.innerWidth - menuWidth - pad
-    if (y + menuHeight + pad > window.innerHeight) y = window.innerHeight - menuHeight - pad
+    if (y + h + pad > window.innerHeight) y = window.innerHeight - h - pad
+    if (y < pad) y = pad
     setCtxMenu({ x, y })
-  }, [])
+  }, [onArtistClick, onRemoveFromPlaylist, track.artists.length])
 
   const handlePlayNext = useCallback((): void => {
     if (queueIndex >= 0) {
@@ -225,7 +234,6 @@ function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.12, ease: 'easeOut' }}
-          onClick={(e) => e.stopPropagation()}
         >
           <button className="track-row__ctx-item" onClick={handlePlayNext}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -282,6 +290,17 @@ function TrackRow({ track, queue, index, onArtistClick }: Props): JSX.Element {
             </svg>
             Копировать
           </button>
+          {onRemoveFromPlaylist && (
+            <>
+              <div className="track-row__ctx-sep" />
+              <button className="track-row__ctx-item track-row__ctx-item--danger" onClick={() => { setCtxMenu(null); onRemoveFromPlaylist?.() }}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+                Удалить из плейлиста
+              </button>
+            </>
+          )}
         </motion.div>,
         document.body
       )}

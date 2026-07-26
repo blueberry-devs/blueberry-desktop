@@ -2,7 +2,8 @@ import { useSyncExternalStore } from 'react'
 import { TrackResult } from '../api/yandexMusic'
 import { markUnsynced } from './playlistSync'
 import { getAuth } from './auth'
-import { addTrackToCloudPlaylist as apiAddTrackToCloudPlaylist } from '../services/playlists'
+import { setPlaylistVersion } from './playlistVersions'
+import { addTrackToCloudPlaylist as apiAddTrackToCloudPlaylist, removeTrackFromCloudPlaylist as apiRemoveTrackFromCloudPlaylist } from '../services/playlists'
 
 const STORAGE_KEY = 'ym-clone:playlists'
 
@@ -95,14 +96,45 @@ export function addTrackToPlaylist(id: string, track: TrackResult): void {
   // Fire-and-forget: push to cloud immediately if playlist has cloudId
   const auth = getAuth()
   if (pl.cloudId && auth.accessToken) {
-    apiAddTrackToCloudPlaylist(auth.accessToken, pl.cloudId, track)
+    apiAddTrackToCloudPlaylist(auth.accessToken, pl.cloudId, track).then((newVersion) => {
+      if (newVersion != null) setPlaylistVersion(pl.cloudId!, newVersion)
+    })
   }
 }
 
 export function removeTrackFromPlaylist(id: string, trackId: string): void {
+  const pl = cache.find((p) => p.id === id)
+  const track = pl?.tracks.find((t) => t.id === trackId)
+
+  console.log('[playlists] removeTrackFromPlaylist called', { id, trackId, plName: pl?.name, cloudId: pl?.cloudId, trackTitle: track?.title })
+
   cache = cache.map((p) => (p.id === id ? { ...p, tracks: p.tracks.filter((t) => t.id !== trackId) } : p))
   markUnsynced()
   emit()
+
+  // Fire-and-forget: delete from cloud immediately if playlist is synced
+  if (track && pl?.cloudId) {
+    const auth = getAuth()
+    if (auth.accessToken) {
+      console.log('[playlists] calling apiRemoveTrackFromCloudPlaylist', { cloudId: pl.cloudId, trackId, trackTitle: track.title })
+      apiRemoveTrackFromCloudPlaylist(auth.accessToken, pl.cloudId, track).then((newVersion) => {
+        if (newVersion != null) {
+          console.log('[playlists] remove from cloud done, newVersion:', newVersion)
+          setPlaylistVersion(pl.cloudId!, newVersion)
+        } else {
+          console.warn('[playlists] remove from cloud returned null — track may not exist on server or resolve failed')
+        }
+      })
+    } else {
+      console.warn('[playlists] not authenticated — skipping cloud delete')
+    }
+  } else {
+    console.warn('[playlists] skipping cloud delete —', {
+      noTrack: !track,
+      noCloudId: !pl?.cloudId,
+      playlistExists: !!pl,
+    })
+  }
 }
 
 export function moveTrackInPlaylist(id: string, fromIndex: number, toIndex: number): void {

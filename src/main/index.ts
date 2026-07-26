@@ -16,7 +16,7 @@ import { spawn, execSync, ChildProcessWithoutNullStreams } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import { updatePresence, clearPresence, destroy as destroyDiscord } from './discord'
-import log from 'electron-log'
+// electron-log removed — using console.* instead
 
 let sidecar: ChildProcessWithoutNullStreams | null = null
 let tray: Tray | null = null
@@ -59,9 +59,9 @@ function killOrphansOnPort(port: number): void {
       for (const pid of pids) {
         try {
           execSync(`taskkill /F /T /PID ${pid}`)
-          log.info(`[sidecar] killed orphaned process tree on port ${port} (pid ${pid})`)
+          console.info(`[sidecar] killed orphaned process tree on port ${port} (pid ${pid})`)
         } catch (e) {
-          log.warn('[sidecar] orphan kill race on pid', pid, e)
+          console.warn('[sidecar] orphan kill race on pid', pid, e)
         }
       }
     } else {
@@ -69,9 +69,9 @@ function killOrphansOnPort(port: number): void {
       for (const pid of out.split('\n').map((p) => p.trim()).filter(Boolean)) {
         try {
           execSync(`kill -9 ${pid}`)
-          log.info(`[sidecar] killed orphaned process on port ${port} (pid ${pid})`)
+          console.info(`[sidecar] killed orphaned process on port ${port} (pid ${pid})`)
         } catch (e) {
-          log.warn('[sidecar] orphan kill race on pid', pid, e)
+          console.warn('[sidecar] orphan kill race on pid', pid, e)
         }
       }
     }
@@ -111,11 +111,11 @@ function scheduleRestart(): void {
   if (isQuitting) return
   restartCount++
   if (restartCount > MAX_RESTART_ATTEMPTS) {
-    log.error('[sidecar] max restart attempts reached, giving up')
+    console.error('[sidecar] max restart attempts reached, giving up')
     return
   }
   const delay = Math.min(1000 * restartCount, 10_000)
-  log.info(`[sidecar] restarting in ${delay}ms (attempt ${restartCount}/${MAX_RESTART_ATTEMPTS})`)
+  console.info(`[sidecar] restarting in ${delay}ms (attempt ${restartCount}/${MAX_RESTART_ATTEMPTS})`)
   restartTimer = setTimeout(() => {
     restartTimer = null
     startSidecar()
@@ -168,7 +168,7 @@ function startSidecar(): void {
   }
 
   if (!entry) {
-    log.warn('[sidecar] music-server.exe not found in', serverDir)
+    console.warn('[sidecar] music-server.exe not found in', serverDir)
     return
   }
 
@@ -193,14 +193,14 @@ function startSidecar(): void {
 
   child.stdout.on('data', (data) => {
     for (const line of data.toString().trim().split('\n')) {
-      log.info(`[server] ${line}`)
+      console.info(`[server] ${line}`)
     }
   })
 
-  child.on('error', (err) => log.error('[sidecar] spawn failed:', err.message))
+  child.on('error', (err) => console.error('[sidecar] spawn failed:', err.message))
 
   child.on('exit', (code, signal) => {
-    log.info(`[sidecar] exited code=${code} signal=${signal}`)
+    console.info(`[sidecar] exited code=${code} signal=${signal}`)
     if (sidecar === child) {
       sidecar = null
       scheduleRestart()
@@ -211,13 +211,13 @@ function startSidecar(): void {
     // Dev mode: stderr → log.warn, poll /api/status for readiness
     child.stderr.on('data', (data) => {
       for (const line of data.toString().trim().split('\n')) {
-        log.warn(`[server] ${line}`)
+        console.warn(`[server] ${line}`)
       }
     })
 
     let ready = false
     const readyTimeout = setTimeout(() => {
-      if (!ready) log.warn('[sidecar] server not ready after 30s')
+      if (!ready) console.warn('[sidecar] server not ready after 30s')
     }, 30_000)
 
     const poll = (): void => {
@@ -228,7 +228,7 @@ function startSidecar(): void {
           clearTimeout(readyTimeout)
           restartCount = 0
           mainWindowRef?.webContents.send('sidecar:ready')
-          log.info('[sidecar] ready')
+          console.info('[sidecar] ready')
         })
         .catch(() => setTimeout(poll, 200))
     }
@@ -238,7 +238,7 @@ function startSidecar(): void {
     let started = false
     child.stderr.on('data', (data) => {
       for (const line of data.toString().trim().split('\n')) {
-        log.info(`[server] ${line}`)
+        console.info(`[server] ${line}`)
         if (!started && line.includes('sidecar starting on http')) {
           started = true
           restartCount = 0
@@ -394,11 +394,11 @@ function setupAutoUpdater(): void {
   autoUpdater.autoInstallOnAppQuit = true
 
   autoUpdater.on('download-progress', (info) => {
-    log.info(`[updater] ${Math.round(info.percent)}% downloaded`)
+    console.info(`[updater] ${Math.round(info.percent)}% downloaded`)
   })
 
   autoUpdater.on('update-downloaded', (info) => {
-    log.info('[updater] Update downloaded. Restart the app to install.')
+    console.info('[updater] Update downloaded. Restart the app to install.')
     mainWindowRef?.webContents.send('notification:show', {
       type: 'update',
       title: 'update',
@@ -407,7 +407,7 @@ function setupAutoUpdater(): void {
   })
 
   autoUpdater.on('error', (err) => {
-    log.error('[updater] error:', err.message)
+    console.error('[updater] error:', err.message)
   })
 }
 
@@ -415,7 +415,7 @@ function checkForUpdates(manual: boolean): void {
   if (!app.isPackaged || updateCheckInFlight) return
   updateCheckInFlight = true
 
-  log.info('[updater] checking for updates, current version:', app.getVersion())
+  console.info('[updater] checking for updates, current version:', app.getVersion())
 
   if (manual) {
     const onNotAvailable = (): void => {
@@ -427,7 +427,7 @@ function checkForUpdates(manual: boolean): void {
 
   autoUpdater
     .checkForUpdates()
-    .catch((err) => log.error('[updater] check failed:', err.message))
+    .catch((err) => console.error('[updater] check failed:', err.message))
     .finally(() => {
       updateCheckInFlight = false
     })
@@ -609,11 +609,11 @@ function checkRussianIp(): void {
           })
         }
       } catch (e) {
-        log.warn('[vpn-check] geo parse failed:', e)
+        console.warn('[vpn-check] geo parse failed:', e)
       }
     })
   }).on('error', (err) => {
-    log.warn('[vpn-check] ip-api network error:', err.message)
+    console.warn('[vpn-check] ip-api network error:', err.message)
   })
 }
 
@@ -631,7 +631,7 @@ function compareVersions(a: string, b: string): number {
 
 function checkDevUpdate(): void {
   const currentVersion = app.getVersion()
-  log.info('[updater] dev check, current version:', currentVersion)
+  console.info('[updater] dev check, current version:', currentVersion)
 
   const repo = 'blueberry-devs/blueberry-desktop'
   https.get(`https://api.github.com/repos/${repo}/releases/latest`, { headers: { 'User-Agent': 'blueberry-desktop' } }, (res) => {
@@ -643,17 +643,17 @@ function checkDevUpdate(): void {
         const latestVersion = release.tag_name || release.name || ''
         if (compareVersions(currentVersion, latestVersion) < 0) {
           if (app.isPackaged) {
-            log.info(`[updater] Update available: ${latestVersion}. electron-updater will handle the download.`)
+            console.info(`[updater] Update available: ${latestVersion}. electron-updater will handle the download.`)
             return
           }
-          log.info('[updater] Run git pull && npm run build to update.')
+          console.info('[updater] Run git pull && npm run build to update.')
           mainWindowRef?.webContents.send('notification:show', {
             type: 'update',
             title: 'update',
             message: latestVersion
           })
         } else {
-          log.info('[updater] up to date')
+          console.info('[updater] up to date')
           mainWindowRef?.webContents.send('notification:show', {
             type: 'uptodate',
             title: 'uptodate',
@@ -661,11 +661,11 @@ function checkDevUpdate(): void {
           })
         }
       } catch (e) {
-        log.warn('[updater] dev check parse error:', e)
+        console.warn('[updater] dev check parse error:', e)
       }
     })
   }).on('error', (err) => {
-    log.warn('[updater] dev check network error:', err.message)
+    console.warn('[updater] dev check network error:', err.message)
   })
 }
 
@@ -677,16 +677,8 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  log.initialize()
-  const { writeFn } = log.transports.console
-  log.transports.console.writeFn = (args) => {
-    const text = args.message.data.join(' ')
-    if (text.includes('[Wave]')) {
-      process.stdout.write(`\x1b[38;5;210m${text}\x1b[0m\n`)
-    } else {
-      writeFn(args)
-    }
-  }
+  // log.initialize() removed with electron-log
+  // electron-log console transport removed
   startSidecar()
   createWindow()
   setupAutoUpdater()

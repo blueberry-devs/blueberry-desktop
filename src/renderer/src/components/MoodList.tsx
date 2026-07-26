@@ -7,7 +7,7 @@ import { TrackResult } from '../api/yandexMusic'
 import { useProfile } from '../store/profile'
 import { useTranslation } from '../utils/useTranslation'
 import { CATEGORIES, CategoryId, getMoodPhrases } from '../data/moodPhrases'
-import log from 'electron-log/renderer'
+
 import './MoodList.css'
 
 const GENRE_KEYWORDS: Record<CategoryId, string[]> = {
@@ -119,7 +119,7 @@ function MoodList() {
 
   const moodItems = useMemo(() => {
     const detected = detectGenres(liked)
-    log.info(`[Mood] liked tracks: ${liked.length}, detected genres: ${detected.length > 0 ? detected.join(', ') : 'none (random fallback)'}`)
+    console.info(`[Mood] liked tracks: ${liked.length}, detected genres: ${detected.length > 0 ? detected.join(', ') : 'none (random fallback)'}`)
     const active = detected.length > 0 ? detected : CATEGORIES
     const pool: { key: string; label: string; query: string }[] = []
     for (const cat of active) {
@@ -138,7 +138,7 @@ function MoodList() {
       ...item,
       icon: `/moods/mood_${String(icons[i]).padStart(2, '0')}.png`
     }))
-    log.info(`[Mood] showing ${count} items from ${active.length} categories, unique icons`)
+    console.info(`[Mood] showing ${count} items from ${active.length} categories, unique icons`)
     return result
   }, [phrases, liked])
 

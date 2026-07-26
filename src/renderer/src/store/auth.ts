@@ -110,13 +110,19 @@ export async function tryRestoreSession(): Promise<boolean> {
   const state = getAuth()
   if (!state.accessToken || !state.refreshToken) return false
 
-  const user = await getMe(state.accessToken)
+  const { user, httpStatus } = await getMe(state.accessToken)
   if (user) {
     cache = { ...cache, user }
     emit()
     return true
   }
 
+  // Server error (5xx) or network error — don't invalidate saved tokens
+  if (httpStatus !== 401 && httpStatus !== 0) {
+    return true
+  }
+
+  // Token likely expired (401) — try refresh
   const result = await apiRefresh(state.refreshToken)
   if (result.success && result.accessToken) {
     cache = {
@@ -128,7 +134,10 @@ export async function tryRestoreSession(): Promise<boolean> {
     return true
   }
 
-  clearAuth()
+  // Only clear auth on definitive auth error from refresh endpoint too
+  if (result.httpStatus === 401) {
+    clearAuth()
+  }
   return false
 }
 
@@ -172,22 +181,25 @@ export async function refreshProfile(): Promise<void> {
   if (!state.accessToken) return
 
   // Try fetching profile with current access token
-  let user = await getMe(state.accessToken)
-  if (user) {
-    cache = { ...cache, user }
+  let result = await getMe(state.accessToken)
+  if (result.user) {
+    cache = { ...cache, user: result.user }
     lastProfileFetch = now
     emit()
     return
   }
+
+  // Server error (5xx/network) — skip refresh, keep cached profile
+  if (result.httpStatus !== 401 && result.httpStatus !== 0) return
 
   // Token might be expired — try refresh (uses shared lock, no race)
   const refreshed = await doRefresh()
   if (!refreshed) return
 
   // Retry profile fetch with new token
-  user = await getMe(cache.accessToken!)
-  if (user) {
-    cache = { ...cache, user }
+  result = await getMe(cache.accessToken!)
+  if (result.user) {
+    cache = { ...cache, user: result.user }
     lastProfileFetch = now
     emit()
   }
@@ -218,7 +230,11 @@ async function doRefresh(): Promise<boolean> {
       emit()
       return true
     }
-    clearAuth()
+    // Refresh failed — only clear auth on definitive auth error (401).
+    // Server errors (502/5xx) or network errors are temporary; keep tokens.
+    if (result.httpStatus === 401) {
+      clearAuth()
+    }
     return false
   } finally {
     isRefreshing = false

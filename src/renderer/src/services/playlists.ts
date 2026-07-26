@@ -330,6 +330,8 @@ export async function diffPlaylist(
 
 /**
  * Send local actions for a single playlist. Returns new version + server actions.
+ * Handles 409 (version conflict) by reading the body — the server sends the
+ * current state even when versions clash.
  */
 export async function syncPlaylist(
   accessToken: string,
@@ -346,8 +348,11 @@ export async function syncPlaylist(
       },
       body: JSON.stringify({ clientVersion, localActions } satisfies PlaylistSyncRequest),
     })
-    if (!res.ok) return null
-    return (await res.json()) as PlaylistSyncResponse
+    // 409 still has a valid body with newVersion + serverActions
+    const body = (await res.json()) as PlaylistSyncResponse
+    if (body && typeof body.newVersion === 'number') return body
+    if (res.ok) return body
+    return null
   } catch {
     return null
   }
@@ -355,12 +360,13 @@ export async function syncPlaylist(
 
 /**
  * Add a single track to a cloud playlist.
+ * Returns the new playlist version, or null on failure.
  */
 export async function addTrackToCloudPlaylist(
   accessToken: string,
   playlistId: string,
   track: TrackResult,
-): Promise<boolean> {
+): Promise<number | null> {
   try {
     const dto = mapTrackToDto(track)
     const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}/tracks`, {
@@ -371,9 +377,60 @@ export async function addTrackToCloudPlaylist(
       },
       body: JSON.stringify(dto),
     })
-    return res.ok
+    if (!res.ok) return null
+    const detail = (await res.json()) as CloudPlaylistDetail
+    return detail.version ?? null
   } catch {
-    return false
+    return null
+  }
+}
+
+/**
+ * Remove a single track from a cloud playlist.
+ * Resolves the external track to a server-side UUID first, then calls DELETE.
+ * Returns the new playlist version (may be null if the response has no body).
+ */
+export async function removeTrackFromCloudPlaylist(
+  accessToken: string,
+  playlistId: string,
+  track: TrackResult,
+): Promise<number | null> {
+  try {
+    console.log('[removeTrack] resolving external track:', track.id, track.title)
+    const dto = mapTrackToDto(track)
+    const resolved = await resolveTracks(accessToken, [dto])
+    if (resolved.length === 0 || !resolved[0].id) {
+      console.warn('[removeTrack] failed to resolve track to server UUID', track.id)
+      return null
+    }
+    console.log('[removeTrack] resolved to server UUID:', resolved[0].id)
+
+    const url = `${BASE_URL}/api/playlists/${playlistId}/tracks/${resolved[0].id}`
+    console.log('[removeTrack] DELETE', url)
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+    console.log('[removeTrack] response status:', res.status)
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      console.warn('[removeTrack] server returned', res.status, text)
+      return null
+    }
+
+    try {
+      const body = await res.json() as { version?: number }
+      console.log('[removeTrack] success, new version:', body.version)
+      return body.version ?? null
+    } catch {
+      console.log('[removeTrack] success, no body returned')
+      return null
+    }
+  } catch (e) {
+    console.error('[removeTrack] unexpected error:', e)
+    return null
   }
 }
 

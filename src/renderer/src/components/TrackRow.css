@@ -205,6 +205,14 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.track-row__ctx-item--danger {
+  color: #ff6b6b;
+}
+
+.track-row__ctx-item--danger:hover {
+  background: rgba(255, 70, 70, 0.12);
+}
+
 .track-row__ctx-sep {
   height: 1px;
   margin: 4px 8px;

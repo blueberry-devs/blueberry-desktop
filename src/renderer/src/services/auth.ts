@@ -66,14 +66,24 @@ export async function login(
 
 export async function refresh(
   refreshToken: string,
-): Promise<AuthResult> {
+): Promise<AuthResult & { httpStatus: number }> {
   try {
     const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
     })
-    return (await res.json()) as AuthResult
+    let body: AuthResult | null = null
+    try { body = (await res.json()) as AuthResult } catch { /* empty/invalid body */ }
+    return {
+      success: body?.success ?? false,
+      accessToken: body?.accessToken ?? null,
+      refreshToken: body?.refreshToken ?? null,
+      expiresIn: body?.expiresIn ?? null,
+      user: body?.user ?? null,
+      error: body?.error ?? (res.ok ? null : `HTTP ${res.status}`),
+      httpStatus: res.status,
+    }
   } catch {
     return {
       success: false,
@@ -82,20 +92,21 @@ export async function refresh(
       expiresIn: null,
       user: null,
       error: 'Network error',
+      httpStatus: 0,
     }
   }
 }
 
 export async function getMe(
   accessToken: string,
-): Promise<AuthUser | null> {
+): Promise<{ user: AuthUser | null; httpStatus: number }> {
   try {
     const res = await fetch(`${BASE_URL}/api/auth/me`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
-    if (!res.ok) return null
-    return (await res.json()) as AuthUser
+    if (!res.ok) return { user: null, httpStatus: res.status }
+    return { user: (await res.json()) as AuthUser, httpStatus: res.status }
   } catch {
-    return null
+    return { user: null, httpStatus: 0 }
   }
 }

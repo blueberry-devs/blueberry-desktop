@@ -5,7 +5,7 @@ import { getHistory } from '../store/history'
 import { pickCategoryForQuery } from '../data/wavePhrases'
 import { phraseToKeyword } from '../data/moodPhrases'
 import { usePlayer } from './PlayerContext'
-import log from 'electron-log/renderer'
+
 
 // How close to the end of the queue we top it up with a fresh batch, so
 // Next/Previous always have somewhere real to go instead of a queue of one.
@@ -87,7 +87,7 @@ async function fetchCandidates(genre: string): Promise<TrackResult[]> {
   const keyword = phraseToKeyword(genre) ?? genre
 
   if (isArtistQuery(keyword)) {
-    log.info(`[Wave] Analysing favourites... searching artist "${keyword}"`)
+    console.log(`[Wave] Analysing favourites... searching artist "${keyword}"`)
     const [artistResults, genreResults] = await Promise.all([
       searchArtistTracks(keyword).catch(() => [] as TrackResult[]),
       searchTracksMulti(`${keyword} music`, ['yandex', 'soundcloud', 'youtube']).catch(() => [] as TrackResult[]),
@@ -104,23 +104,23 @@ async function fetchCandidates(genre: string): Promise<TrackResult[]> {
       }
     }
     if (merged.length > 0) {
-      log.info(`[Wave] Found ${merged.length} tracks for artist "${keyword}" in ${Date.now() - start}ms`)
+      console.log(`[Wave] Found ${merged.length} tracks for artist "${keyword}" in ${Date.now() - start}ms`)
       return shuffle(merged)
     }
-    log.info(`[Wave] No tracks found for "${keyword}", returning empty`)
+    console.log(`[Wave] No tracks found for "${keyword}", returning empty`)
     return []
   }
 
   const queries = buildQueries(keyword)
-  log.info(`[Wave] Analysing favourites... ${queries.length} queries for "${genre}" → "${keyword}"`)
-  queries.forEach((q) => log.info(`  query: ${q}`))
+  console.log(`[Wave] Analysing favourites... ${queries.length} queries for "${genre}" → "${keyword}"`)
+  queries.forEach((q) => console.log(`  query: ${q}`))
 
   // Search sequentially so we can return early — don't wait for all queries
   const merged: TrackResult[] = []
   const seen = new Set<string>()
   for (const q of queries) {
     const batch = await searchTracksMulti(q, ['yandex', 'soundcloud', 'youtube']).catch(() => [] as TrackResult[])
-    log.info(`[Wave]   "${q}" returned ${batch.length} raw results`)
+    console.log(`[Wave]   "${q}" returned ${batch.length} raw results`)
     for (const t of batch) {
       if (!t || !isUsable(t)) continue
       const sig = trackSignature(t)
@@ -128,13 +128,13 @@ async function fetchCandidates(genre: string): Promise<TrackResult[]> {
       seen.add(sig)
       merged.push(t)
       if (merged.length >= 10) {
-        log.info(`[Wave] Got ${merged.length} candidates in ${Date.now() - start}ms (early exit)`)
+        console.log(`[Wave] Got ${merged.length} candidates in ${Date.now() - start}ms (early exit)`)
         return shuffle(merged)
       }
     }
   }
 
-  log.info(`[Wave] Got ${merged.length} unique candidates in ${Date.now() - start}ms`)
+  console.log(`[Wave] Got ${merged.length} unique candidates in ${Date.now() - start}ms`)
   return shuffle(merged)
 }
 

@@ -16,7 +16,6 @@ import { pushHistory } from '../store/history'
 import { recordPlay } from '../store/playCount'
 import { getDownloadPath } from '../store/downloads'
 import { type AudioQuality, getProfile, setAudioQuality as setProfileAudioQuality, setAdaptiveEQ as setProfileAdaptiveEQ } from '../store/profile'
-
 function updateDiscordPresence(track: TrackResult, elapsed: number, playing: boolean): void {
   window.api.discordUpdatePresence({
     trackName: track.title,
@@ -212,7 +211,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
     for (let i = 0; i < filters.length && i < adjustments.length; i++) {
       filters[i].gain.value = adjustments[i]
     }
-    log.info('[eq] adaptive profile applied:', adjustments.map((g) => g.toFixed(1)).join(' '))
+    console.log('[eq] adaptive profile applied:', adjustments.map((g) => g.toFixed(1)).join(' '))
   }
 
   function clearEQProfile(): void {
@@ -598,9 +597,9 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
         enhancementPresenceRef.current = enhPresence
         enhancementGainRef.current = enhGain
         updateAudioChain(audioQualityRef.current)
-        log.info('[enhancement] connected — comp + 5-band EQ + sub + bass + presence')
+        console.log('[enhancement] connected — comp + 5-band EQ + sub + bass + presence')
       } catch (e) {
-        log.warn('[enhancement] Web Audio enhancement unavailable:', e)
+        console.warn('[enhancement] Web Audio enhancement unavailable:', e)
       }
     }
     audio.addEventListener('play', setupEnhancement)

@@ -7,7 +7,7 @@ import { toggleLike, useIsLiked } from '../store/likes'
 import { usePlaylists, addTrackToPlaylist } from '../store/playlists'
 import { useProfile } from '../store/profile'
 import { fetchVideoClip } from '../api/yandexMusic'
-import log from 'electron-log/renderer'
+
 import {
   PlayIcon,
   PauseIcon,
@@ -123,20 +123,20 @@ function NowPlayingFullscreen(): JSX.Element | null {
     const trackId = currentTrack.id
     const cached = _clipCache.get(trackId)
     if (cached !== undefined) {
-      if (cached) log.debug('[cache] Video background: %s', cached.slice(0, 60))
+      if (cached) console.debug('[cache] Video background: %s', cached.slice(0, 60))
       setClipUrl(cached)
       return
     }
     let cancelled = false
-    log.debug('[0%] Fetching video background for %s - %s', currentTrack.title, currentTrack.artists[0])
+    console.debug('[0%] Fetching video background for %s - %s', currentTrack.title, currentTrack.artists[0])
     fetchVideoClip(currentTrack.title, currentTrack.artists[0] ?? '')
       .then((url) => {
         if (cancelled) return
         _clipCacheSet(trackId, url)
         if (url) {
-          log.debug('[100%] Video background ready: %s', url.slice(0, 60))
+          console.debug('[100%] Video background ready: %s', url.slice(0, 60))
         } else {
-          log.debug('[100%] No video background found')
+          console.debug('[100%] No video background found')
         }
         setClipUrl(url)
       })

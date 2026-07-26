@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from '../utils/useTranslation'
 import { usePlayer } from '../player/PlayerContext'
-import { Playlist, moveTrackInPlaylist, deletePlaylist } from '../store/playlists'
+import { Playlist, moveTrackInPlaylist, deletePlaylist, removeTrackFromPlaylist } from '../store/playlists'
 import { requestArtistSearch } from '../store/searchQuery'
 import TrackRow from './TrackRow'
 import './PlaylistDetailView.css'
@@ -107,7 +107,7 @@ function PlaylistDetailView({ playlist, onBack, readonly = false }: Props): JSX.
               onDragEnd={handleDragEnd}
               style={{ opacity: dragOverIndex === i ? 0.5 : 1, transition: 'opacity 0.15s' }}
             >
-              <TrackRow track={t} queue={playlist.tracks} index={i} onArtistClick={requestArtistSearch} />
+              <TrackRow track={t} queue={playlist.tracks} index={i} onArtistClick={requestArtistSearch} onRemoveFromPlaylist={readonly ? undefined : () => removeTrackFromPlaylist(playlist.id, t.id)} />
             </div>
           ))
         )}
