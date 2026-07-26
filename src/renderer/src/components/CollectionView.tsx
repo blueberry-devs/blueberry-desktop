@@ -7,16 +7,14 @@ import { useDownloads } from '../store/downloads'
 import { isAuthenticated, getAuth } from '../store/auth'
 import { fetchCloudPlaylists, fetchCloudPlaylistDetail, type CloudPlaylistSummary } from '../services/playlists'
 import { setCloudPlaylists, useCloudPlaylists } from '../store/cloudPlaylists'
-import type { TrackSource } from '../api/yandexMusic'
+import type { TrackSource, PlaylistResult } from '../api/yandexMusic'
 import type { Playlist } from '../store/playlists'
 import TrackRow from './TrackRow'
 import ServiceBadge from './ServiceBadge'
-import { requestArtistSearch } from '../store/searchQuery'
 import CreatePlaylistCard from './CreatePlaylistCard'
 import PlaylistDetailView from './PlaylistDetailView'
 import RemotePlaylistDetailView from './RemotePlaylistDetailView'
-import { usePlayer } from '../player/PlayerContext'
-import { PlaylistResult } from '../api/yandexMusic'
+import { requestArtistSearch } from '../store/searchQuery'
 import { useArtistCovers } from '../hooks/useArtistCovers'
 import './CollectionView.css'
 
@@ -28,10 +26,10 @@ function CollectionView(): JSX.Element {
   const downloadedTracks = useMemo(() => Object.values(downloads), [downloads])
   const favoritePlaylists = useFavoritePlaylists()
   const cloudPlaylists = useCloudPlaylists()
-  const { playQueue } = usePlayer()
   const [openPlaylistId, setOpenPlaylistId] = useState<string | null>(null)
   const [openRemotePlaylist, setOpenRemotePlaylist] = useState<PlaylistResult | null>(null)
   const [openCloudPlaylist, setOpenCloudPlaylist] = useState<Playlist | null>(null)
+  const [showLiked, setShowLiked] = useState(false)
   const [cloudLoading, setCloudLoading] = useState<string | null>(null)
 
   // Refresh cloud playlists display on mount (sync happens during auth)
@@ -97,6 +95,16 @@ function CollectionView(): JSX.Element {
   const right = indexed.filter((_, i) => i % 2 === 1)
 
   const openPlaylist = playlists.find((p) => p.id === openPlaylistId)
+  if (showLiked) {
+    const likedPlaylist: Playlist = {
+      id: '__liked__',
+      name: 'Мне нравится',
+      cover: null,
+      tracks: liked,
+      createdAt: Date.now(),
+    }
+    return <PlaylistDetailView playlist={likedPlaylist} onBack={() => setShowLiked(false)} />
+  }
   if (openPlaylist) {
     return <PlaylistDetailView playlist={openPlaylist} onBack={() => setOpenPlaylistId(null)} />
   }
@@ -120,7 +128,7 @@ function CollectionView(): JSX.Element {
         У вашей музыки есть <span className="collection-view__accent">цвет</span>
       </p>
 
-      <div className="collection-view__hero-card hero-card--animated" onClick={() => liked.length > 0 && playQueue(liked, 0)}>
+      <div className="collection-view__hero-card hero-card--animated" onClick={() => liked.length > 0 && setShowLiked(true)}>
         <div className="collection-view__hero-icon">
           <svg width="26" height="26" viewBox="0 0 18 18" fill="none">
             <path

@@ -60,14 +60,18 @@ function PlaylistDetailView({ playlist, onBack, readonly = false }: Props): JSX.
 
       <div className="playlist-detail__header">
         <div className="playlist-detail__cover" style={playlist.cover ? { backgroundImage: `url(${playlist.cover})` } : undefined}>
-          {!playlist.cover && (
+          {!playlist.cover && playlist.id === '__liked__' ? (
+            <svg width="40" height="40" viewBox="0 0 18 18" fill="none">
+              <path d="M9 15.5S2 11.2 2 6.8C2 4.4 3.9 2.8 6 2.8c1.4 0 2.6.7 3 1.8.4-1.1 1.6-1.8 3-1.8 2.1 0 4 1.6 4 4 0 4.4-7 8.7-7 8.7Z" fill="#ff4d6d" />
+            </svg>
+          ) : !playlist.cover && (
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
               <path d="M20 6 L23 15 L32 12 L26 20 L34 24 L23 26 L26 34 L18 27 L11 34 L13 25 L4 22 L13 18 L11 10 Z" fill="#ffdb4d" />
             </svg>
           )}
         </div>
         <div className="playlist-detail__meta">
-          <div className="playlist-detail__label">Плейлист</div>
+          <div className="playlist-detail__label">{playlist.id === '__liked__' ? 'Мне нравится' : 'Плейлист'}</div>
           <h1 className="playlist-detail__title">{playlist.name}</h1>
           <div className="playlist-detail__sub">{playlist.tracks.length} треков</div>
           <div className="playlist-detail__actions">
