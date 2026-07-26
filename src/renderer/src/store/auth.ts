@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { login as apiLogin, register as apiRegister, refresh as apiRefresh, getMe, type AuthUser } from '../services/auth'
+import { syncPlaylists } from '../services/playlists'
+import { getPlaylists } from './playlists'
 
 const STORAGE_KEY = 'ym-clone:auth'
 
@@ -73,6 +75,8 @@ export async function login(
       refreshToken: result.refreshToken,
       user: result.user,
     })
+    // Sync local playlists to cloud in background
+    syncPlaylists(result.accessToken, getPlaylists())
     return null
   }
   return result.error ?? 'Login failed'
@@ -98,6 +102,8 @@ export async function register(
         refreshToken: result.refreshToken,
         user: result.user,
       })
+      // Sync local playlists to cloud in background
+      syncPlaylists(result.accessToken, getPlaylists())
     }
     return { error: null, emailConfirmationRequired: false }
   }
