@@ -17,6 +17,11 @@ export function setCloudPlaylists(playlists: CloudPlaylistSummary[]): void {
   emit()
 }
 
+export function removeCloudPlaylist(id: string): void {
+  cache = cache.filter((p) => p.id !== id)
+  emit()
+}
+
 export function useCloudPlaylists(): CloudPlaylistSummary[] {
   return useSyncExternalStore(
     (cb) => {

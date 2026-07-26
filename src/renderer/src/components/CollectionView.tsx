@@ -5,8 +5,8 @@ import { usePlaylists } from '../store/playlists'
 import { useFavoritePlaylists } from '../store/favoritePlaylists'
 import { useDownloads } from '../store/downloads'
 import { isAuthenticated, getAuth } from '../store/auth'
-import { fetchCloudPlaylists, fetchCloudPlaylistDetail, type CloudPlaylistSummary } from '../services/playlists'
-import { setCloudPlaylists, useCloudPlaylists } from '../store/cloudPlaylists'
+import { fetchCloudPlaylists, fetchCloudPlaylistDetail, deleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
+import { setCloudPlaylists, removeCloudPlaylist, useCloudPlaylists } from '../store/cloudPlaylists'
 import type { TrackSource, PlaylistResult } from '../api/yandexMusic'
 import type { Playlist } from '../store/playlists'
 import TrackRow from './TrackRow'
@@ -29,6 +29,7 @@ function CollectionView(): JSX.Element {
   const [openPlaylistId, setOpenPlaylistId] = useState<string | null>(null)
   const [openRemotePlaylist, setOpenRemotePlaylist] = useState<PlaylistResult | null>(null)
   const [openCloudPlaylist, setOpenCloudPlaylist] = useState<Playlist | null>(null)
+  const [openCloudPlaylistServerId, setOpenCloudPlaylistServerId] = useState<string | null>(null)
   const [showLiked, setShowLiked] = useState(false)
   const [cloudLoading, setCloudLoading] = useState<string | null>(null)
 
@@ -67,6 +68,7 @@ function CollectionView(): JSX.Element {
       createdAt: new Date(detail.createdAt).getTime(),
     }
     setOpenCloudPlaylist(syntheticPlaylist)
+    setOpenCloudPlaylistServerId(detail.id)
   }
 
   const artistTracks = useMemo(() => {
@@ -115,8 +117,15 @@ function CollectionView(): JSX.Element {
     return (
       <PlaylistDetailView
         playlist={openCloudPlaylist}
-        onBack={() => setOpenCloudPlaylist(null)}
-        readonly
+        onBack={() => { setOpenCloudPlaylist(null); setOpenCloudPlaylistServerId(null) }}
+        onDelete={async () => {
+          const token = getAuth().accessToken
+          if (!token || !openCloudPlaylistServerId) return
+          await deleteCloudPlaylist(token, openCloudPlaylistServerId)
+          removeCloudPlaylist(openCloudPlaylistServerId)
+          setOpenCloudPlaylist(null)
+          setOpenCloudPlaylistServerId(null)
+        }}
       />
     )
   }
@@ -168,42 +177,29 @@ function CollectionView(): JSX.Element {
               <div className="collection-view__playlist-count">{p.tracks.length} треков</div>
             </button>
           ))}
-        </div>
-      </section>
-
-      {cloudPlaylists.length > 0 && (
-        <section className="collection-view__section">
-          <h2 className="collection-view__artists-title">Облачные плейлисты</h2>
-          <div className="collection-view__playlist-grid">
-            {cloudPlaylists.map((pl) => (
-              <button
-                key={pl.id}
-                className="collection-view__playlist-card"
-                onClick={() => handleOpenCloudPlaylist(pl)}
-                disabled={cloudLoading === pl.id}
+          {cloudPlaylists.map((pl) => (
+            <button
+              key={`cloud_${pl.id}`}
+              className="collection-view__playlist-card"
+              onClick={() => handleOpenCloudPlaylist(pl)}
+              disabled={cloudLoading === pl.id}
+            >
+              <div
+                className="collection-view__playlist-cover"
+                style={pl.imageUrl ? { backgroundImage: `url(${pl.imageUrl})` } : undefined}
               >
-                <div
-                  className="collection-view__playlist-cover"
-                  style={pl.imageUrl ? { backgroundImage: `url(${pl.imageUrl})` } : undefined}
-                >
-                  {!pl.imageUrl && (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                      <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="currentColor" opacity="0.6"/>
-                    </svg>
-                  )}
-                </div>
-                <div className="collection-view__playlist-name">{pl.title}</div>
-                <div className="collection-view__playlist-count">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ marginRight: 4, verticalAlign: -1 }}>
-                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="currentColor" opacity="0.4"/>
+                {!pl.imageUrl && (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="currentColor" opacity="0.6"/>
                   </svg>
-                  {pl.trackCount} треков
-                </div>
-              </button>
-            ))}
+                )}
+              </div>
+              <div className="collection-view__playlist-name">{pl.title}</div>
+              <div className="collection-view__playlist-count">{pl.trackCount} треков</div>
+            </button>
+          ))}
           </div>
         </section>
-      )}
 
       {favoritePlaylists.length > 0 && (
         <section className="collection-view__section">

@@ -434,6 +434,25 @@ export async function removeTrackFromCloudPlaylist(
   }
 }
 
+/**
+ * Delete a cloud playlist entirely.
+ * Returns true if the server accepted the deletion.
+ */
+export async function deleteCloudPlaylist(
+  accessToken: string,
+  playlistId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 /* ========== Orchestration ========== */
 
 /**

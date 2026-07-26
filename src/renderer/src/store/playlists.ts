@@ -3,7 +3,7 @@ import { TrackResult } from '../api/yandexMusic'
 import { markUnsynced } from './playlistSync'
 import { getAuth } from './auth'
 import { setPlaylistVersion } from './playlistVersions'
-import { addTrackToCloudPlaylist as apiAddTrackToCloudPlaylist, removeTrackFromCloudPlaylist as apiRemoveTrackFromCloudPlaylist } from '../services/playlists'
+import { addTrackToCloudPlaylist as apiAddTrackToCloudPlaylist, removeTrackFromCloudPlaylist as apiRemoveTrackFromCloudPlaylist, deleteCloudPlaylist as apiDeleteCloudPlaylist } from '../services/playlists'
 
 const STORAGE_KEY = 'ym-clone:playlists'
 
@@ -66,9 +66,18 @@ export function createPlaylist(name: string, cover: string | null = null): Playl
 }
 
 export function deletePlaylist(id: string): void {
+  const pl = cache.find((p) => p.id === id)
   cache = cache.filter((p) => p.id !== id)
   markUnsynced()
   emit()
+
+  // Fire-and-forget: delete from cloud API if playlist is synced
+  if (pl?.cloudId) {
+    const auth = getAuth()
+    if (auth.accessToken) {
+      apiDeleteCloudPlaylist(auth.accessToken, pl.cloudId)
+    }
+  }
 }
 
 export function renamePlaylist(id: string, name: string): void {

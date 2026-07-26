@@ -9,17 +9,22 @@ import './PlaylistDetailView.css'
 interface Props {
   playlist: Playlist
   onBack: () => void
+  onDelete?: () => Promise<void> | void
   readonly?: boolean
 }
 
-function PlaylistDetailView({ playlist, onBack, readonly = false }: Props): JSX.Element {
+function PlaylistDetailView({ playlist, onBack, onDelete, readonly = false }: Props): JSX.Element {
   const { playQueue } = usePlayer()
   const { t } = useTranslation()
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const dragIndexRef = useRef<number | null>(null)
 
-  const handleDelete = (): void => {
-    deletePlaylist(playlist.id)
+  const handleDelete = async (): Promise<void> => {
+    if (onDelete) {
+      await onDelete()
+    } else {
+      deletePlaylist(playlist.id)
+    }
     onBack()
   }
 
@@ -83,7 +88,7 @@ function PlaylistDetailView({ playlist, onBack, readonly = false }: Props): JSX.
                 {t('common.listen')}
               </button>
             )}
-            {!readonly && (
+            {(!readonly || onDelete) && (
               <button className="playlist-detail__delete" onClick={handleDelete} title={t('playlist.deleteTitle')}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M2 4h12M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M6.5 7v5M9.5 7v5M3.5 4l.8 9.2a1 1 0 0 0 1 .8h5.4a1 1 0 0 0 1-.8l.8-9.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
