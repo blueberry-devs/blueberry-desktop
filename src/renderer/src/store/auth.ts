@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { login as apiLogin, register as apiRegister, refresh as apiRefresh, getMe, type AuthUser } from '../services/auth'
+import { startBackgroundSync, stopBackgroundSync } from './backgroundSync'
 
 const STORAGE_KEY = 'ym-clone:auth'
 
@@ -54,6 +55,7 @@ export function setAuth(state: AuthState): void {
   emit()
   if (state.accessToken) {
     startTokenRefresh()
+    startBackgroundSync()
   }
 }
 
@@ -237,16 +239,18 @@ function startTokenRefresh(): void {
   }, REFRESH_INTERVAL_MS)
 }
 
-// Patch clearAuth to stop refresh on logout
+// Patch clearAuth to stop refresh and background sync on logout
 const origClearAuth = clearAuth
 clearAuth = (): void => {
   stopTokenRefresh()
+  stopBackgroundSync()
   origClearAuth()
 }
 
 // Start refresh on init if already logged in
 if (cache.accessToken) {
   startTokenRefresh()
+  startBackgroundSync()
 }
 
 export function useAuth(): AuthState {

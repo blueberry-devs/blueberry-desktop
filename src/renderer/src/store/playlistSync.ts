@@ -1,6 +1,7 @@
 const STORAGE_KEY = 'ym-clone:playlists-synced'
 
 let cache: boolean = load()
+let unsyncedGen = 0
 const listeners = new Set<() => void>()
 
 function load(): boolean {
@@ -40,8 +41,18 @@ export function markSynced(): void {
 }
 
 export function markUnsynced(): void {
+  unsyncedGen++
   if (cache) {
     cache = false
     emit()
   }
+}
+
+/**
+ * Returns the current generation counter.
+ * Increments on every markUnsynced() call.
+ * Use to detect external mutations during a batch sync operation.
+ */
+export function getUnsyncedGeneration(): number {
+  return unsyncedGen
 }

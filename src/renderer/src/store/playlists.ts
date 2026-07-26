@@ -126,6 +126,22 @@ export function setPlaylistCloudId(id: string, cloudId: string): void {
   emit()
 }
 
+/**
+ * Add multiple tracks at once without marking unsynced.
+ * Skips duplicates. Used by background sync.
+ */
+export function addTracksSilently(id: string, tracks: TrackResult[]): void {
+  if (tracks.length === 0) return
+  cache = cache.map((p) => {
+    if (p.id !== id) return p
+    const existing = new Set(p.tracks.map((t) => t.id))
+    const newTracks = tracks.filter((t) => !existing.has(t.id))
+    if (newTracks.length === 0) return p
+    return { ...p, tracks: [...p.tracks, ...newTracks] }
+  })
+  emit()
+}
+
 export function usePlaylists(): Playlist[] {
   return useSyncExternalStore(subscribe, getPlaylists)
 }

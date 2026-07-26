@@ -5,7 +5,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 /* ========== Internal DTOs matching v1.yaml ========== */
 
-interface TrackUploadDto {
+export interface TrackUploadDto {
   externalId: string
   externalSource: string
   externalUrl: string
