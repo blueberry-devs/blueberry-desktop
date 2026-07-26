@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(8px);
   animation: overlay-fadein 0.15s ease-out;
 }
 
@@ -15,8 +15,8 @@
 }
 
 .modal-dialog {
-  background: #1e1e1e;
-  border: 1px solid #333;
+  background: rgba(30, 30, 30, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 24px 28px;
   min-width: 320px;

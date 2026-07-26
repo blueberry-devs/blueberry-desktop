@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { createPlaylist } from '../store/playlists'
 import { useTranslation } from '../utils/useTranslation'
 import './CreatePlaylistCard.css'
@@ -9,23 +9,60 @@ function readFileAsDataUrl(file: File, onDone: (url: string) => void): void {
   reader.readAsDataURL(file)
 }
 
+const ANIM_MS = 150
+
 function CreatePlaylistModal({ onClose }: { onClose: () => void }): JSX.Element {
   const { t } = useTranslation()
   const [name, setName] = useState('')
   const [cover, setCover] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [closing, setClosing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>()
+
+  const close = useCallback(() => {
+    if (closing) return
+    setClosing(true)
+    timer.current = setTimeout(() => {
+      onClose()
+    }, ANIM_MS)
+  }, [closing, onClose])
 
   const submit = (): void => {
     if (!name.trim()) return
     createPlaylist(name, cover)
-    onClose()
+    close()
   }
 
+  // Block scroll while modal is open
+  useEffect(() => {
+    const el = document.querySelector('.collection-view') || document.querySelector('.app__content')
+    if (el) (el as HTMLElement).style.overflow = 'hidden'
+    return () => {
+      if (el) (el as HTMLElement).style.overflow = ''
+    }
+  }, [])
+
+  // Prevent wheel/touch scroll on the overlay itself
+  useEffect(() => {
+    const preventScroll = (e: Event) => e.preventDefault()
+    // Need the latest overlay ref — just attach to document
+    document.addEventListener('wheel', preventScroll, { passive: false })
+    document.addEventListener('touchmove', preventScroll, { passive: false })
+    return () => {
+      document.removeEventListener('wheel', preventScroll)
+      document.removeEventListener('touchmove', preventScroll)
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => clearTimeout(timer.current)
+  }, [])
+
   return (
-    <div className="cp-modal" onClick={onClose}>
-      <div className="cp-modal__card view-enter" onClick={(e) => e.stopPropagation()}>
-        <button className="cp-modal__close" onClick={onClose} aria-label={t('playlist.closeLabel')}>
+    <div className={`cp-modal${closing ? ' cp-modal--closing' : ''}`} onClick={close}>
+      <div className="cp-modal__card" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={close} aria-label={t('playlist.closeLabel')}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
@@ -95,7 +132,7 @@ function CreatePlaylistModal({ onClose }: { onClose: () => void }): JSX.Element 
         </div>
 
         <div className="cp-modal__actions">
-          <button className="cp-modal__cancel" onClick={onClose}>
+          <button className="cp-modal__cancel" onClick={close}>
             {t('common.cancel')}
           </button>
           <button className="cp-modal__confirm" onClick={submit} disabled={!name.trim()}>

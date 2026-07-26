@@ -49,20 +49,30 @@
   animation: cpFadeIn 0.15s ease both;
 }
 
+.cp-modal--closing {
+  animation: cpFadeOut 0.15s ease both;
+  pointer-events: none;
+}
+
 .cp-modal__card {
   position: relative;
   width: 420px;
   max-width: calc(100vw - 48px);
   padding: 28px;
   border-radius: 18px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: rgba(30, 30, 30, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
 }
 
 @keyframes cpFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes cpFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 .cp-modal__close {

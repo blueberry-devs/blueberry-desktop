@@ -50,6 +50,16 @@ function Modal({ open, title, message, confirmLabel, cancelLabel, onConfirm, onC
     [closing],
   )
 
+  // Block body scroll when modal is visible
+  useEffect(() => {
+    if (visible) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [visible])
+
   useEffect(() => {
     if (!visible) return
     const handler = (e: KeyboardEvent) => {
