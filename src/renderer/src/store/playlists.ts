@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import { TrackResult } from '../api/yandexMusic'
 import { markUnsynced } from './playlistSync'
+import { getAuth } from './auth'
+import { addTrackToCloudPlaylist as apiAddTrackToCloudPlaylist } from '../services/playlists'
 
 const STORAGE_KEY = 'ym-clone:playlists'
 
@@ -81,11 +83,20 @@ export function setPlaylistCover(id: string, cover: string | null): void {
 }
 
 export function addTrackToPlaylist(id: string, track: TrackResult): void {
+  const pl = cache.find((p) => p.id === id)
+  if (!pl || pl.tracks.some((t) => t.id === track.id)) return
+
   cache = cache.map((p) =>
-    p.id === id && !p.tracks.some((t) => t.id === track.id) ? { ...p, tracks: [...p.tracks, track] } : p
+    p.id === id ? { ...p, tracks: [...p.tracks, track] } : p
   )
   markUnsynced()
   emit()
+
+  // Fire-and-forget: push to cloud immediately if playlist has cloudId
+  const auth = getAuth()
+  if (pl.cloudId && auth.accessToken) {
+    apiAddTrackToCloudPlaylist(auth.accessToken, pl.cloudId, track)
+  }
 }
 
 export function removeTrackFromPlaylist(id: string, trackId: string): void {
