@@ -1,4 +1,4 @@
-import { getPlaylists, addTracksSilently, addPlaylistFromCloud, setPlaylistCloudId } from './playlists'
+import { getPlaylists, addTracksSilently, addPlaylistFromCloud, setPlaylistCloudId, hasPendingCloudRequest } from './playlists'
 import { getPlaylistVersion, setPlaylistVersion } from './playlistVersions'
 import { isSynced, markSynced, getUnsyncedGeneration } from './playlistSync'
 import { isAuthenticated, getAuth } from './auth'
@@ -100,6 +100,7 @@ async function runSync(): Promise<void> {
     // 3. Handle existing playlists — per-playlist diff+sync
     for (const pl of localPlaylists) {
       if (!pl.cloudId) continue
+      if (hasPendingCloudRequest(pl.cloudId)) continue // skip — user action in flight
 
       const cloudDetail = await fetchCloudPlaylistDetail(token, pl.cloudId)
       if (!cloudDetail) continue
