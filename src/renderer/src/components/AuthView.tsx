@@ -7,8 +7,8 @@ import { setCloudPlaylists } from '../store/cloudPlaylists'
 import {
   syncAfterLogin,
   fetchCloudPlaylists,
+  fetchCloudPlaylistDetail,
   type SyncChoice,
-  type CloudPlaylistSummary,
 } from '../services/playlists'
 import './AuthView.css'
 
@@ -102,8 +102,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
 
   // Sync-after-auth state
   const [syncState, setSyncState] = useState<'idle' | 'checking' | 'prompt' | 'syncing'>('idle')
-  const [syncMatchCount, setSyncMatchCount] = useState(0)
-  const cloudSummariesRef = useRef<CloudPlaylistSummary[]>([])
+  const [syncItemCount, setSyncItemCount] = useState(0)
 
   useEffect(() => {
     tryRestoreSession().then((restored) => {
@@ -160,17 +159,43 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
 
     setSyncState('checking')
     const summaries = await fetchCloudPlaylists(token)
-    cloudSummariesRef.current = summaries
 
     const localPls = getPlaylists()
-    const localNames = new Set(localPls.map((p) => p.name.toLowerCase().trim()))
-    const matches = summaries.filter((s) => localNames.has(s.title.toLowerCase().trim()))
+    const localByName = new Map(localPls.map((p) => [p.name.toLowerCase().trim(), p]))
+    const matched = summaries.filter((s) => localByName.has(s.title.toLowerCase().trim()))
 
-    if (matches.length > 0) {
-      setSyncMatchCount(matches.length)
+    // Fetch details for matched playlists to compare content
+    let realDiffCount = 0
+    for (const s of matched) {
+      const detail = await fetchCloudPlaylistDetail(token, s.id)
+      if (!detail) continue
+      const local = localByName.get(s.title.toLowerCase().trim())
+      if (!local) continue
+
+      // Check if cloud has tracks local doesn't have, or vice versa
+      const localIds = new Set(local.tracks.map((t) => t.id))
+      const cloudIds = new Set(detail.tracks.map((t) => t.externalId))
+      const missingFromLocal = detail.tracks.some((t) => !localIds.has(t.externalId))
+      const missingFromCloud = local.tracks.some((t) => !cloudIds.has(t.id))
+
+      if (missingFromLocal || missingFromCloud) {
+        realDiffCount++
+      }
+    }
+
+    // Also count new cloud-only playlists (no local match at all)
+    const localCloudIds = new Set(localPls.filter((p) => p.cloudId).map((p) => p.cloudId))
+    const newCloudCount = summaries.filter((s) => {
+      if (localCloudIds.has(s.id)) return false
+      if (localPls.some((p) => p.id === `cloud_${s.id}`)) return false
+      return !localByName.has(s.title.toLowerCase().trim())
+    }).length
+
+    if (realDiffCount > 0 || newCloudCount > 0) {
+      setSyncItemCount(realDiffCount + newCloudCount)
       setSyncState('prompt')
     } else {
-      // No title conflicts — auto-merge
+      // Nothing real to merge — silent sync and close
       await executeSync('merge')
     }
   }, [executeSync])
@@ -302,14 +327,14 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
         ) : syncState === 'prompt' ? (
           <>
             <div className="auth-card__header">
-              <h1 className="auth-card__title">Найдены совпадения</h1>
+              <h1 className="auth-card__title">Обнаружены различия</h1>
               <p className="auth-card__subtitle">
-                У вас есть локальные плейлисты, названия которых совпадают с облачными ({syncMatchCount} шт.)
+                Обнаружены новые треки и плейлисты на сервере ({syncItemCount} шт.)
               </p>
             </div>
             <div className="auth-sync-prompt">
               <p className="auth-sync-prompt__text">
-                Хотите объединить их с облачными или загрузить как новые?
+                Объединить плейлисты или загрузить локальные как новые?
               </p>
               <div className="auth-sync-prompt__actions">
                 <button
