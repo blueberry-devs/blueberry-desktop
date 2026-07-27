@@ -31,7 +31,11 @@ function TrashView({ onBack }: Props): JSX.Element {
     }
   }, [loadDeleted, hasShown])
 
-  const hasItems = deletedLocal.length > 0 || apiDeletedCloudPls.length > 0
+  // Filter out API items that already have a matching local trash entry (same cloudId)
+  const localCloudIds = new Set(deletedLocal.map((d) => d.playlist.cloudId).filter(Boolean))
+  const dedupedApiDeleted = apiDeletedCloudPls.filter((pl) => !localCloudIds.has(pl.id))
+
+  const hasItems = deletedLocal.length > 0 || dedupedApiDeleted.length > 0
 
   return (
     <div className="trash-view view-enter">
@@ -51,7 +55,7 @@ function TrashView({ onBack }: Props): JSX.Element {
         <div className="trash-view__meta">
           <h1 className="trash-view__title">Корзина</h1>
           <div className="trash-view__sub">
-            {deletedLocal.length + apiDeletedCloudPls.length} плейлистов
+            {deletedLocal.length + dedupedApiDeleted.length} плейлистов
           </div>
         </div>
       </div>
@@ -103,7 +107,7 @@ function TrashView({ onBack }: Props): JSX.Element {
           </div>
         ))}
 
-        {apiDeletedCloudPls.map((pl) => (
+        {dedupedApiDeleted.map((pl) => (
           <div key={pl.id} className="trash-view__item">
             <div className="trash-view__cover" style={pl.imageUrl ? { backgroundImage: `url(${pl.imageUrl})` } : undefined}>
               {!pl.imageUrl && (
