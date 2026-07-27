@@ -50,9 +50,6 @@ function TrashView({ onBack }: Props): JSX.Element {
           <h1 className="trash-view__title">Корзина</h1>
           <div className="trash-view__sub">
             {deletedLocal.length + apiDeletedCloudPls.length} плейлистов
-            {apiDeletedCloudPls.length > 0 && deletedLocal.length > 0 && ' · '}
-            {deletedLocal.length > 0 && `${deletedLocal.length} локальных`}
-            {apiDeletedCloudPls.length > 0 && `${deletedLocal.length > 0 ? ', ' : ''}${apiDeletedCloudPls.length} облачных`}
           </div>
         </div>
       </div>
