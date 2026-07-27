@@ -4,6 +4,7 @@ import { restorePlaylist, forceDeletePlaylist } from '../store/playlists'
 import { useDeletedPlaylists } from '../store/deletedPlaylists'
 import { fetchDeletedCloudPlaylists, fetchCloudPlaylists, restoreCloudPlaylist as apiRestoreCloudPlaylist, forceDeleteCloudPlaylist as apiForceDeleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
 import { setCloudPlaylists } from '../store/cloudPlaylists'
+import Modal from './Modal'
 import './TrashView.css'
 
 interface Props {
@@ -14,6 +15,7 @@ function TrashView({ onBack }: Props): JSX.Element {
   const deletedLocal = useDeletedPlaylists()
   const [apiDeletedCloudPls, setApiDeletedCloudPls] = useState<CloudPlaylistSummary[]>([])
   const [hasShown, setHasShown] = useState(false)
+  const [forceConfirm, setForceConfirm] = useState<{ name: string; id: string; type: 'local' | 'cloud' } | null>(null)
 
   const loadDeleted = useCallback(async () => {
     if (!isAuthenticated()) return
@@ -89,7 +91,7 @@ function TrashView({ onBack }: Props): JSX.Element {
               </button>
               <button
                 className="trash-view__force"
-                onClick={() => forceDeletePlaylist(d.playlist.id)}
+                onClick={() => setForceConfirm({ name: d.playlist.name, id: d.playlist.id, type: 'local' })}
                 title="Удалить навсегда"
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -137,12 +139,7 @@ function TrashView({ onBack }: Props): JSX.Element {
               </button>
               <button
                 className="trash-view__force"
-                onClick={async () => {
-                  const token = getAuth().accessToken
-                  if (!token) return
-                  await apiForceDeleteCloudPlaylist(token, pl.id)
-                  setApiDeletedCloudPls((prev) => prev.filter((p) => p.id !== pl.id))
-                }}
+                onClick={() => setForceConfirm({ name: pl.title, id: pl.id, type: 'cloud' })}
                 title="Удалить навсегда"
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -154,6 +151,30 @@ function TrashView({ onBack }: Props): JSX.Element {
           </div>
         ))}
       </div>
+
+      {forceConfirm && (
+        <Modal
+          open
+          title="Удалить навсегда"
+          message={`Плейлист «${forceConfirm.name}» будет удалён без возможности восстановления.`}
+          confirmLabel="Удалить"
+          cancelLabel="Отмена"
+          onConfirm={() => {
+            if (forceConfirm.type === 'local') {
+              forceDeletePlaylist(forceConfirm.id)
+            } else {
+              const token = getAuth().accessToken
+              if (token) {
+                apiForceDeleteCloudPlaylist(token, forceConfirm.id).then(() => {
+                  setApiDeletedCloudPls((prev) => prev.filter((p) => p.id !== forceConfirm.id))
+                })
+              }
+            }
+            setForceConfirm(null)
+          }}
+          onCancel={() => setForceConfirm(null)}
+        />
+      )}
     </div>
   )
 }

@@ -128,7 +128,7 @@ function PlaylistDetailView({ playlist, onBack, onDelete, readonly = false }: Pr
       <Modal
         open={showDeleteConfirm}
         title={playlist.id === '__liked__' ? 'Мне нравится' : 'Удалить плейлист'}
-        message={playlist.id === '__liked__' ? 'Удалить все треки из «Мне нравится»?' : `Удалить плейлист «${playlist.name}»?`}
+        message={playlist.id === '__liked__' ? 'Удалить все треки из «Мне нравится»?' : `Переместить плейлист «${playlist.name}» в корзину?`}
         confirmLabel="Удалить"
         cancelLabel="Отмена"
         onConfirm={handleDeleteConfirmed}
