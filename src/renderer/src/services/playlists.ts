@@ -292,17 +292,33 @@ export async function fetchCloudPlaylists(
 
 /**
  * Fetch a single playlist full detail (with tracks + version).
+ * Supports If-None-Match conditional requests using playlist version ETag.
  */
+const _detailEtags = new Map<string, string>()
+const _detailCache = new Map<string, CloudPlaylistDetail>()
+
 export async function fetchCloudPlaylistDetail(
   accessToken: string,
   playlistId: string,
 ): Promise<CloudPlaylistDetail | null> {
   try {
-    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+    const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` }
+    const etag = _detailEtags.get(playlistId)
+    if (etag) {
+      headers['If-None-Match'] = etag
+    }
+    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}`, { headers })
+    if (res.status === 304) {
+      return _detailCache.get(playlistId) ?? null
+    }
     if (!res.ok) return null
-    return (await res.json()) as CloudPlaylistDetail
+
+    const newEtag = res.headers.get('ETag')
+    if (newEtag) _detailEtags.set(playlistId, newEtag)
+
+    const detail = (await res.json()) as CloudPlaylistDetail
+    _detailCache.set(playlistId, detail)
+    return detail
   } catch {
     return null
   }
@@ -310,6 +326,7 @@ export async function fetchCloudPlaylistDetail(
 
 /**
  * Get diff (server changes) since a given version.
+ * Handles 304 (no changes) by returning null (caller treats null as "no diff").
  */
 export async function diffPlaylist(
   accessToken: string,
@@ -317,10 +334,16 @@ export async function diffPlaylist(
   sinceVersion: number,
 ): Promise<PlaylistDiffResponse | null> {
   try {
+    const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` }
+    const etag = _detailEtags.get(playlistId)
+    if (etag) {
+      headers['If-None-Match'] = etag
+    }
     const res = await fetch(
       `${BASE_URL}/api/playlists/${playlistId}/diff?sinceVersion=${sinceVersion}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      { headers },
     )
+    if (res.status === 304) return null
     if (!res.ok) return null
     return (await res.json()) as PlaylistDiffResponse
   } catch {
@@ -455,20 +478,38 @@ export async function deleteCloudPlaylist(
 
 /**
  * Fetch list of soft-deleted cloud playlists (trash).
+ * Supports If-None-Match conditional requests using LibraryVersion ETag.
  */
+let _deletedEtag: string | null = null
+let _deletedCache: CloudPlaylistSummary[] = []
+
 export async function fetchDeletedCloudPlaylists(
   accessToken: string,
 ): Promise<CloudPlaylistSummary[]> {
   try {
-    const res = await fetch(`${BASE_URL}/api/playlists/deleted`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+    const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` }
+    if (_deletedEtag) {
+      headers['If-None-Match'] = _deletedEtag
+    }
+    const res = await fetch(`${BASE_URL}/api/playlists/deleted`, { headers })
+    if (res.status === 304) {
+      // Not modified — return cached data
+      return _deletedCache
+    }
     if (!res.ok) return []
+
+    // Update ETag from response
+    const etag = res.headers.get('ETag')
+    if (etag) _deletedEtag = etag
+
     const body = await res.json()
-    // API returns a paginated object { items: [...], totalCount, ... }
-    if (Array.isArray(body)) return body as CloudPlaylistSummary[]
-    if (body && Array.isArray(body.items)) return body.items as CloudPlaylistSummary[]
-    return []
+    let items: CloudPlaylistSummary[] = []
+    if (Array.isArray(body)) items = body as CloudPlaylistSummary[]
+    else if (body && Array.isArray(body.items)) items = body.items as CloudPlaylistSummary[]
+
+    // Cache for 304 handling
+    _deletedCache = items
+    return items
   } catch {
     return []
   }
@@ -508,6 +549,14 @@ export async function forceDeleteCloudPlaylist(
   } catch {
     return false
   }
+}
+
+/** Clear all conditional-request ETag caches (call on logout). */
+export function clearPlaylistCache(): void {
+  _deletedEtag = null
+  _deletedCache = []
+  _detailEtags.clear()
+  _detailCache.clear()
 }
 
 /* ========== Orchestration ========== */
