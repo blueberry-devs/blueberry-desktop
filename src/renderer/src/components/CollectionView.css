@@ -205,91 +205,39 @@
   text-align: center;
 }
 
-/* Корзина — trash section */
-.collection-view__trash-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.4);
-  cursor: default;
-}
-
-.collection-view__trash-list {
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-width: 600px;
-}
-
-.collection-view__trash-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  transition: background 0.12s ease;
-}
-
-.collection-view__trash-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.collection-view__trash-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.collection-view__trash-name {
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.collection-view__trash-count {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.collection-view__trash-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.collection-view__trash-restore,
-.collection-view__trash-force {
+/* Кнопка корзины рядом с заголовком плейлистов */
+.collection-view__trash-link {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 8px;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.3);
+  background: transparent;
   cursor: pointer;
+  position: relative;
   transition: background 0.12s ease, color 0.12s ease;
 }
 
-.collection-view__trash-restore {
-  color: rgba(255, 255, 255, 0.7);
+.collection-view__trash-link:hover {
+  color: rgba(255, 255, 255, 0.6);
   background: rgba(255, 255, 255, 0.06);
 }
 
-.collection-view__trash-restore:hover {
+.collection-view__trash-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: #ff4d6d;
   color: #fff;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.collection-view__trash-force {
-  color: rgba(255, 77, 109, 0.7);
-  background: rgba(255, 77, 109, 0.08);
-}
-
-.collection-view__trash-force:hover {
-  color: #ff4d6d;
-  background: rgba(255, 77, 109, 0.15);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
 }
