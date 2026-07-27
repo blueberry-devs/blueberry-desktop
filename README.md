@@ -20,8 +20,6 @@
 
 Search and play tracks from **SoundCloud**, **YouTube**, **Spotify**, and **Yandex Music**, with synced lyrics, a reactive shader background, and an infinite "wave" queue generator — no account or authentication required.
 
-> **Disclaimer:** Blueberry Desktop is an independent, unofficial, community-built project. It is **not affiliated with, endorsed by, sponsored by, or in any way officially connected to** Yandex LLC, Yandex Music, or any of their subsidiaries or affiliates. Any resemblance in name or UI concept to Yandex Music is coincidental/inspirational only — no Yandex trademarks, branding, logos, or proprietary assets are used, and no Yandex source code is included. "Yandex" and "Яндекс Музыка" are trademarks of their respective owners. This project only talks to Yandex's public catalog API for optional chart/search data, exactly as any third-party client is free to do, and is licensed entirely separately from and independently of Yandex's own software.
-
 ## Preview
 
 <p align="center">
