@@ -3,8 +3,9 @@ import { TrackResult } from '../api/yandexMusic'
 import { markUnsynced } from './playlistSync'
 import { getAuth } from './auth'
 import { setPlaylistVersion } from './playlistVersions'
-import { addTrackToCloudPlaylist as apiAddTrackToCloudPlaylist, removeTrackFromCloudPlaylist as apiRemoveTrackFromCloudPlaylist, deleteCloudPlaylist as apiDeleteCloudPlaylist, createCloudPlaylist as apiCreateCloudPlaylist } from '../services/playlists'
-import { removeCloudPlaylist } from './cloudPlaylists'
+import { addTrackToCloudPlaylist as apiAddTrackToCloudPlaylist, removeTrackFromCloudPlaylist as apiRemoveTrackFromCloudPlaylist, deleteCloudPlaylist as apiDeleteCloudPlaylist, createCloudPlaylist as apiCreateCloudPlaylist, restoreCloudPlaylist as apiRestoreCloudPlaylist, forceDeleteCloudPlaylist as apiForceDeleteCloudPlaylist, fetchCloudPlaylists } from '../services/playlists'
+import { removeCloudPlaylist, setCloudPlaylists } from './cloudPlaylists'
+import { addDeletedPlaylist, removeDeletedPlaylist, getDeletedPlaylists } from './deletedPlaylists'
 
 const STORAGE_KEY = 'ym-clone:playlists'
 
@@ -103,16 +104,69 @@ export function createPlaylist(name: string, cover: string | null = null): Playl
 
 export function deletePlaylist(id: string): void {
   const pl = cache.find((p) => p.id === id)
+  if (!pl) return
+
+  // Move to trash instead of permanent removal
+  addDeletedPlaylist(pl)
   cache = cache.filter((p) => p.id !== id)
   markUnsynced()
   emit()
 
-  // Remove from cloud playlists display and delete from API if synced
-  if (pl?.cloudId) {
+  // Soft delete on API if synced (moves to server-side trash)
+  if (pl.cloudId) {
     removeCloudPlaylist(pl.cloudId)
     const auth = getAuth()
     if (auth.accessToken) {
       cloudRequest(pl.cloudId, () => apiDeleteCloudPlaylist(auth.accessToken, pl.cloudId!))
+    }
+  }
+}
+
+/**
+ * Restore a playlist from trash back to active playlists.
+ */
+export function restorePlaylist(id: string): void {
+  const cacheDeleted = getDeletedPlaylists().find((d) => d.playlist.id === id)
+  if (!cacheDeleted) {
+    console.warn('[playlists] restorePlaylist: not found in trash', id)
+    return
+  }
+
+  removeDeletedPlaylist(id)
+  cache = [cacheDeleted.playlist, ...cache]
+  markUnsynced()
+  emit()
+
+  // Restore on server if it had a cloudId
+  const cloudId = cacheDeleted.playlist.cloudId
+  if (cloudId) {
+    const auth = getAuth()
+    if (auth.accessToken) {
+      cloudRequest(cloudId, async () => {
+        await apiRestoreCloudPlaylist(auth.accessToken, cloudId)
+        // Re-fetch cloud playlists to re-add to display
+        const cloudPls = await fetchCloudPlaylists(auth.accessToken)
+        setCloudPlaylists(cloudPls)
+      })
+    }
+  }
+}
+
+/**
+ * Permanently delete a playlist from trash (force delete).
+ * Calls force delete on API if synced.
+ */
+export function forceDeletePlaylist(id: string): void {
+  const deleted = getDeletedPlaylists().find((d) => d.playlist.id === id)
+
+  removeDeletedPlaylist(id)
+
+  // Force delete on API if synced (permanent, bypasses trash)
+  if (deleted?.playlist.cloudId) {
+    const cloudId = deleted.playlist.cloudId
+    const auth = getAuth()
+    if (auth.accessToken) {
+      cloudRequest(cloudId, () => apiForceDeleteCloudPlaylist(auth.accessToken, cloudId))
     }
   }
 }

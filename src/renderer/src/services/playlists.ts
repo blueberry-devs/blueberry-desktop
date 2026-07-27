@@ -453,6 +453,59 @@ export async function deleteCloudPlaylist(
   }
 }
 
+/**
+ * Fetch list of soft-deleted cloud playlists (trash).
+ */
+export async function fetchDeletedCloudPlaylists(
+  accessToken: string,
+): Promise<CloudPlaylistSummary[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/playlists/deleted`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return []
+    return (await res.json()) as CloudPlaylistSummary[]
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Restore a soft-deleted cloud playlist from trash.
+ */
+export async function restoreCloudPlaylist(
+  accessToken: string,
+  playlistId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}/restore`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Permanently delete a cloud playlist (force delete, bypasses trash).
+ */
+export async function forceDeleteCloudPlaylist(
+  accessToken: string,
+  playlistId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}/force`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 /* ========== Orchestration ========== */
 
 /**

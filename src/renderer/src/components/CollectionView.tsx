@@ -1,12 +1,13 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useTranslation } from '../utils/useTranslation'
 import { useLikedTracks } from '../store/likes'
-import { usePlaylists } from '../store/playlists'
+import { usePlaylists, restorePlaylist, forceDeletePlaylist } from '../store/playlists'
 import { useFavoritePlaylists } from '../store/favoritePlaylists'
 import { useDownloads } from '../store/downloads'
 import { isAuthenticated, getAuth } from '../store/auth'
-import { fetchCloudPlaylists, fetchCloudPlaylistDetail, deleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
+import { fetchCloudPlaylists, fetchCloudPlaylistDetail, deleteCloudPlaylist, fetchDeletedCloudPlaylists, restoreCloudPlaylist as apiRestoreCloudPlaylist, forceDeleteCloudPlaylist as apiForceDeleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
 import { setCloudPlaylists, removeCloudPlaylist, useCloudPlaylists } from '../store/cloudPlaylists'
+import { useDeletedPlaylists } from '../store/deletedPlaylists'
 import type { TrackSource, PlaylistResult } from '../api/yandexMusic'
 import type { Playlist } from '../store/playlists'
 import TrackRow from './TrackRow'
@@ -39,14 +40,27 @@ function CollectionView(): JSX.Element {
   const [openCloudPlaylistServerId, setOpenCloudPlaylistServerId] = useState<string | null>(null)
   const [showLiked, setShowLiked] = useState(false)
   const [cloudLoading, setCloudLoading] = useState<string | null>(null)
+  const [apiDeletedCloudPls, setApiDeletedCloudPls] = useState<CloudPlaylistSummary[]>([])
+  const deletedLocal = useDeletedPlaylists()
+
+  const reloadDeletedCloud = useCallback(async () => {
+    if (!isAuthenticated()) return
+    const token = getAuth().accessToken!
+    const deleted = await fetchDeletedCloudPlaylists(token)
+    setApiDeletedCloudPls(deleted)
+  }, [])
 
   // Refresh cloud playlists display on mount (sync happens during auth)
   useEffect(() => {
     if (!isAuthenticated()) return
     const token = getAuth().accessToken!
     ;(async () => {
-      const cloud = await fetchCloudPlaylists(token)
+      const [cloud, deleted] = await Promise.all([
+        fetchCloudPlaylists(token),
+        fetchDeletedCloudPlaylists(token),
+      ])
       setCloudPlaylists(cloud)
+      setApiDeletedCloudPls(deleted)
     })()
   }, [])
 
@@ -126,13 +140,16 @@ function CollectionView(): JSX.Element {
         playlist={openCloudPlaylist}
         onBack={() => { setOpenCloudPlaylist(null); setOpenCloudPlaylistServerId(null) }}
         onDelete={async () => {
-          const token = getAuth().accessToken
-          if (!token || !openCloudPlaylistServerId) return
-          await deleteCloudPlaylist(token, openCloudPlaylistServerId)
-          removeCloudPlaylist(openCloudPlaylistServerId)
-          setOpenCloudPlaylist(null)
-          setOpenCloudPlaylistServerId(null)
-        }}
+      const token = getAuth().accessToken
+      if (!token || !openCloudPlaylistServerId) return
+      await deleteCloudPlaylist(token, openCloudPlaylistServerId)
+      removeCloudPlaylist(openCloudPlaylistServerId)
+      // Refresh trash
+      const deleted = await fetchDeletedCloudPlaylists(token)
+      setApiDeletedCloudPls(deleted)
+      setOpenCloudPlaylist(null)
+      setOpenCloudPlaylistServerId(null)
+    }}
       />
     )
   }
@@ -230,6 +247,97 @@ function CollectionView(): JSX.Element {
                   <span style={{ marginLeft: 4 }}>{pl.owner} · {pl.trackCount} треков</span>
                 </div>
               </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Корзина: deleted local playlists + deleted cloud playlists from API */}
+      {(deletedLocal.length > 0 || apiDeletedCloudPls.length > 0) && (
+        <section className="collection-view__section">
+          <h2 className="collection-view__artists-title collection-view__trash-title">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ marginRight: 6 }}>
+              <path d="M2 4h12M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M6.5 7v5M9.5 7v5M3.5 4l.8 9.2a1 1 0 0 0 1 .8h5.4a1 1 0 0 0 1-.8l.8-9.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>
+            </svg>
+            Корзина
+          </h2>
+          <div className="collection-view__trash-list">
+            {deletedLocal.map((d) => (
+              <div key={d.playlist.id} className="collection-view__trash-item">
+                <div className="collection-view__trash-info">
+                  <div className="collection-view__trash-name">{d.playlist.name}</div>
+                  <div className="collection-view__trash-count">{d.playlist.tracks.length} треков</div>
+                </div>
+                <div className="collection-view__trash-actions">
+                  <button
+                    className="collection-view__trash-restore"
+                    onClick={() => restorePlaylist(d.playlist.id)}
+                    title="Восстановить"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M2 8a6 6 0 0 1 10.47-4M14 8a6 6 0 0 1-10.47 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                      <path d="M12.5 1.5V5H9M3.5 14.5V11H7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Восстановить
+                  </button>
+                  <button
+                    className="collection-view__trash-force"
+                    onClick={() => forceDeletePlaylist(d.playlist.id)}
+                    title="Удалить навсегда"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M2 4h12M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M6.5 7v5M9.5 7v5M3.5 4l.8 9.2a1 1 0 0 0 1 .8h5.4a1 1 0 0 0 1-.8l.8-9.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Навсегда
+                  </button>
+                </div>
+              </div>
+            ))}
+            {apiDeletedCloudPls.map((pl) => (
+              <div key={pl.id} className="collection-view__trash-item">
+                <div className="collection-view__trash-info">
+                  <div className="collection-view__trash-name">{pl.title}</div>
+                  <div className="collection-view__trash-count">{pl.trackCount} треков</div>
+                </div>
+                <div className="collection-view__trash-actions">
+                  <button
+                    className="collection-view__trash-restore"
+                    onClick={async () => {
+                      const token = getAuth().accessToken
+                      if (!token) return
+                      const ok = await apiRestoreCloudPlaylist(token, pl.id)
+                      if (ok) {
+                        setApiDeletedCloudPls((prev) => prev.filter((p) => p.id !== pl.id))
+                        // Re-fetch cloud playlists to re-add to display
+                        const cloud = await fetchCloudPlaylists(token)
+                        setCloudPlaylists(cloud)
+                      }
+                    }}
+                    title="Восстановить"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M2 8a6 6 0 0 1 10.47-4M14 8a6 6 0 0 1-10.47 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                      <path d="M12.5 1.5V5H9M3.5 14.5V11H7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Восстановить
+                  </button>
+                  <button
+                    className="collection-view__trash-force"
+                    onClick={async () => {
+                      const token = getAuth().accessToken
+                      if (!token) return
+                      await apiForceDeleteCloudPlaylist(token, pl.id)
+                      setApiDeletedCloudPls((prev) => prev.filter((p) => p.id !== pl.id))
+                    }}
+                    title="Удалить навсегда"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M2 4h12M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M6.5 7v5M9.5 7v5M3.5 4l.8 9.2a1 1 0 0 0 1 .8h5.4a1 1 0 0 0 1-.8l.8-9.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Навсегда
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </section>
