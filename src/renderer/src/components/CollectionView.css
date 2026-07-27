@@ -239,3 +239,49 @@
   line-height: 14px;
   text-align: center;
 }
+
+/* ---- Playlist context menu ---- */
+
+.playlist-context-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 190px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(35, 35, 35, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px);
+  animation: cpFadeIn 0.1s ease both;
+}
+
+.playlist-context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  transition: background 0.1s ease;
+}
+
+.playlist-context-menu__item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.playlist-context-menu__item--danger {
+  color: #ff4d6d;
+}
+
+.playlist-context-menu__item--danger:hover {
+  background: rgba(255, 77, 109, 0.12);
+}
+
+.playlist-context-menu__sep {
+  height: 1px;
+  margin: 4px 8px;
+  background: rgba(255, 255, 255, 0.08);
+}

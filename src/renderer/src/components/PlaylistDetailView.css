@@ -88,6 +88,7 @@
   transform: none;
 }
 
+.playlist-detail__edit,
 .playlist-detail__delete,
 .playlist-detail__fav {
   display: inline-flex;

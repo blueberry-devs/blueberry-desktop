@@ -75,9 +75,11 @@ function AppInner(): JSX.Element {
 
   // Listen for openAuth() calls from anywhere (e.g. Settings account button)
   useEffect(() => {
-    const unsub = subscribeAuthDialog(() => {
-      setAuthClosing(false)
-      setShowAuth(true)
+    const unsub = subscribeAuthDialog((open) => {
+      if (open) {
+        setAuthClosing(false)
+        setShowAuth(true)
+      }
     })
     return unsub
   }, [])
@@ -160,7 +162,7 @@ function AppInner(): JSX.Element {
 
       <Suspense fallback={null}>
         <div className="app__glow-layer">
-          <PlasmaWave playing={isPlaying} getFrequencyBands={getFrequencyBands} currentTrackId={currentTrack?.id} colorPreset={profile.waveColorPreset} />
+          <PlasmaWave playing={isPlaying} getFrequencyBands={getFrequencyBands} currentTrackId={currentTrack?.id} colorPreset="random" />
         </div>
       </Suspense>
 

@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { createPlaylist } from '../store/playlists'
 import { useTranslation } from '../utils/useTranslation'
 import './CreatePlaylistCard.css'
@@ -56,10 +57,18 @@ function CreatePlaylistModal({ onClose }: { onClose: () => void }): JSX.Element 
   }, [])
 
   useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [close])
+
+  useEffect(() => {
     return () => clearTimeout(timer.current)
   }, [])
 
-  return (
+  return createPortal(
     <div className={`cp-modal${closing ? ' cp-modal--closing' : ''}`} onClick={close}>
       <div className="cp-modal__card" onClick={(e) => e.stopPropagation()}>
         <button className="cp-modal__close" onClick={close} aria-label={t('playlist.closeLabel')}>
@@ -140,7 +149,8 @@ function CreatePlaylistModal({ onClose }: { onClose: () => void }): JSX.Element 
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

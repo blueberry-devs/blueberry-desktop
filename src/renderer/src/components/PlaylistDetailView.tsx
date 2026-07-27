@@ -1,11 +1,173 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from '../utils/useTranslation'
 import { usePlayer } from '../player/PlayerContext'
-import { Playlist, moveTrackInPlaylist, deletePlaylist, removeTrackFromPlaylist } from '../store/playlists'
+import { Playlist, moveTrackInPlaylist, deletePlaylist, removeTrackFromPlaylist, renamePlaylist, setPlaylistCover } from '../store/playlists'
 import { requestArtistSearch } from '../store/searchQuery'
 import TrackRow from './TrackRow'
 import Modal from './Modal'
 import './PlaylistDetailView.css'
+
+function readFileAsDataUrl(file: File, onDone: (url: string) => void): void {
+  const reader = new FileReader()
+  reader.onload = () => onDone(reader.result as string)
+  reader.readAsDataURL(file)
+}
+
+const ANIM_MS = 150
+
+function EditPlaylistModal({ playlist, onClose }: { playlist: Playlist; onClose: () => void }): JSX.Element {
+  const { t } = useTranslation()
+  const [name, setName] = useState(playlist.name)
+  const [cover, setCover] = useState<string | null>(playlist.cover)
+  const [dragging, setDragging] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>()
+
+  const close = useCallback(() => {
+    if (closing) return
+    setClosing(true)
+    timer.current = setTimeout(onClose, ANIM_MS)
+  }, [closing, onClose])
+
+  const submit = (): void => {
+    if (!name.trim()) return
+    renamePlaylist(playlist.id, name)
+    if (cover !== playlist.cover) {
+      setPlaylistCover(playlist.id, cover)
+    }
+    close()
+  }
+
+  useEffect(() => {
+    const el = document.querySelector('.playlist-detail') || document.querySelector('.app__content')
+    if (el) (el as HTMLElement).style.overflow = 'hidden'
+    return () => {
+      if (el) (el as HTMLElement).style.overflow = ''
+    }
+  }, [])
+
+  useEffect(() => {
+    const preventScroll = (e: Event) => e.preventDefault()
+    document.addEventListener('wheel', preventScroll, { passive: false })
+    document.addEventListener('touchmove', preventScroll, { passive: false })
+    return () => {
+      document.removeEventListener('wheel', preventScroll)
+      document.removeEventListener('touchmove', preventScroll)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [close])
+
+  useEffect(() => {
+    return () => clearTimeout(timer.current)
+  }, [])
+
+  return createPortal(
+    <div className={`cp-modal${closing ? ' cp-modal--closing' : ''}`} onClick={close}>
+      <div className="cp-modal__card" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={close} aria-label={t('playlist.closeLabel')}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </button>
+
+        <h2 className="cp-modal__title">Редактировать плейлист</h2>
+
+        <div className="cp-modal__body">
+          <button
+            className={`cp-modal__cover${dragging ? ' cp-modal__cover--dragging' : ''}`}
+            onClick={() => fileRef.current?.click()}
+            style={cover ? { backgroundImage: `url(${cover})` } : undefined}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setDragging(true)
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setDragging(false)
+              const file = e.dataTransfer.files?.[0]
+              if (file) readFileAsDataUrl(file, setCover)
+            }}
+          >
+            {!cover && (
+              <span className="cp-modal__cover-placeholder">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="5" width="18" height="15" rx="2" stroke="currentColor" strokeWidth="1.4" />
+                  <circle cx="8.5" cy="10.5" r="1.6" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M21 16l-5.5-5.5a1.5 1.5 0 0 0-2.1 0L4 19" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+                <span>{t('playlist.chooseCover')}</span>
+              </span>
+            )}
+            {cover && (
+              <span className="cp-modal__cover-hover">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 7h3l1.5-2h7L17 7h3v12H4V7Z" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
+                  <circle cx="12" cy="13" r="3.5" stroke="#fff" strokeWidth="1.5" />
+                </svg>
+                {t('playlist.changeCover')}
+              </span>
+            )}
+          </button>
+          {cover && (
+            <button
+              className="cp-modal__cover-remove"
+              onClick={() => setCover(null)}
+              title="Удалить обложку"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+              Удалить обложку
+            </button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) readFileAsDataUrl(file, setCover)
+            }}
+          />
+
+          <div className="cp-modal__fields">
+            <label className="cp-modal__label">{t('playlist.nameLabel')}</label>
+            <input
+              className="cp-modal__input"
+              placeholder={t('playlist.namePlaceholder')}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submit()}
+              autoFocus
+              maxLength={60}
+            />
+          </div>
+        </div>
+
+        <div className="cp-modal__actions">
+          <button className="cp-modal__cancel" onClick={close}>
+            {t('common.cancel')}
+          </button>
+          <button className="cp-modal__confirm" onClick={submit} disabled={!name.trim()}>
+            Сохранить
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
 
 interface Props {
   playlist: Playlist
@@ -20,6 +182,7 @@ function PlaylistDetailView({ playlist, onBack, onDelete, readonly = false }: Pr
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const dragIndexRef = useRef<number | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
 
   const handleDeleteConfirmed = async (): Promise<void> => {
     setShowDeleteConfirm(false)
@@ -91,6 +254,13 @@ function PlaylistDetailView({ playlist, onBack, onDelete, readonly = false }: Pr
                 {t('common.listen')}
               </button>
             )}
+            {!readonly && (
+              <button className="playlist-detail__edit" onClick={() => setShowEdit(true)} title="Редактировать">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M11.5 1.5a2.1 2.1 0 0 1 3 3L5 14H2v-3l9.5-9.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
             {(!readonly || onDelete) && (
               <button className="playlist-detail__delete" onClick={() => setShowDeleteConfirm(true)} title={t('playlist.deleteTitle')}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -134,6 +304,8 @@ function PlaylistDetailView({ playlist, onBack, onDelete, readonly = false }: Pr
         onConfirm={handleDeleteConfirmed}
         onCancel={() => setShowDeleteConfirm(false)}
       />
+
+      {showEdit && <EditPlaylistModal playlist={playlist} onClose={() => setShowEdit(false)} />}
     </div>
   )
 }

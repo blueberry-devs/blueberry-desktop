@@ -1,7 +1,7 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from '../utils/useTranslation'
 import { useLikedTracks } from '../store/likes'
-import { usePlaylists } from '../store/playlists'
+import { usePlaylists, deletePlaylist, renamePlaylist, createPlaylist, addTrackToPlaylist } from '../store/playlists'
 import { useDeletedPlaylists } from '../store/deletedPlaylists'
 import { useFavoritePlaylists } from '../store/favoritePlaylists'
 import { useDownloads } from '../store/downloads'
@@ -18,6 +18,7 @@ import RemotePlaylistDetailView from './RemotePlaylistDetailView'
 import TrashView from './TrashView'
 import { requestArtistSearch } from '../store/searchQuery'
 import { useArtistCovers } from '../hooks/useArtistCovers'
+import Modal from './Modal'
 import './CollectionView.css'
 
 function CollectionView(): JSX.Element {
@@ -42,6 +43,48 @@ function CollectionView(): JSX.Element {
   const [showTrash, setShowTrash] = useState(false)
   const [cloudLoading, setCloudLoading] = useState<string | null>(null)
   const deletedLocal = useDeletedPlaylists()
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; playlist: Playlist } | null>(null)
+  const [renameTarget, setRenameTarget] = useState<Playlist | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [renameClosing, setRenameClosing] = useState(false)
+  const renameTimer = useRef<ReturnType<typeof setTimeout>>(void 0)
+  const renameInputRef = useRef<HTMLInputElement>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Playlist | null>(null)
+
+  const closeRename = useCallback(() => {
+    if (renameClosing) return
+    setRenameClosing(true)
+    renameTimer.current = setTimeout(() => {
+      setRenameTarget(null)
+      setRenameClosing(false)
+    }, 150)
+  }, [renameClosing])
+
+  const submitRename = useCallback(() => {
+    if (!renameValue.trim() || !renameTarget) return
+    renamePlaylist(renameTarget.id, renameValue)
+    closeRename()
+  }, [renameValue, renameTarget, closeRename])
+
+  useEffect(() => {
+    if (!renameTarget) return
+    const el = document.querySelector('.collection-view') || document.querySelector('.app__content')
+    if (el) (el as HTMLElement).style.overflow = 'hidden'
+    return () => {
+      if (el) (el as HTMLElement).style.overflow = ''
+    }
+  }, [renameTarget])
+
+  useEffect(() => {
+    if (!renameTarget) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeRename()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [renameTarget, closeRename])
 
   // Refresh cloud playlists display on mount
   useEffect(() => {
@@ -102,6 +145,32 @@ function CollectionView(): JSX.Element {
 
   const openPlaylist = playlists.find((p) => p.id === openPlaylistId)
 
+  const handleContextMenu = useCallback((e: React.MouseEvent, pl: Playlist) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY, playlist: pl })
+  }, [])
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), [])
+
+  useEffect(() => {
+    if (!contextMenu) return
+    const handler = () => closeContextMenu()
+    window.addEventListener('click', handler)
+    window.addEventListener('scroll', handler, true)
+    return () => {
+      window.removeEventListener('click', handler)
+      window.removeEventListener('scroll', handler, true)
+    }
+  }, [contextMenu, closeContextMenu])
+
+  useEffect(() => {
+    if (renameTarget) {
+      setRenameValue(renameTarget.name)
+      setTimeout(() => renameInputRef.current?.focus(), 50)
+    }
+  }, [renameTarget])
+
   if (showTrash) {
     return <TrashView onBack={() => setShowTrash(false)} />
   }
@@ -139,7 +208,7 @@ function CollectionView(): JSX.Element {
   }
 
   return (
-    <div className="collection-view view-enter">
+    <><div className="collection-view view-enter">
       <h1 className="collection-view__title">{t('collection.title')}</h1>
       <p className="collection-view__subtitle">
         {t('collection.subtitle')}<span className="collection-view__accent">{t('collection.subtitleAccent')}</span>
@@ -181,7 +250,12 @@ function CollectionView(): JSX.Element {
         <div className="collection-view__playlist-grid">
           <CreatePlaylistCard />
           {playlists.map((p) => (
-            <button key={p.id} className="collection-view__playlist-card" onClick={() => setOpenPlaylistId(p.id)}>
+            <button
+              key={p.id}
+              className="collection-view__playlist-card"
+              onClick={() => setOpenPlaylistId(p.id)}
+              onContextMenu={(e) => handleContextMenu(e, p)}
+            >
               <div
                 className="collection-view__playlist-cover"
                 style={p.cover ? { backgroundImage: `url(${p.cover})` } : undefined}
@@ -313,6 +387,111 @@ function CollectionView(): JSX.Element {
         </>
       )}
     </div>
+
+      {contextMenu && (
+        <div
+          className="playlist-context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="playlist-context-menu__item"
+            onClick={() => {
+              setRenameTarget(contextMenu.playlist)
+              closeContextMenu()
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M11.5 1.5a2.1 2.1 0 0 1 3 3L5 14H2v-3l9.5-9.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Переименовать
+          </button>
+          <button
+            className="playlist-context-menu__item"
+            onClick={() => {
+              const dup = createPlaylist(contextMenu.playlist.name + ' (копия)', contextMenu.playlist.cover)
+              for (const t of contextMenu.playlist.tracks) {
+                addTrackToPlaylist(dup.id, t)
+              }
+              closeContextMenu()
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M6 8h4M8 6v4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+            Дублировать
+          </button>
+          <div className="playlist-context-menu__sep" />
+          <button
+            className="playlist-context-menu__item playlist-context-menu__item--danger"
+            onClick={() => {
+              setDeleteTarget(contextMenu.playlist)
+              closeContextMenu()
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M2 4h12M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M6.5 7v5M9.5 7v5M3.5 4l.8 9.2a1 1 0 0 0 1 .8h5.4a1 1 0 0 0 1-.8l.8-9.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Удалить
+          </button>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <Modal
+          open
+          title="Удалить плейлист"
+          message={`Переместить плейлист «${deleteTarget.name}» в корзину?`}
+          confirmLabel="Удалить"
+          cancelLabel="Отмена"
+          onConfirm={() => {
+            deletePlaylist(deleteTarget.id)
+            setDeleteTarget(null)
+          }}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {renameTarget && (
+        <div className={`cp-modal${renameClosing ? ' cp-modal--closing' : ''}`} onClick={closeRename}>
+          <div className="cp-modal__card" onClick={(e) => e.stopPropagation()}>
+            <button className="cp-modal__close" onClick={closeRename}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+            <h2 className="cp-modal__title">Переименовать плейлист</h2>
+            <div className="cp-modal__body" style={{ flexDirection: 'column', gap: 12, marginTop: 20 }}>
+              <label className="cp-modal__label">Название</label>
+              <input
+                ref={renameInputRef}
+                className="cp-modal__input"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && renameValue.trim()) {
+                    submitRename()
+                  }
+                  if (e.key === 'Escape') closeRename()
+                }}
+                maxLength={60}
+              />
+            </div>
+            <div className="cp-modal__actions">
+              <button className="cp-modal__cancel" onClick={closeRename}>Отмена</button>
+              <button
+                className="cp-modal__confirm"
+                onClick={submitRename}
+                disabled={!renameValue.trim()}
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
