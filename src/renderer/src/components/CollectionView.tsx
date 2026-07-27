@@ -169,9 +169,10 @@ function CollectionView(): JSX.Element {
         <h2 className="collection-view__artists-title">
           {t('collection.playlists')}
           <button className="collection-view__trash-link" onClick={() => setShowTrash(true)} title="Корзина">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
               <path d="M2 4h12M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M6.5 7v5M9.5 7v5M3.5 4l.8 9.2a1 1 0 0 0 1 .8h5.4a1 1 0 0 0 1-.8l.8-9.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
+            Корзина
             {deletedLocal.length > 0 && (
               <span className="collection-view__trash-badge">{deletedLocal.length}</span>
             )}

@@ -19,7 +19,7 @@ function TrashView({ onBack }: Props): JSX.Element {
     if (!isAuthenticated()) return
     const token = getAuth().accessToken!
     const deleted = await fetchDeletedCloudPlaylists(token)
-    setApiDeletedCloudPls(deleted)
+    if (Array.isArray(deleted)) setApiDeletedCloudPls(deleted)
   }, [])
 
   useEffect(() => {

@@ -464,7 +464,11 @@ export async function fetchDeletedCloudPlaylists(
       headers: { Authorization: `Bearer ${accessToken}` },
     })
     if (!res.ok) return []
-    return (await res.json()) as CloudPlaylistSummary[]
+    const body = await res.json()
+    // API returns a paginated object { items: [...], totalCount, ... }
+    if (Array.isArray(body)) return body as CloudPlaylistSummary[]
+    if (body && Array.isArray(body.items)) return body.items as CloudPlaylistSummary[]
+    return []
   } catch {
     return []
   }
