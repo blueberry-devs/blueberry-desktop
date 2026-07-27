@@ -73,6 +73,7 @@ function PlaylistSubmenu({
   setShowMenu: (v: boolean) => void
   setShowPlaylists: React.Dispatch<React.SetStateAction<boolean>>
 }): JSX.Element {
+  const { t } = useTranslation()
   const wrapRef = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const subRef = useRef<HTMLDivElement>(null)
@@ -98,7 +99,7 @@ function PlaylistSubmenu({
           <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
           <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         </svg>
-        <span className="now-playing__dropdown-item-label">В плейлист</span>
+        <span className="now-playing__dropdown-item-label">{t('player.addToPlaylist')}</span>
         <svg className="now-playing__dropdown-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
           <path d="M4.5 2l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -106,7 +107,7 @@ function PlaylistSubmenu({
       {show && displayTrack && (
         <div ref={subRef} className={`now-playing__dropdown-sub${posData.cls}${scrollCls}`} style={posData.maxHeight > 0 ? { maxHeight: posData.maxHeight } : undefined}>
           {playlists.length === 0 ? (
-            <div className="now-playing__dropdown-empty">{'Нет плейлистов'}</div>
+            <div className="now-playing__dropdown-empty">{t('player.noPlaylists')}</div>
           ) : (
             playlists.map((p: any) => (
               <button

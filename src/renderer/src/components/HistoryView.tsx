@@ -53,8 +53,8 @@ function HistoryView(): JSX.Element {
               </svg>
             </div>
             <div className="history-view__hero-meta">
-              <div className="history-view__hero-title">Слушать всё подряд</div>
-              <div className="history-view__hero-sub">{history.length} треков</div>
+              <div className="history-view__hero-title">{t('history.listenAll')}</div>
+              <div className="history-view__hero-sub">{t('history.trackCount').replace('{n}', String(history.length))}</div>
             </div>
           </div>
 

@@ -142,7 +142,7 @@ function Sidebar({ activeTab, onSelectTab }: Props): JSX.Element {
       <button
         onClick={() => onSelectTab('account')}
         className={`sidebar__nav-item${activeTab === 'account' ? ' sidebar__nav-item--active' : ''}`}
-        title={open ? undefined : 'Аккаунт'}
+        title={open ? undefined : t('account.title')}
       >
         {activeTab === 'account' && (
           <motion.span
@@ -154,7 +154,7 @@ function Sidebar({ activeTab, onSelectTab }: Props): JSX.Element {
         <span className="sidebar__nav-icon">
           <NavIcon type="user" />
         </span>
-        <span className="sidebar__nav-label">Аккаунт</span>
+        <span className="sidebar__nav-label">{t('account.title')}</span>
       </button>
 
       <button

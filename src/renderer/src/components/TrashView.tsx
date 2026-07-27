@@ -4,6 +4,7 @@ import { restorePlaylist, forceDeletePlaylist } from '../store/playlists'
 import { useDeletedPlaylists } from '../store/deletedPlaylists'
 import { fetchDeletedCloudPlaylists, fetchCloudPlaylists, restoreCloudPlaylist as apiRestoreCloudPlaylist, forceDeleteCloudPlaylist as apiForceDeleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
 import { setCloudPlaylists } from '../store/cloudPlaylists'
+import { useTranslation } from '../utils/useTranslation'
 import Modal from './Modal'
 import './TrashView.css'
 
@@ -12,6 +13,7 @@ interface Props {
 }
 
 function TrashView({ onBack }: Props): JSX.Element {
+  const { t } = useTranslation()
   const deletedLocal = useDeletedPlaylists()
   const [apiDeletedCloudPls, setApiDeletedCloudPls] = useState<CloudPlaylistSummary[]>([])
   const [hasShown, setHasShown] = useState(false)
@@ -43,7 +45,7 @@ function TrashView({ onBack }: Props): JSX.Element {
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Коллекция
+        {t('collection.back')}
       </button>
 
       <div className="trash-view__header">
@@ -53,17 +55,17 @@ function TrashView({ onBack }: Props): JSX.Element {
           </svg>
         </div>
         <div className="trash-view__meta">
-          <h1 className="trash-view__title">Корзина</h1>
+          <h1 className="trash-view__title">{t('trash.title')}</h1>
           <div className="trash-view__sub">
-            {deletedLocal.length + dedupedApiDeleted.length} плейлистов
+            {t('trash.totalCount').replace('{n}', String(deletedLocal.length + dedupedApiDeleted.length))}
           </div>
         </div>
       </div>
 
       {!hasItems && (
         <div className="trash-view__empty">
-          <p>Корзина пуста.</p>
-          <p className="trash-view__empty-hint">Удалённые плейлисты будут перемещены сюда.</p>
+          <p>{t('trash.empty')}</p>
+          <p className="trash-view__empty-hint">{t('trash.emptyHint')}</p>
         </div>
       )}
 
@@ -79,29 +81,29 @@ function TrashView({ onBack }: Props): JSX.Element {
             </div>
             <div className="trash-view__info">
               <div className="trash-view__name">{d.playlist.name}</div>
-              <div className="trash-view__count">{d.playlist.tracks.length} треков</div>
+              <div className="trash-view__count">{t('collection.trackCount').replace('{n}', String(d.playlist.tracks.length))}</div>
             </div>
             <div className="trash-view__actions">
               <button
                 className="trash-view__restore"
                 onClick={() => restorePlaylist(d.playlist.id)}
-                title="Восстановить"
+                title={t('trash.restore')}
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M2 8a6 6 0 0 1 10.47-4M14 8a6 6 0 0 1-10.47 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
                   <path d="M12.5 1.5V5H9M3.5 14.5V11H7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                Восстановить
+                {t('trash.restore')}
               </button>
               <button
                 className="trash-view__force"
                 onClick={() => setForceConfirm({ name: d.playlist.name, id: d.playlist.id, type: 'local' })}
-                title="Удалить навсегда"
+                title={t('trash.deleteForever')}
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M2 4h12M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M6.5 7v5M9.5 7v5M3.5 4l.8 9.2a1 1 0 0 0 1 .8h5.4a1 1 0 0 0 1-.8l.8-9.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                Навсегда
+                {t('trash.deleteForeverShort')}
               </button>
             </div>
           </div>
@@ -118,7 +120,7 @@ function TrashView({ onBack }: Props): JSX.Element {
             </div>
             <div className="trash-view__info">
               <div className="trash-view__name">{pl.title}</div>
-              <div className="trash-view__count">{pl.trackCount} треков</div>
+              <div className="trash-view__count">{t('collection.trackCount').replace('{n}', String(pl.trackCount))}</div>
             </div>
             <div className="trash-view__actions">
               <button
@@ -133,23 +135,23 @@ function TrashView({ onBack }: Props): JSX.Element {
                     setCloudPlaylists(cloud)
                   }
                 }}
-                title="Восстановить"
+                title={t('trash.restore')}
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M2 8a6 6 0 0 1 10.47-4M14 8a6 6 0 0 1-10.47 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
                   <path d="M12.5 1.5V5H9M3.5 14.5V11H7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                Восстановить
+                {t('trash.restore')}
               </button>
               <button
                 className="trash-view__force"
                 onClick={() => setForceConfirm({ name: pl.title, id: pl.id, type: 'cloud' })}
-                title="Удалить навсегда"
+                title={t('trash.deleteForever')}
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M2 4h12M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M6.5 7v5M9.5 7v5M3.5 4l.8 9.2a1 1 0 0 0 1 .8h5.4a1 1 0 0 0 1-.8l.8-9.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                Навсегда
+                {t('trash.deleteForeverShort')}
               </button>
             </div>
           </div>
@@ -159,10 +161,10 @@ function TrashView({ onBack }: Props): JSX.Element {
       {forceConfirm && (
         <Modal
           open
-          title="Удалить навсегда"
-          message={`Плейлист «${forceConfirm.name}» будет удалён без возможности восстановления.`}
-          confirmLabel="Удалить"
-          cancelLabel="Отмена"
+          title={t('trash.deleteConfirmTitle')}
+          message={t('trash.deleteConfirmMessage').replace('{name}', forceConfirm.name)}
+          confirmLabel={t('playlist.deleteConfirmBtn')}
+          cancelLabel={t('common.cancel')}
           onConfirm={() => {
             if (forceConfirm.type === 'local') {
               forceDeletePlaylist(forceConfirm.id)

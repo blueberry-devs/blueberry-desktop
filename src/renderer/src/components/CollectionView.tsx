@@ -108,7 +108,7 @@ function CollectionView(): JSX.Element {
   if (showLiked) {
     const likedPlaylist: Playlist = {
       id: '__liked__',
-      name: 'Мне нравится',
+      name: t('collection.likedTitle'),
       cover: null,
       tracks: liked,
       createdAt: Date.now(),
@@ -142,7 +142,7 @@ function CollectionView(): JSX.Element {
     <div className="collection-view view-enter">
       <h1 className="collection-view__title">{t('collection.title')}</h1>
       <p className="collection-view__subtitle">
-        У вашей музыки есть <span className="collection-view__accent">цвет</span>
+        {t('collection.subtitle')}<span className="collection-view__accent">{t('collection.subtitleAccent')}</span>
       </p>
 
       <div className="collection-view__hero-card hero-card--animated" onClick={() => liked.length > 0 && setShowLiked(true)}>
@@ -156,23 +156,23 @@ function CollectionView(): JSX.Element {
         </div>
         <div className="collection-view__hero-meta">
           <div className="collection-view__hero-title">
-            Мне нравится
+            {t('collection.likedTitle')}
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <div className="collection-view__hero-sub">{liked.length} треков</div>
+          <div className="collection-view__hero-sub">{t('collection.trackCount').replace('{n}', String(liked.length))}</div>
         </div>
       </div>
 
       <section className="collection-view__section">
         <h2 className="collection-view__artists-title">
           {t('collection.playlists')}
-          <button className="collection-view__trash-link" onClick={() => setShowTrash(true)} title="Корзина">
+          <button className="collection-view__trash-link" onClick={() => setShowTrash(true)} title={t('collection.trash')}>
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
               <path d="M2 4h12M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M6.5 7v5M9.5 7v5M3.5 4l.8 9.2a1 1 0 0 0 1 .8h5.4a1 1 0 0 0 1-.8l.8-9.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Корзина
+            {t('collection.trash')}
             {deletedLocal.length > 0 && (
               <span className="collection-view__trash-badge">{deletedLocal.length}</span>
             )}
@@ -193,7 +193,7 @@ function CollectionView(): JSX.Element {
                 )}
               </div>
               <div className="collection-view__playlist-name">{p.name}</div>
-              <div className="collection-view__playlist-count">{p.tracks.length} треков</div>
+              <div className="collection-view__playlist-count">{t('collection.trackCount').replace('{n}', String(p.tracks.length))}</div>
             </button>
           ))}
           {cloudOnlyPlaylists.map((pl) => (
@@ -214,7 +214,7 @@ function CollectionView(): JSX.Element {
                 )}
               </div>
               <div className="collection-view__playlist-name">{pl.title}</div>
-              <div className="collection-view__playlist-count">{pl.trackCount} треков</div>
+              <div className="collection-view__playlist-count">{t('collection.trackCount').replace('{n}', String(pl.trackCount))}</div>
             </button>
           ))}
         </div>
@@ -239,7 +239,7 @@ function CollectionView(): JSX.Element {
                 <div className="collection-view__playlist-name">{pl.title}</div>
                 <div className="collection-view__playlist-count">
                   <ServiceBadge source={pl.source} size={12} />
-                  <span style={{ marginLeft: 4 }}>{pl.owner} · {pl.trackCount} треков</span>
+                  <span style={{ marginLeft: 4 }}>{pl.owner} · {t('collection.trackCount').replace('{n}', String(pl.trackCount))}</span>
                 </div>
               </button>
             ))}

@@ -63,7 +63,7 @@ function PlaylistDetailView({ playlist, onBack, onDelete, readonly = false }: Pr
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Коллекция
+        {t('collection.back')}
       </button>
 
       <div className="playlist-detail__header">
@@ -79,9 +79,9 @@ function PlaylistDetailView({ playlist, onBack, onDelete, readonly = false }: Pr
           )}
         </div>
         <div className="playlist-detail__meta">
-          <div className="playlist-detail__label">{playlist.id === '__liked__' ? 'Мне нравится' : 'Плейлист'}</div>
+          <div className="playlist-detail__label">{playlist.id === '__liked__' ? t('playlist.likedLabel') : t('playlist.label')}</div>
           <h1 className="playlist-detail__title">{playlist.name}</h1>
-          <div className="playlist-detail__sub">{playlist.tracks.length} треков</div>
+          <div className="playlist-detail__sub">{t('collection.trackCount').replace('{n}', String(playlist.tracks.length))}</div>
           <div className="playlist-detail__actions">
             {playlist.tracks.length > 0 && (
               <button className="playlist-detail__play" onClick={() => playQueue(playlist.tracks, 0)}>
@@ -105,7 +105,7 @@ function PlaylistDetailView({ playlist, onBack, onDelete, readonly = false }: Pr
       <div className="playlist-detail__tracks">
         {playlist.tracks.length === 0 ? (
           <div className="playlist-detail__empty">
-            Добавляйте треки через кнопку «+» на любом треке в поиске, чартах или коллекции.
+            {t('playlist.addTracksHint')}
           </div>
         ) : (
           playlist.tracks.map((t, i) => (

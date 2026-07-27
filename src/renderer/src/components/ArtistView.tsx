@@ -39,7 +39,7 @@ function ArtistView({ name, onBack }: Props): JSX.Element {
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Поиск
+        {t('artist.back')}
       </button>
 
       <div className="artist-view__header">
@@ -61,7 +61,7 @@ function ArtistView({ name, onBack }: Props): JSX.Element {
               <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
                 <path d="M5.5 3.5l9 5.5-9 5.5Z" fill="#000" />
               </svg>
-              Слушать
+              {t('artist.listenBtn')}
             </button>
           )}
         </div>

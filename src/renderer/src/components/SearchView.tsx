@@ -22,7 +22,7 @@ let debounceTimer: ReturnType<typeof setTimeout>
 type ResultsTab = 'top' | 'tracks' | 'artists' | 'playlists'
 type CardIcon = 'sun' | 'smile' | 'dumbbell' | 'note' | 'clock' | 'sparkle' | 'moon' | 'guitar' | 'mic' | 'megaphone'
 
-const DISABLED_PILLS = ['Альбомы', 'Моя волна', 'Подкасты', 'Аудиокниги', 'Клипы']
+const DISABLED_PILLS = ['search.albums', 'search.myWave', 'search.podcasts', 'search.audiobooks', 'search.clips']
 
 const ALL_SOURCES: TrackSource[] = ['yandex', 'soundcloud', 'youtube']
 
@@ -32,9 +32,9 @@ interface SourceConfig {
 }
 
 const SOURCE_CONFIGS: Record<TrackSource, SourceConfig> = {
-  yandex: { label: 'Яндекс', icon: yandexIcon },
-  soundcloud: { label: 'SoundCloud', icon: soundcloudIcon },
-  youtube: { label: 'YouTube', icon: youtubeIcon },
+  yandex: { label: 'search.sourceYandex', icon: yandexIcon },
+  soundcloud: { label: 'search.sourceSoundcloud', icon: soundcloudIcon },
+  youtube: { label: 'search.sourceYoutube', icon: youtubeIcon },
 }
 
 const COLLECTIONS: { label: string; query: string; gradient: string; icon: CardIcon }[] = [
@@ -357,7 +357,7 @@ function SearchView(): JSX.Element {
           autoFocus
         />
         {query && (
-          <button className="search-view__clear" onClick={() => setQuery('')} aria-label="Очистить">
+          <button className="search-view__clear" onClick={() => setQuery('')} aria-label={t('search.clearBtn')}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <line x1="1" y1="1" x2="13" y2="13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
               <line x1="13" y1="1" x2="1" y2="13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -386,7 +386,7 @@ function SearchView(): JSX.Element {
           {emptyTab === 'popular' && (
             <>
               <section className="search-view__section">
-                <h2 className="search-view__section-title">Подборки музыки</h2>
+                <h2 className="search-view__section-title">{t('search.collectionsTitle')}</h2>
                 <div className="search-view__scroller">
                   {COLLECTIONS.map((c) => (
                     <button
@@ -403,7 +403,7 @@ function SearchView(): JSX.Element {
               </section>
 
               <section className="search-view__section">
-                <h2 className="search-view__section-title">Вы могли пропустить</h2>
+                <h2 className="search-view__section-title">{t('search.missedTitle')}</h2>
                 <div className="search-view__scroller">
                   {SKIP_CARDS.map((c) => (
                     <button
@@ -445,12 +445,12 @@ function SearchView(): JSX.Element {
                   key={source}
                   className={`search-view__source-pill${active ? ' search-view__source-pill--active' : ''}`}
                   onClick={() => toggleSource(source)}
-                  title={active ? `Отключить ${cfg.label}` : `Включить ${cfg.label}`}
+                  title={active ? t('search.disableSource').replace('{name}', t(cfg.label)) : t('search.enableSource').replace('{name}', t(cfg.label))}
                 >
                   <span className="search-view__source-pill-icon">
-                    <img src={cfg.icon} alt={cfg.label} />
+                    <img src={cfg.icon} alt={t(cfg.label)} />
                   </span>
-                  <span className="search-view__source-pill-label">{cfg.label}</span>
+                  <span className="search-view__source-pill-label">{t(cfg.label)}</span>
                   {active && <span className="search-view__source-pill-check">✓</span>}
                 </button>
               )
@@ -482,9 +482,9 @@ function SearchView(): JSX.Element {
             >
               {t('search.playlists')}
             </button>
-            {DISABLED_PILLS.map((label) => (
-              <button key={label} className="search-view__pill search-view__pill--disabled" disabled>
-                {label}
+            {DISABLED_PILLS.map((key) => (
+              <button key={key} className="search-view__pill search-view__pill--disabled" disabled>
+                {t(key)}
               </button>
             ))}
           </div>
@@ -671,7 +671,7 @@ function SearchView(): JSX.Element {
             <path d="M2 12V4l8 4-8 4Z" fill="currentColor" />
             <rect x="12" y="3" width="2" height="10" fill="currentColor" />
           </svg>
-          Воспроизвести
+          {t('contextMenu.play')}
         </button>
         <div className="track-row__ctx-sep" />
         <button className="track-row__ctx-item" onClick={() => {
@@ -683,7 +683,7 @@ function SearchView(): JSX.Element {
             <rect x="4" y="2" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
             <path d="M12 4V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h1" stroke="currentColor" strokeWidth="1.4" fill="none" />
           </svg>
-          Копировать
+          {t('contextMenu.copy')}
         </button>
       </motion.div>,
       document.body

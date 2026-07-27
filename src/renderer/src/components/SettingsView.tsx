@@ -40,18 +40,18 @@ function SettingsView(): JSX.Element {
       <section className="settings-view__section">
         <h2 className="settings-view__section-title">
           <span className="settings-view__section-icon"><UserIcon size={14} /></span>
-          Аккаунт
+          {t('settings.accountSection')}
         </h2>
         <div className="settings-view__about">
           <div className="settings-view__about-row">
-            <span>{auth.user?.email || 'Не авторизован'}</span>
+            <span>{auth.user?.email || t('settings.notLoggedIn')}</span>
             {auth.user ? (
               <button className="settings-view__account-btn" onClick={logout}>
-                <LogOutIcon size={14} /> Выйти
+                <LogOutIcon size={14} /> {t('settings.logoutBtn')}
               </button>
             ) : (
               <button className="settings-view__account-btn settings-view__account-btn--primary" onClick={openAuth}>
-                <UserIcon size={14} /> Войти
+                <UserIcon size={14} /> {t('settings.loginBtn')}
               </button>
             )}
           </div>
@@ -85,7 +85,7 @@ function SettingsView(): JSX.Element {
       <section className="settings-view__section">
         <h2 className="settings-view__section-title">
           <span className="settings-view__section-icon"><PlayIcon size={14} /></span>
-          Плеер
+          {t('settings.playerSection')}
         </h2>
         <div className="settings-view__row">
           <div className="settings-view__row-text">
@@ -149,7 +149,7 @@ function SettingsView(): JSX.Element {
       <section className="settings-view__section">
         <h2 className="settings-view__section-title">
           <span className="settings-view__section-icon"><ShieldIcon size={14} /></span>
-          Контент
+          {t('settings.contentSection')}
         </h2>
         <div className="settings-view__row">
           <div className="settings-view__row-text">
@@ -220,7 +220,7 @@ function SettingsView(): JSX.Element {
             <span className="settings-view__about-value">{version}</span>
           </div>
           <div className="settings-view__about-row">
-            <span>Сборка</span>
+            <span>{t('settings.buildLabel')}</span>
             <span className="settings-view__about-value">{t('about.buildName')}</span>
           </div>
         </div>

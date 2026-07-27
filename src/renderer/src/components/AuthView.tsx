@@ -10,6 +10,7 @@ import {
   fetchCloudPlaylistDetail,
   type SyncChoice,
 } from '../services/playlists'
+import { useTranslation } from '../utils/useTranslation'
 import './AuthView.css'
 
 interface IconProps { size: number; className?: string }
@@ -88,6 +89,7 @@ interface AuthViewProps {
 }
 
 export default function AuthView({ closing, onClose }: AuthViewProps) {
+  const { t } = useTranslation()
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -206,19 +208,19 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
       setError('')
 
       if (!email.trim()) {
-        setError('Введите email')
+        setError(t('auth.enterEmail'))
         return
       }
       if (!password) {
-        setError('Введите пароль')
+        setError(t('auth.enterPassword'))
         return
       }
       if (mode === 'register' && password !== confirmPassword) {
-        setError('Пароли не совпадают')
+        setError(t('auth.passwordMismatch'))
         return
       }
       if (mode === 'register' && password.length < 6) {
-        setError('Пароль должен быть не менее 6 символов')
+        setError(t('auth.passwordMinLength'))
         return
       }
 
@@ -275,47 +277,47 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
       <div className={`auth-view__overlay${closing ? ' auth-view__overlay--closing' : ''}`} />
 
       <button className="auth-view__skip" onClick={onClose} type="button">
-        Пропустить
+        {t('auth.skip')}
       </button>
 
       <div className={`auth-card${closing ? ' auth-card--closing' : ''}`}>
-        <button className="auth-card__close" onClick={onClose} type="button" aria-label="Закрыть">
+        <button className="auth-card__close" onClick={onClose} type="button" aria-label={t('playlist.closeLabel')}>
           <XIcon size={20} />
         </button>
 
         {registeredEmail ? (
           <>
             <div className="auth-card__header">
-              <h1 className="auth-card__title">Подтвердите почту</h1>
+              <h1 className="auth-card__title">{t('auth.confirmEmailTitle')}</h1>
               <p className="auth-card__subtitle">
-                Мы отправили письмо на <strong>{registeredEmail}</strong>
+                {t('auth.confirmEmailMessage').replace('{email}', registeredEmail)}
               </p>
             </div>
 
             <div className="auth-confirm">
               <p className="auth-confirm__text">
-                Перейдите по ссылке в письме, чтобы подтвердить email, затем войдите в аккаунт.
+                {t('auth.confirmEmailHint')}
               </p>
               <p className="auth-confirm__hint">
-                Не пришло? Проверьте папку «Спам» или повторите регистрацию.
+                {t('auth.confirmEmailSpam')}
               </p>
               <button
                 type="button"
                 className="auth-form__submit"
                 onClick={() => setRegisteredEmail('')}
               >
-                <LogInIcon size={16} /> Войти
+                <LogInIcon size={16} /> {t('auth.loginBtn')}
               </button>
             </div>
           </>
         ) : syncState === 'checking' || syncState === 'syncing' ? (
           <>
             <div className="auth-card__header">
-              <h1 className="auth-card__title">Синхронизация</h1>
+              <h1 className="auth-card__title">{t('auth.syncInProgress')}</h1>
               <p className="auth-card__subtitle">
                 {syncState === 'checking'
-                  ? 'Проверяем облачные плейлисты…'
-                  : 'Загружаем ваши плейлисты в облако…'}
+                  ? t('auth.syncChecking')
+                  : t('auth.syncUploading')}
               </p>
             </div>
             <div className="auth-confirm">
@@ -327,14 +329,14 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
         ) : syncState === 'prompt' ? (
           <>
             <div className="auth-card__header">
-              <h1 className="auth-card__title">Обнаружены различия</h1>
+              <h1 className="auth-card__title">{t('auth.syncDiffTitle')}</h1>
               <p className="auth-card__subtitle">
-                Обнаружены новые треки и плейлисты на сервере ({syncItemCount} шт.)
+                {t('auth.syncDiffMessage').replace('{n}', String(syncItemCount))}
               </p>
             </div>
             <div className="auth-sync-prompt">
               <p className="auth-sync-prompt__text">
-                Объединить плейлисты или загрузить локальные как новые?
+                {t('auth.syncDiffPrompt')}
               </p>
               <div className="auth-sync-prompt__actions">
                 <button
@@ -343,7 +345,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                   onClick={() => executeSync('merge')}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                  Объединить
+                  {t('auth.syncMerge')}
                 </button>
                 <button
                   type="button"
@@ -351,7 +353,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                   onClick={() => executeSync('upload-new')}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 5v14M5 12h14"/></svg>
-                  Загрузить как новые
+                  {t('auth.syncUploadNew')}
                 </button>
               </div>
               <button
@@ -360,7 +362,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                 style={{ marginTop: 12 }}
                 onClick={onClose}
               >
-                Пропустить
+                {t('auth.skip')}
               </button>
             </div>
           </>
@@ -368,18 +370,18 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
           <>
             <div className="auth-card__header">
               <h1 className="auth-card__title">
-                {mode === 'login' ? 'Войти' : 'Регистрация'}
+                {mode === 'login' ? t('auth.loginTitle') : t('auth.registerTitle')}
               </h1>
               <p className="auth-card__subtitle">
                 {mode === 'login'
-                  ? 'Войдите в свой аккаунт'
-                  : 'Создайте новый аккаунт'}
+                  ? t('auth.loginHint')
+                  : t('auth.registerHint')}
               </p>
             </div>
 
             <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-form__field">
-            <label className="auth-form__label">Email</label>
+            <label className="auth-form__label">{t('auth.email')}</label>
             <div className="auth-form__input-wrap">
               <MailIcon size={16} className="auth-form__icon" />
               <input
@@ -395,7 +397,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
           </div>
 
           <div className="auth-form__field">
-            <label className="auth-form__label">Пароль</label>
+            <label className="auth-form__label">{t('auth.password')}</label>
             <div className="auth-form__input-wrap">
               <LockIcon size={16} className="auth-form__icon" />
               <input
@@ -411,7 +413,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                 className="auth-form__toggle-vis"
                 onClick={() => setShowPassword((v) => !v)}
                 tabIndex={-1}
-                aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
               >
                 {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
               </button>
@@ -420,7 +422,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
 
           {mode === 'register' && (
             <div className="auth-form__field">
-              <label className="auth-form__label">Подтвердите пароль</label>
+              <label className="auth-form__label">{t('auth.confirmPassword')}</label>
               <div className="auth-form__input-wrap">
                 <LockIcon size={16} className="auth-form__icon" />
                 <input
@@ -436,7 +438,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                   className="auth-form__toggle-vis"
                   onClick={() => setShowConfirm((v) => !v)}
                   tabIndex={-1}
-                  aria-label={showConfirm ? 'Скрыть пароль' : 'Показать пароль'}
+                  aria-label={showConfirm ? t('auth.hidePassword') : t('auth.showPassword')}
                 >
                   {showConfirm ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
                 </button>
@@ -454,9 +456,9 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
             {loading ? (
               <div className="auth-form__spinner-sm" />
             ) : mode === 'login' ? (
-              <><LogInIcon size={16} /> Войти</>
+              <><LogInIcon size={16} /> {t('auth.loginBtn')}</>
             ) : (
-              <><UserPlusIcon size={16} /> Зарегистрироваться</>
+              <><UserPlusIcon size={16} /> {t('auth.registerBtn')}</>
             )}
           </button>
         </form>
@@ -467,22 +469,22 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                 <button
                   type="button"
                   className="auth-card__link"
-                  onClick={() => setError('Функция восстановления пароля скоро появится')}
+                  onClick={() => setError(t('auth.forgotPasswordSoon'))}
                 >
-                  Забыли пароль?
+                  {t('auth.forgotPassword')}
                 </button>
                 <div className="auth-card__switch">
-                  Нет аккаунта?{' '}
+                  {t('auth.noAccount')}{' '}
                   <button type="button" className="auth-card__link" onClick={switchMode}>
-                    Зарегистрироваться
+                    {t('auth.registerBtn')}
                   </button>
                 </div>
               </>
             ) : (
               <div className="auth-card__switch">
-                Уже есть аккаунт?{' '}
+                {t('auth.haveAccount')}{' '}
                 <button type="button" className="auth-card__link" onClick={switchMode}>
-                  <ChevronLeftIcon size={14} /> Войти
+                  <ChevronLeftIcon size={14} /> {t('auth.loginBtn')}
                 </button>
               </div>
             )}

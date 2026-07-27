@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from '../utils/useTranslation'
 import './Modal.css'
 
 interface ModalProps {
@@ -16,6 +17,7 @@ interface ModalProps {
 const ANIM_MS = 150
 
 function Modal({ open, title, message, confirmLabel, cancelLabel, onConfirm, onCancel, children }: ModalProps) {
+  const { t } = useTranslation()
   const [visible, setVisible] = useState(open)
   const [closing, setClosing] = useState(false)
   const prevOpen = useRef(open)
@@ -85,7 +87,7 @@ function Modal({ open, title, message, confirmLabel, cancelLabel, onConfirm, onC
         {children}
         <div className="modal-actions">
           <button className="modal-btn modal-btn--cancel" onClick={() => close(onCancel)}>
-            {cancelLabel ?? 'Cancel'}
+            {cancelLabel ?? t('common.cancel')}
           </button>
           <button className="modal-btn modal-btn--confirm" onClick={() => close(onConfirm)}>
             {confirmLabel ?? 'OK'}

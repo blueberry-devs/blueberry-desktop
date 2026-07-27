@@ -266,9 +266,9 @@ function NowPlayingFullscreen(): JSX.Element | null {
                 </button>
                 {showQueue && (
                   <div className="np-fullscreen__queue-popup" onClick={(e) => e.stopPropagation()}>
-                    <div className="np-fullscreen__queue-title">Далее</div>
+                    <div className="np-fullscreen__queue-title">{t('player.queueTitle')}</div>
                     {upcoming.length === 0 ? (
-                      <div className="np-fullscreen__queue-empty">Очередь пуста</div>
+                      <div className="np-fullscreen__queue-empty">{t('player.queueEmpty')}</div>
                     ) : (
                       upcoming.slice(0, 8).map((t, i) => (
                         <button
@@ -403,7 +403,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
             exit={{ opacity: 0, x: 24 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
           >
-            {lyricsLoading && <div className="np-fullscreen__status">Загружаем текст…</div>}
+            {lyricsLoading && <div className="np-fullscreen__status">{t('player.loadingLyrics')}</div>}
 
             {!lyricsLoading && lyrics && lyrics.length > 0 && (
               <>
@@ -432,7 +432,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
             {!lyricsLoading &&
               (!lyrics || lyrics.length === 0) &&
               (!lyricsPlain || lyricsPlain.length === 0) && (
-                <div className="np-fullscreen__status">Текст песни не найден</div>
+                <div className="np-fullscreen__status">{t('player.lyricsNotFound')}</div>
               )}
           </motion.div>
           )}

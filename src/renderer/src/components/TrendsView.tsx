@@ -12,13 +12,13 @@ import './TrendsView.css'
 type TopTab = 'foryou' | 'trends'
 type MoodFilter = 'mood' | 'activity' | 'genre'
 
-const STYLE_CHIPS: { label: string; query: string }[] = [
-  { label: 'Рок', query: 'rock music' },
-  { label: 'Хип-хоп', query: 'hip hop music' },
-  { label: 'Поп', query: 'pop music' },
-  { label: 'Метал', query: 'metal music' },
-  { label: 'Инди', query: 'indie music' },
-  { label: 'Электроника', query: 'electronic music' }
+const STYLE_CHIPS: { labelKey: string; query: string }[] = [
+  { labelKey: 'trends.chipRock', query: 'rock music' },
+  { labelKey: 'trends.chipHipHop', query: 'hip hop music' },
+  { labelKey: 'trends.chipPop', query: 'pop music' },
+  { labelKey: 'trends.chipMetal', query: 'metal music' },
+  { labelKey: 'trends.chipIndie', query: 'indie music' },
+  { labelKey: 'trends.chipElectronic', query: 'electronic music' }
 ]
 
 function shuffle<T>(arr: T[]): T[] {
@@ -31,18 +31,18 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 const EXPLORE_GENRES = [
-  { label: 'Альтернативное прошлое', query: 'alternative rock', gradient: 'linear-gradient(135deg,#2c2c34,#4a4a58)' },
-  { label: 'Бег по лужам', query: 'indie rock', gradient: 'linear-gradient(135deg,#1e2a3a,#3a5068)' },
-  { label: 'Энергия поп-панка', query: 'pop punk', gradient: 'linear-gradient(135deg,#5b2a86,#8a5cf6)' },
-  { label: 'Когда вскипает кровь', query: 'metalcore', gradient: 'linear-gradient(135deg,#8a3a1a,#ff7a3d)' },
-  { label: 'Альтернативный разбег', query: 'alt rock hits', gradient: 'linear-gradient(135deg,#7a1a3a,#ff2d95)' }
+  { labelKey: 'trends.exploreAltPast', query: 'alternative rock', gradient: 'linear-gradient(135deg,#2c2c34,#4a4a58)' },
+  { labelKey: 'trends.explorePuddleRun', query: 'indie rock', gradient: 'linear-gradient(135deg,#1e2a3a,#3a5068)' },
+  { labelKey: 'trends.explorePunkEnergy', query: 'pop punk', gradient: 'linear-gradient(135deg,#5b2a86,#8a5cf6)' },
+  { labelKey: 'trends.exploreBloodBoils', query: 'metalcore', gradient: 'linear-gradient(135deg,#8a3a1a,#ff7a3d)' },
+  { labelKey: 'trends.exploreAltRun', query: 'alt rock hits', gradient: 'linear-gradient(135deg,#7a1a3a,#ff2d95)' }
 ]
 
 function TrendsView(): JSX.Element {
   const [topTab, setTopTab] = useState<TopTab>('foryou')
   const [moodFilter, setMoodFilter] = useState<MoodFilter>('mood')
   const [monthlyTrends, setMonthlyTrends] = useState<TrackResult[]>([])
-  const [styleChip, setStyleChip] = useState(STYLE_CHIPS[0].label)
+  const [styleChip, setStyleChip] = useState(STYLE_CHIPS[0].labelKey)
   const [styleTracks, setStyleTracks] = useState<TrackResult[]>([])
   const [recommended, setRecommended] = useState<TrackResult[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,21 +53,21 @@ function TrendsView(): JSX.Element {
   const { t } = useTranslation()
 
   // Mood-based preset cards
-  const moodCards: Record<MoodFilter, { kicker: string; label: string; query: string }[]> = {
+  const moodCards: Record<MoodFilter, { kickerKey: string; labelKey: string; query: string }[]> = {
     mood: [
-      { kicker: 'Настроение', label: 'Энергичное', query: 'energetic hype' },
-      { kicker: 'Настроение', label: 'Спокойное', query: 'chill instrumental' },
-      { kicker: 'Настроение', label: 'Вдохновляющее', query: 'inspirational epic' }
+      { kickerKey: 'trends.moodKicker', labelKey: 'trends.moodEnergizing', query: 'energetic hype' },
+      { kickerKey: 'trends.moodKicker', labelKey: 'trends.moodCalm', query: 'chill instrumental' },
+      { kickerKey: 'trends.moodKicker', labelKey: 'trends.moodInspiring', query: 'inspirational epic' }
     ],
     activity: [
-      { kicker: 'Активность', label: 'Бег', query: 'running workout' },
-      { kicker: 'Активность', label: 'Работа', query: 'focus instrumental' },
-      { kicker: 'Активность', label: 'Вечеринка', query: 'party hits' }
+      { kickerKey: 'trends.activityKicker', labelKey: 'trends.activityRunning', query: 'running workout' },
+      { kickerKey: 'trends.activityKicker', labelKey: 'trends.activityWork', query: 'focus instrumental' },
+      { kickerKey: 'trends.activityKicker', labelKey: 'trends.activityParty', query: 'party hits' }
     ],
     genre: [
-      { kicker: 'Жанр', label: 'Рок', query: 'рок' },
-      { kicker: 'Жанр', label: 'Хип-хоп', query: 'хип-хоп' },
-      { kicker: 'Жанр', label: 'Электроника', query: 'электроника' }
+      { kickerKey: 'trends.genreKicker', labelKey: 'trends.genreRockLabel', query: 'рок' },
+      { kickerKey: 'trends.genreKicker', labelKey: 'trends.genreHipHopLabel', query: 'хип-хоп' },
+      { kickerKey: 'trends.genreKicker', labelKey: 'trends.genreElectronicLabel', query: 'электроника' }
     ]
   }
 
@@ -81,7 +81,7 @@ function TrendsView(): JSX.Element {
 
   // Fetch style chips
   useEffect(() => {
-    const query = STYLE_CHIPS.find((c) => c.label === styleChip)?.query ?? styleChip
+    const query = STYLE_CHIPS.find((c) => c.labelKey === styleChip)?.query ?? styleChip
     searchTracksMulti(query, ['yandex', 'soundcloud', 'youtube'])
       .then((res) => setStyleTracks(shuffle(res).slice(0, 10)))
       .catch(() => setStyleTracks([]))
@@ -239,7 +239,7 @@ function TrendsView(): JSX.Element {
 
           {recommended.length > 0 && (
             <section className="trends-view__section">
-              <h2 className="trends-view__section-title">Рекомендовано для вас</h2>
+              <h2 className="trends-view__section-title">{t('trends.recommended')}</h2>
               <div className="trends-view__style-grid">
                 {recommended.slice(0, 10).map((t) => (
                   <button key={t.id} className="trends-view__style-card" onClick={() => play(t)}>
@@ -256,15 +256,15 @@ function TrendsView(): JSX.Element {
 
           {recommended.length === 0 && liked.length === 0 && (
             <section className="trends-view__section">
-              <h2 className="trends-view__section-title">Попробуйте нажать сердечко</h2>
+              <h2 className="trends-view__section-title">{t('trends.likePrompt')}</h2>
               <p className="trends-view__hint">
-                Добавляйте треки в любимые, чтобы мы могли подбирать рекомендации на основе вашего вкуса
+                {t('trends.likeHint')}
               </p>
             </section>
           )}
 
           <section className="trends-view__section">
-            <h2 className="trends-view__section-title">Настроение и активность</h2>
+            <h2 className="trends-view__section-title">{t('trends.moodActivity')}</h2>
             <div className="trends-view__pills">
               {(['mood', 'activity', 'genre'] as MoodFilter[]).map((id) => (
                 <button
@@ -272,19 +272,19 @@ function TrendsView(): JSX.Element {
                   className={`trends-view__pill${moodFilter === id ? ' trends-view__pill--active' : ''}`}
                   onClick={() => setMoodFilter(id)}
                 >
-                  {id === 'mood' ? 'Настроение' : id === 'activity' ? 'Активность' : 'Жанр'}
+                  {id === 'mood' ? t('trends.moodTab') : id === 'activity' ? t('trends.activityTab') : t('trends.genreTab')}
                 </button>
               ))}
             </div>
             <div className="trends-view__ai-cards">
               {moodCards[moodFilter].map((card) => (
-                <button key={card.label} className="trends-view__ai-card" onClick={() => playMood(card.query)}>
-                  <span className="trends-view__ai-kicker">{card.kicker}</span>
+                <button key={card.labelKey} className="trends-view__ai-card" onClick={() => playMood(card.query)}>
+                  <span className="trends-view__ai-kicker">{t(card.kickerKey)}</span>
                   <span className="trends-view__ai-label">
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                       <path d="M3 2l6 4-6 4Z" fill="currentColor" />
                     </svg>
-                    {card.label}
+                    {t(card.labelKey)}
                   </span>
                 </button>
               ))}
@@ -296,11 +296,11 @@ function TrendsView(): JSX.Element {
             <div className="trends-view__chips">
               {STYLE_CHIPS.map((chip) => (
                 <button
-                  key={chip.label}
-                  className={`trends-view__chip${styleChip === chip.label ? ' trends-view__chip--active' : ''}`}
-                  onClick={() => setStyleChip(chip.label)}
+                  key={chip.labelKey}
+                  className={`trends-view__chip${styleChip === chip.labelKey ? ' trends-view__chip--active' : ''}`}
+                  onClick={() => setStyleChip(chip.labelKey)}
                 >
-                  {chip.label}
+                  {t(chip.labelKey)}
                 </button>
               ))}
             </div>
@@ -344,7 +344,7 @@ function TrendsView(): JSX.Element {
 
       {topTab === 'trends' && monthlyTrends.length > 0 && (
         <section className="trends-view__section">
-          <h2 className="trends-view__section-title">Чарт за месяц</h2>
+          <h2 className="trends-view__section-title">{t('trends.monthlyChart')}</h2>
           <div className="trends-view__release-row">
             {monthlyTrends.slice(0, 6).map((t) => (
               <div key={t.id} className="trends-view__release-card">
@@ -378,7 +378,7 @@ function TrendsView(): JSX.Element {
 
       {topTab === 'trends' && monthlyTrends.length > 8 && (
         <section className="trends-view__section">
-          <h2 className="trends-view__section-title">Премьера</h2>
+          <h2 className="trends-view__section-title">{t('trends.premiere')}</h2>
           <div className="trends-view__premiere-grid">
             {monthlyTrends.slice(6, 14).map((t, i) => (
               <TrackRow key={t.id} track={t} queue={monthlyTrends.slice(6, 14)} index={i} onArtistClick={requestArtistSearch} />
@@ -393,12 +393,12 @@ function TrendsView(): JSX.Element {
           <div className="trends-view__explore-row">
             {EXPLORE_GENRES.map((g) => (
               <button
-                key={g.label}
+                key={g.labelKey}
                 className="trends-view__explore-card"
                 style={{ background: g.gradient }}
                 onClick={() => playMood(g.query)}
               >
-                <span className="trends-view__explore-label">{g.label}</span>
+                <span className="trends-view__explore-label">{t(g.labelKey)}</span>
               </button>
             ))}
           </div>
