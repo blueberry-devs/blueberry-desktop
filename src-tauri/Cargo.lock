@@ -153,7 +153,7 @@ dependencies = [
 
 [[package]]
 name = "blueberry-desktop"
-version = "1.400.0"
+version = "1.4.0"
 dependencies = [
  "dirs",
  "discord-rich-presence",

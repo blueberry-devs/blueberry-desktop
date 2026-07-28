@@ -1,6 +1,6 @@
 {
   "productName": "Blueberry Desktop",
-  "version": "1.400.0",
+  "version": "1.4.0",
   "identifier": "com.blueberry.desktop",
   "build": {
     "frontendDist": "../dist",

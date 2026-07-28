@@ -1,6 +1,6 @@
 [package]
 name = "blueberry-desktop"
-version = "1.400.0"
+version = "1.4.0"
 description = "Blueberry Desktop — Tauri v2"
 edition = "2021"
 
