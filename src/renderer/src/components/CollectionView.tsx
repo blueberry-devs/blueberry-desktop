@@ -44,6 +44,8 @@ function CollectionView(): JSX.Element {
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; playlist: Playlist } | null>(null)
+  const [ctxClosing, setCtxClosing] = useState(false)
+  const ctxTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const [renameTarget, setRenameTarget] = useState<Playlist | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [renameClosing, setRenameClosing] = useState(false)
@@ -169,21 +171,44 @@ function CollectionView(): JSX.Element {
   const handleContextMenu = useCallback((e: React.MouseEvent, pl: Playlist) => {
     e.preventDefault()
     e.stopPropagation()
+    setCtxClosing(false)
     setContextMenu({ x: e.clientX, y: e.clientY, playlist: pl })
   }, [])
 
-  const closeContextMenu = useCallback(() => setContextMenu(null), [])
+  const closeCtx = useCallback(() => {
+    if (ctxClosing || !contextMenu) return
+    setCtxClosing(true)
+    ctxTimerRef.current = setTimeout(() => {
+      setCtxClosing(false)
+      setContextMenu(null)
+    }, 120)
+  }, [ctxClosing, contextMenu])
 
   useEffect(() => {
     if (!contextMenu) return
-    const handler = () => closeContextMenu()
+    const handler = () => closeCtx()
     window.addEventListener('click', handler)
     window.addEventListener('scroll', handler, true)
     return () => {
       window.removeEventListener('click', handler)
       window.removeEventListener('scroll', handler, true)
     }
-  }, [contextMenu, closeContextMenu])
+  }, [contextMenu, closeCtx])
+
+  // Escape closes context menu
+  useEffect(() => {
+    if (!contextMenu) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') closeCtx()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [contextMenu, closeCtx])
+
+  // Clean up animation timer
+  useEffect(() => {
+    return () => { if (ctxTimerRef.current) clearTimeout(ctxTimerRef.current) }
+  }, [])
 
   useEffect(() => {
     if (renameTarget) {
@@ -411,7 +436,7 @@ function CollectionView(): JSX.Element {
 
       {contextMenu && (
         <div
-          className="playlist-context-menu"
+          className={`playlist-context-menu${ctxClosing ? ' playlist-context-menu--closing' : ''}`}
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -419,7 +444,7 @@ function CollectionView(): JSX.Element {
             className="playlist-context-menu__item"
             onClick={() => {
               setRenameTarget(contextMenu.playlist)
-              closeContextMenu()
+              closeCtx()
             }}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -434,7 +459,7 @@ function CollectionView(): JSX.Element {
               for (const t of contextMenu.playlist.tracks) {
                 addTrackToPlaylist(dup.id, t)
               }
-              closeContextMenu()
+              closeCtx()
             }}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -448,7 +473,7 @@ function CollectionView(): JSX.Element {
             className="playlist-context-menu__item playlist-context-menu__item--danger"
             onClick={() => {
               setDeleteTarget(contextMenu.playlist)
-              closeContextMenu()
+              closeCtx()
             }}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
