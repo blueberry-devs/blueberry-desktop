@@ -6,8 +6,8 @@ import {
   fetchReplies as apiFetchReplies,
   createComment as apiCreateComment,
   deleteComment as apiDeleteComment,
-  toggleCommentLike as apiToggleLike,
-  toggleCommentDislike as apiToggleDislike,
+  likeComment as apiLikeComment,
+  unlikeComment as apiUnlikeComment,
 } from '../services/comments'
 
 const STORAGE_KEY = 'ym-clone:comments-v2'
@@ -23,8 +23,8 @@ export interface Comment {
   text: string
   timestamp: number
   parentId?: string
-  likes: string[]
-  dislikes: string[]
+  likeCount: number
+  isLikedByMe: boolean
 }
 
 /* ========== State ========== */
@@ -34,10 +34,8 @@ type CommentsData = Record<string, Comment[]>
 interface TrackMeta {
   /** Whether we've ever fetched from server for this track */
   fetchedFromServer: boolean
-  /** Current page loaded from server */
-  serverPage: number
-  /** Whether server has more pages */
-  hasMoreOnServer: boolean
+  /** Cursor for the next page (null = no more pages) */
+  nextCursor: number | null
   /** Nonce to trigger re-render */
   _rev: number
 }
@@ -55,11 +53,11 @@ function loadFromDisk(): CommentsData {
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     if (typeof parsed !== 'object' || parsed === null) return {}
-    // Migrate from v1 (plain array values) to v2 format if needed
+    // Migrate from v1 (plain array values with likes/dislikes arrays) to v3
     const migrated: CommentsData = {}
     for (const [trackId, comments] of Object.entries(parsed)) {
       if (!Array.isArray(comments)) continue
-      migrated[trackId] = comments.map((c: Partial<Comment>) => ({
+      migrated[trackId] = comments.map((c: Partial<Comment & { likes?: string[]; dislikes?: string[] }>) => ({
         id: c.id ?? '',
         trackId: c.trackId ?? trackId,
         author: c.author ?? '',
@@ -67,8 +65,8 @@ function loadFromDisk(): CommentsData {
         text: c.text ?? '',
         timestamp: c.timestamp ?? Date.now(),
         parentId: c.parentId || undefined,
-        likes: Array.isArray(c.likes) ? c.likes : [],
-        dislikes: Array.isArray(c.dislikes) ? c.dislikes : [],
+        likeCount: c.likeCount ?? (Array.isArray(c.likes) ? c.likes.length : 0),
+        isLikedByMe: c.isLikedByMe ?? false,
       }))
     }
     return migrated
@@ -103,8 +101,7 @@ function ensureMeta(trackId: string): TrackMeta {
   if (!trackMeta[trackId]) {
     trackMeta[trackId] = {
       fetchedFromServer: false,
-      serverPage: 0,
-      hasMoreOnServer: false,
+      nextCursor: null,
       _rev: 0,
     }
   }
@@ -158,7 +155,7 @@ export function hasServerFetched(trackId: string): boolean {
  * Check if the server has more pages of comments to load.
  */
 export function hasMoreServerPages(trackId: string): boolean {
-  return trackMeta[trackId]?.hasMoreOnServer ?? false
+  return trackMeta[trackId]?.nextCursor != null
 }
 
 /**
@@ -173,17 +170,14 @@ export function getCommentCount(trackId: string): number {
 function dtoToLocal(dto: CommentDto): Comment {
   return {
     id: dto.id,
-    trackId: dto.trackId,
-    author: dto.authorName,
-    authorId: dto.authorId,
+    trackId: dto.entityId,
+    author: dto.userName ?? 'Unknown',
+    authorId: dto.userId,
     text: dto.text,
     timestamp: new Date(dto.createdAt).getTime(),
     parentId: dto.parentId ?? undefined,
-    // The local ClientComment stores likes/dislikes as arrays of usernames.
-    // Server DTO returns counts + boolean flags — we reconstruct a minimal
-    // representation for the local cache so the UI can highlight correctly.
-    likes: dto.likedByMe ? [dto.authorName] : [],
-    dislikes: dto.dislikedByMe ? [dto.authorName] : [],
+    likeCount: dto.likeCount,
+    isLikedByMe: dto.isLikedByMe,
   }
 }
 
@@ -209,7 +203,7 @@ function mergeFromServer(
 /* ========== Actions ========== */
 
 /**
- * Fetch comments from server. Falls back to local cache when offline.
+ * Fetch comments from server with cursor-based pagination.
  * Call this when opening comments for a track.
  */
 export async function loadCommentsFromServer(
@@ -221,21 +215,20 @@ export async function loadCommentsFromServer(
   const meta = ensureMeta(trackId)
   if (meta.fetchedFromServer) return // already loaded
 
-  const result = await apiFetchComments(auth.accessToken, trackId, 1, PAGE_SIZE)
+  const result = await apiFetchComments(auth.accessToken, trackId, 'track', undefined, PAGE_SIZE)
   if (!result) {
     // Server unavailable — keep local cache as-is
     return
   }
 
   meta.fetchedFromServer = true
-  meta.serverPage = 1
-  meta.hasMoreOnServer = result.page < result.totalPages
+  meta.nextCursor = result.nextCursor
 
-  mergeFromServer(trackId, result.items)
+  mergeFromServer(trackId, result.comments)
 }
 
 /**
- * Load next page from server (pagination).
+ * Load next page from server (cursor-based pagination).
  */
 export async function loadMoreCommentsFromServer(
   trackId: string,
@@ -244,20 +237,19 @@ export async function loadMoreCommentsFromServer(
   if (!auth.accessToken) return false
 
   const meta = ensureMeta(trackId)
-  if (!meta.hasMoreOnServer) return false
+  if (meta.nextCursor == null) return false
 
-  const nextPage = meta.serverPage + 1
   const result = await apiFetchComments(
     auth.accessToken,
     trackId,
-    nextPage,
+    'track',
+    meta.nextCursor,
     PAGE_SIZE,
   )
   if (!result) return false
 
-  meta.serverPage = nextPage
-  meta.hasMoreOnServer = result.page < result.totalPages
-  mergeFromServer(trackId, result.items)
+  meta.nextCursor = result.nextCursor
+  mergeFromServer(trackId, result.comments)
   return true
 }
 
@@ -272,29 +264,35 @@ export async function addComment(
   parentId?: string,
 ): Promise<Comment> {
   const auth = getAuth()
+  const commentId = crypto.randomUUID()
   const comment: Comment = {
-    id: crypto.randomUUID(),
+    id: commentId,
     trackId,
     author,
     authorId: auth.user?.id ?? '',
     text,
     timestamp: Date.now(),
     parentId,
-    likes: [],
-    dislikes: [],
+    likeCount: 0,
+    isLikedByMe: false,
   }
 
-  // Try server first
+  // Try server first with client-supplied UUID for idempotency
   if (auth.accessToken) {
     const created = await apiCreateComment(auth.accessToken, {
-      trackId,
+      id: commentId,
+      entityType: 'track',
+      entityId: trackId,
+      parentId: parentId ?? null,
       text,
-      parentId,
     })
     if (created) {
       comment.id = created.id
       comment.timestamp = new Date(created.createdAt).getTime()
-      comment.authorId = created.authorId
+      comment.authorId = created.userId
+      comment.author = created.userName ?? author
+      comment.likeCount = created.likeCount
+      comment.isLikedByMe = created.isLikedByMe
     }
     // If server failed, we keep the local ID and save locally
   }
@@ -330,59 +328,59 @@ export async function deleteComment(
 }
 
 /**
- * Toggle like. Tries server, falls back to local toggle.
+ * Toggle like on a comment. Sends POST to like or DELETE to unlike
+ * depending on current state. Falls back to local toggle on failure.
  */
 export async function toggleLike(
   trackId: string,
   commentId: string,
-  username: string,
 ): Promise<void> {
   const auth = getAuth()
-  if (auth.accessToken) {
-    await apiToggleLike(auth.accessToken, commentId)
-  }
-  // Optimistic local update
-  const all = cache[trackId] ?? []
-  cache = {
-    ...cache,
-    [trackId]: all.map((c) => {
-      if (c.id !== commentId) return c
-      const likes = c.likes.includes(username)
-        ? c.likes.filter((u) => u !== username)
-        : [...c.likes, username]
-      const dislikes = c.dislikes.filter((u) => u !== username)
-      return { ...c, likes, dislikes }
-    }),
-  }
-  emit()
-}
 
-/**
- * Toggle dislike. Tries server, falls back to local toggle.
- */
-export async function toggleDislike(
-  trackId: string,
-  commentId: string,
-  username: string,
-): Promise<void> {
-  const auth = getAuth()
-  if (auth.accessToken) {
-    await apiToggleDislike(auth.accessToken, commentId)
-  }
-  // Optimistic local update
+  // Read current state before mutating
   const all = cache[trackId] ?? []
+  const target = all.find((c) => c.id === commentId)
+  if (!target) return
+
+  const wasLiked = target.isLikedByMe
+
+  // Optimistic local update
   cache = {
     ...cache,
     [trackId]: all.map((c) => {
       if (c.id !== commentId) return c
-      const dislikes = c.dislikes.includes(username)
-        ? c.dislikes.filter((u) => u !== username)
-        : [...c.dislikes, username]
-      const likes = c.likes.filter((u) => u !== username)
-      return { ...c, likes, dislikes }
+      return {
+        ...c,
+        isLikedByMe: !wasLiked,
+        likeCount: wasLiked ? Math.max(0, c.likeCount - 1) : c.likeCount + 1,
+      }
     }),
   }
   emit()
+
+  // Try server
+  if (auth.accessToken) {
+    const dto = wasLiked
+      ? await apiUnlikeComment(auth.accessToken, commentId)
+      : await apiLikeComment(auth.accessToken, commentId)
+    if (dto) {
+      // Apply server state
+      cache = {
+        ...cache,
+        [trackId]: (cache[trackId] ?? []).map((c) => {
+          if (c.id !== commentId) return c
+          return {
+            ...c,
+            isLikedByMe: dto.isLikedByMe,
+            likeCount: dto.likeCount,
+          }
+        }),
+      }
+      emit()
+      return
+    }
+    // Server failed — keep optimistic update
+  }
 }
 
 /* ========== React hooks ========== */
@@ -399,7 +397,7 @@ export function useComments(trackId: string): Comment[] {
 }
 
 /**
- * Subscribe to page changes for a track (used for pagination trigger).
+ * Subscribe to rev changes for a track (used for reactivity).
  */
 export function useCommentsRev(trackId: string): number {
   useSyncExternalStore(

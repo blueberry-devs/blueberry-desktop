@@ -1,93 +1,93 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
-/* ========== DTOs ========== */
+/* ========== DTOs (v1.yaml spec) ========== */
 
 export interface CommentDto {
   id: string
-  trackId: string
-  authorId: string
-  authorName: string
-  authorAvatar: string | null
-  text: string
+  userId: string
+  userName: string | null
+  userAvatarUrl: string | null
+  entityType: string
+  entityId: string
+  rootId: string | null
   parentId: string | null
+  replyToUserName: string | null
+  text: string
+  isDeleted: boolean
+  likeCount: number
+  replyCount: number
   createdAt: string
-  likesCount: number
-  dislikesCount: number
-  likedByMe: boolean
-  dislikedByMe: boolean
-  repliesCount: number
+  updatedAt: string
+  isLikedByMe: boolean
 }
 
-export interface CommentsPageDto {
-  items: CommentDto[]
-  totalCount: number
-  page: number
-  pageSize: number
-  totalPages: number
+export interface CommentsListResult {
+  comments: CommentDto[]
+  nextCursor: number | null
 }
 
 export interface CreateCommentRequest {
-  trackId: string
+  id: string
+  entityType: string
+  entityId: string
+  parentId: string | null
   text: string
-  parentId?: string
 }
 
 /* ========== API calls ========== */
 
 /**
- * Fetch a page of comments for a track.
- * Returns null on error — caller should handle gracefully.
+ * Fetch root comments with cursor-based pagination.
+ * GET /api/comments/{entityType}/{entityId}?cursor=N&limit=N
  */
 export async function fetchComments(
   accessToken: string,
-  trackId: string,
-  page = 1,
-  pageSize = 20,
-): Promise<CommentsPageDto | null> {
+  entityId: string,
+  entityType = 'track',
+  cursor?: number,
+  limit = 20,
+): Promise<CommentsListResult | null> {
   try {
-    const params = new URLSearchParams({
-      trackId,
-      page: String(page),
-      pageSize: String(pageSize),
-    })
-    const res = await fetch(`${BASE_URL}/api/comments?${params}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!res.ok) return null
-    return (await res.json()) as CommentsPageDto
-  } catch {
-    return null
-  }
-}
-
-/**
- * Fetch replies for a specific parent comment.
- */
-export async function fetchReplies(
-  accessToken: string,
-  commentId: string,
-  page = 1,
-  pageSize = 10,
-): Promise<CommentsPageDto | null> {
-  try {
-    const params = new URLSearchParams({
-      page: String(page),
-      pageSize: String(pageSize),
-    })
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (cursor != null) params.set('cursor', String(cursor))
     const res = await fetch(
-      `${BASE_URL}/api/comments/${commentId}/replies?${params}`,
+      `${BASE_URL}/api/comments/${entityType}/${entityId}?${params}`,
       { headers: { Authorization: `Bearer ${accessToken}` } },
     )
     if (!res.ok) return null
-    return (await res.json()) as CommentsPageDto
+    return (await res.json()) as CommentsListResult
   } catch {
     return null
   }
 }
 
 /**
- * Create a new comment.
- * Returns the created comment DTO, or null on failure.
+ * Fetch replies under a root comment (max 5 per page).
+ * GET /api/comments/{rootId}/replies?cursor=N&limit=N
+ */
+export async function fetchReplies(
+  accessToken: string,
+  rootId: string,
+  cursor?: number,
+  limit = 5,
+): Promise<CommentsListResult | null> {
+  try {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (cursor != null) params.set('cursor', String(cursor))
+    const res = await fetch(
+      `${BASE_URL}/api/comments/${rootId}/replies?${params}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    )
+    if (!res.ok) return null
+    return (await res.json()) as CommentsListResult
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Create a comment (or reply). Client supplies the UUID for idempotency.
+ * POST /api/comments
  */
 export async function createComment(
   accessToken: string,
@@ -111,7 +111,7 @@ export async function createComment(
 
 /**
  * Delete a comment (owner or admin only).
- * Returns true if deleted.
+ * DELETE /api/comments/{id}
  */
 export async function deleteComment(
   accessToken: string,
@@ -129,10 +129,10 @@ export async function deleteComment(
 }
 
 /**
- * Toggle like on a comment.
- * Returns the updated DTO or null on failure.
+ * Like a comment. Idempotent.
+ * POST /api/comments/{id}/like
  */
-export async function toggleCommentLike(
+export async function likeComment(
   accessToken: string,
   commentId: string,
 ): Promise<CommentDto | null> {
@@ -152,16 +152,16 @@ export async function toggleCommentLike(
 }
 
 /**
- * Toggle dislike on a comment.
- * Returns the updated DTO or null on failure.
+ * Remove a like from a comment. Idempotent.
+ * DELETE /api/comments/{id}/like
  */
-export async function toggleCommentDislike(
+export async function unlikeComment(
   accessToken: string,
   commentId: string,
 ): Promise<CommentDto | null> {
   try {
-    const res = await fetch(`${BASE_URL}/api/comments/${commentId}/dislike`, {
-      method: 'POST',
+    const res = await fetch(`${BASE_URL}/api/comments/${commentId}/like`, {
+      method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
