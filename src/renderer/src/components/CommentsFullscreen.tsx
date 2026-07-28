@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { usePlayer } from '../player/PlayerContext'
 import { useTranslation } from '../utils/useTranslation'
@@ -51,8 +51,28 @@ function CommentsFullscreen(): JSX.Element | null {
   const [input, setInput] = useState('')
   const [replyTo, setReplyTo] = useState<{ parentId: string; author: string } | null>(null)
   const [translated, setTranslated] = useState<Record<string, boolean>>({})
+  const [closing, setClosing] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleClose = useCallback(() => {
+    if (closing) return
+    setClosing(true)
+    setTimeout(closeComments, 320)
+  }, [closing, closeComments])
+
+  // Intercept Escape before App.tsx global handler so animation plays fully
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      const target = e.target as HTMLElement | null
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return
+      e.stopImmediatePropagation()
+      handleClose()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [handleClose])
 
   const trackId = commentsTrack?.id
   const authed = isAuthenticated()
@@ -163,16 +183,15 @@ function CommentsFullscreen(): JSX.Element | null {
     <motion.div
       className="comments-fullscreen"
       initial={{ opacity: 0, y: 40 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 60 }}
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      animate={closing ? { opacity: 0, y: 60, scale: 0.97 } : { opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
     >
       {commentsTrack.cover && (
         <div className="comments-fullscreen__bg" style={{ backgroundImage: `url(${commentsTrack.cover})` }} />
       )}
-      <div className="comments-fullscreen__scrim" />
+      <div className="comments-fullscreen__scrim" onClick={handleClose} />
 
-      <button className="comments-fullscreen__close" onClick={closeComments}>
+      <button className="comments-fullscreen__close" onClick={handleClose}>
         <svg width="18" height="18" viewBox="0 0 8 18" fill="none">
           <path d="M7 1l-6 8 6 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
