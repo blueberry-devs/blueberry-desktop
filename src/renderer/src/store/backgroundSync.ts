@@ -97,9 +97,11 @@ function findMatchedLocal(
 
 /**
  * Download server-side liked tracks from other devices.
- * Individual likes/unlikes are already sent immediately by toggleLike.
+ * Individual likes/unlikes are already sent immediately by toggleLike,
+ * so this is only needed on app startup / login to pick up cross-device likes.
+ * Safe to call manually on critical desync.
  */
-async function syncLikes(token: string): Promise<void> {
+export async function syncLikes(token: string): Promise<void> {
   try {
     const currentLikes = getLikedTracks()
     const localIds = new Set(currentLikes.map((t) => t.id))
@@ -332,7 +334,9 @@ async function runSync(): Promise<void> {
     }
 
     // ===== Likes sync =====
-    await syncLikes(token)
+    // Likes are synced once at startup via startBackgroundSync.
+    // Individual likes/unlikes are sent immediately by toggleLike,
+    // and cross-device likes are fetched in AuthView after login.
 
     // Only mark synced if no real local changes happened during the sync.
     // addTracksSilently does NOT increment the generation, so this only
@@ -353,16 +357,20 @@ function tick(): void {
   if (!isAuthenticated()) return
   if (!isSynced()) {
     runSync()
-  } else {
-    // Even when playlists are synced, sync likes periodically
-    syncLikes(getAuth().accessToken!).catch(() => {})
   }
 }
 
 /** Start background sync polling. Safe to call multiple times. */
 export function startBackgroundSync(): void {
   stopBackgroundSync()
-  // Initial check
+
+  // Fetch server-side likes once at startup/login
+  const token = getAuth().accessToken
+  if (token) {
+    syncLikes(token)
+  }
+
+  // Initial playlist check
   tick()
   bgInterval = setInterval(tick, POLL_INTERVAL_MS)
 }
