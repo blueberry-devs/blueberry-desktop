@@ -59,6 +59,19 @@ export function useIsLiked(id: string | undefined): boolean {
   return id ? tracks.some((t) => t.id === id) : false
 }
 
+/**
+ * Add tracks to liked store without firing API calls.
+ * Used during initial sync after login to load server-side likes.
+ */
+export function addLikedTracksFromServer(tracks: TrackResult[]): void {
+  store.update((prev) => {
+    const existing = new Set(prev.map((t) => t.id))
+    const newOnes = tracks.filter((t) => !existing.has(t.id))
+    if (newOnes.length === 0) return prev
+    return [...newOnes, ...prev]
+  })
+}
+
 /** Clear all liked tracks (call on logout). */
 export function clearLikedTracks(): void {
   store.set([])

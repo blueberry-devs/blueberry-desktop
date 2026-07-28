@@ -8,8 +8,10 @@ import {
   syncAfterLogin,
   fetchCloudPlaylists,
   fetchAllCloudPlaylistTracks,
+  fetchUserLikes,
   type SyncChoice,
 } from '../services/playlists'
+import { addLikedTracksFromServer } from '../store/likes'
 import { useTranslation } from '../utils/useTranslation'
 import './AuthView.css'
 
@@ -88,6 +90,28 @@ interface AuthViewProps {
   onClose: () => void
 }
 
+/** Fetch server-side liked tracks and add them locally after login. */
+async function syncLikesAfterLogin(token: string): Promise<void> {
+  try {
+    const serverLikes = await fetchUserLikes(token, 'track')
+    const tracks = serverLikes
+      .filter((l) => l.track?.externalId)
+      .map((l) => ({
+        id: l.track!.externalId,
+        source: (l.track!.externalSource === 'YouTubeMusic' ? 'youtube'
+          : l.track!.externalSource === 'SoundCloud' ? 'soundcloud'
+          : 'yandex') as 'youtube' | 'soundcloud' | 'yandex',
+        title: l.track!.title,
+        artists: l.track!.artist ? [l.track!.artist] : [],
+        cover: l.track!.albumImageUrl,
+        duration: l.track!.duration ?? undefined,
+      }))
+    addLikedTracksFromServer(tracks)
+  } catch {
+    // Non-critical — background sync will catch up next cycle
+  }
+}
+
 export default function AuthView({ closing, onClose }: AuthViewProps) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<Mode>('login')
@@ -151,6 +175,10 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
     // Refresh cloud playlists for display elsewhere
     const fresh = await fetchCloudPlaylists(token)
     setCloudPlaylists(fresh)
+
+    // Sync likes from server
+    await syncLikesAfterLogin(token)
+
     markSynced()
     onClose()
   }, [onClose])
