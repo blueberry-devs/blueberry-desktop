@@ -254,7 +254,7 @@ export async function loadMoreCommentsFromServer(
 }
 
 /**
- * Add a comment. Tries server first, falls back to local-only on failure.
+ * Add a comment. Optimistic local save, updates with server data on success.
  * Returns the created comment.
  */
 export async function addComment(
@@ -277,32 +277,49 @@ export async function addComment(
     isLikedByMe: false,
   }
 
-  // Try server first with client-supplied UUID for idempotency
-  if (auth.accessToken) {
-    const created = await apiCreateComment({
-      id: commentId,
-      entityType: 'track',
-      entityId: trackId,
-      parentId: parentId ?? null,
-      text,
-    })
-    if (created) {
-      comment.id = created.id
-      comment.timestamp = new Date(created.createdAt).getTime()
-      comment.authorId = created.userId
-      comment.author = created.userName ?? author
-      comment.likeCount = created.likeCount
-      comment.isLikedByMe = created.isLikedByMe
-    }
-    // If server failed, we keep the local ID and save locally
-  }
-
-  // Save locally
+  // Optimistic local save — show immediately
   const all = cache[trackId] ?? []
   all.push(comment)
   cache = { ...cache, [trackId]: all }
   bumpRev(trackId)
   emit()
+
+  // Try server with client-supplied UUID for idempotency
+  if (auth.accessToken) {
+    try {
+      const created = await apiCreateComment({
+        id: commentId,
+        entityType: 'track',
+        entityId: trackId,
+        parentId: parentId ?? null,
+        text,
+      })
+      if (created) {
+        // Update with server data
+        cache = {
+          ...cache,
+          [trackId]: (cache[trackId] ?? []).map((c) =>
+            c.id === commentId
+              ? {
+                  ...c,
+                  id: created.id,
+                  timestamp: new Date(created.createdAt).getTime(),
+                  authorId: created.userId,
+                  author: created.userName ?? author,
+                  likeCount: created.likeCount,
+                  isLikedByMe: created.isLikedByMe,
+                }
+              : c,
+          ),
+        }
+        bumpRev(trackId)
+        emit()
+      }
+    } catch {
+      // Server failed — keep local version as-is (already in cache)
+    }
+  }
+
   return comment
 }
 
