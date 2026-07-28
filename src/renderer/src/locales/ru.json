@@ -363,5 +363,22 @@
   "language.name.en": "English",
 
   "contextMenu.play": "Воспроизвести",
-  "contextMenu.copy": "Копировать"
+  "contextMenu.copy": "Копировать",
+
+  "comments.title": "Комментарии",
+  "comments.placeholder": "Написать комментарий…",
+  "comments.send": "Отправить",
+  "comments.loginRequired": "Войдите, чтобы писать комментарии",
+  "comments.empty": "Комментариев пока нет",
+  "comments.loadMore": "Загрузить ещё",
+  "comments.translate": "Перевести",
+  "comments.original": "Оригинал",
+  "comments.delete": "Удалить",
+  "comments.reply": "Ответить",
+  "comments.like": "Нравится",
+  "comments.dislike": "Не нравится",
+  "comments.justNow": "только что",
+  "comments.minutesAgo": "{n} мин. назад",
+  "comments.hoursAgo": "{n} ч. назад",
+  "comments.daysAgo": "{n} д. назад"
 }

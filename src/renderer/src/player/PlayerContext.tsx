@@ -42,6 +42,8 @@ interface PlayerState {
   lyricsLoading: boolean
   isLyricsOpen: boolean
   lyricsOpenMode: 'cover' | 'lyrics'
+  isCommentsOpen: boolean
+  commentsTrack: TrackResult | null
   queue: TrackResult[]
   queueIndex: number
   loopMode: LoopMode
@@ -67,6 +69,8 @@ interface PlayerState {
   setActiveGenre: (g: string | null) => void
   openLyrics: (mode?: 'cover' | 'lyrics') => void
   closeLyrics: () => void
+  openComments: (track: TrackResult) => void
+  closeComments: () => void
   getFrequencyBands: (bandCount: number) => Float32Array
 }
 
@@ -110,6 +114,8 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
   const [lyricsPlain, setLyricsPlain] = useState<string[] | null>(null)
   const [lyricsLoading, setLyricsLoading] = useState(false)
   const [isLyricsOpen, setIsLyricsOpen] = useState(false)
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false)
+  const [commentsTrack, setCommentsTrack] = useState<TrackResult | null>(null)
   // Which view the fullscreen player should land on when it opens — the
   // cover by default (expand button, cover click), or straight into lyrics
   // when opened from the "Текст песни" menu item.
@@ -766,6 +772,16 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
 
   const closeLyrics = useCallback(() => setIsLyricsOpen(false), [])
 
+  const openComments = useCallback((track: TrackResult) => {
+    setCommentsTrack(track)
+    setIsCommentsOpen(true)
+  }, [])
+
+  const closeComments = useCallback(() => {
+    setIsCommentsOpen(false)
+    setCommentsTrack(null)
+  }, [])
+
   // cava-style log-spaced spectrum, read live (not through React state —
   // called from a rAF loop at 60fps, far too hot for re-renders). Low bands
   // get few bins (fine bass resolution), high bands get many bins averaged
@@ -846,6 +862,8 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       lyricsLoading,
       isLyricsOpen,
       lyricsOpenMode,
+      isCommentsOpen,
+      commentsTrack,
       queue,
       queueIndex,
       loopMode,
@@ -871,6 +889,8 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       setActiveGenre,
       openLyrics,
       closeLyrics,
+      openComments,
+      closeComments,
       getFrequencyBands
     }),
     [
@@ -886,6 +906,8 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       lyricsLoading,
       isLyricsOpen,
       lyricsOpenMode,
+      isCommentsOpen,
+      commentsTrack,
       queue,
       queueIndex,
       loopMode,
@@ -910,6 +932,8 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
       setVolume,
       openLyrics,
       closeLyrics,
+      openComments,
+      closeComments,
       getFrequencyBands
     ]
   )

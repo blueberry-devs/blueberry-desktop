@@ -24,7 +24,7 @@ interface Props {
 }
 
 function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: Props): JSX.Element {
-  const { currentTrack, isPlaying, isLoading, play, playQueue, queue: currentQueue, queueIndex } = usePlayer()
+  const { currentTrack, isPlaying, isLoading, play, playQueue, queue: currentQueue, queueIndex, openComments } = usePlayer()
   const liked = useIsLiked(track.id)
   const isCurrent = currentTrack?.id === track.id
   const isRowPlaying = isCurrent && isPlaying
@@ -86,7 +86,7 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
     if (onArtistClick) h += ITEM_H * track.artists.length
     h += SEP_H + ITEM_H       // sep + download
     h += SEP_H + ITEM_H * 2   // sep + soundcloud + youtube
-    h += SEP_H + ITEM_H       // sep + copy
+    h += SEP_H + ITEM_H * 2   // sep + comments + copy
     if (onRemoveFromPlaylist) h += SEP_H + ITEM_H // sep + remove
     const menuWidth = 200
     let x = e.clientX
@@ -295,6 +295,15 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
             Слушать через YouTube
           </button>
           <div className="track-row__ctx-sep" />
+          <button className="track-row__ctx-item" onClick={() => { openComments(track); closeCtx() }}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M14 2H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3l2 2 2-2h5a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" stroke="currentColor" strokeWidth="1.4" fill="none" />
+              <circle cx="5.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
+              <circle cx="8" cy="7.5" r="1" fill="currentColor" stroke="none" />
+              <circle cx="10.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
+            </svg>
+            Комментарии
+          </button>
           <button className="track-row__ctx-item" onClick={handleCopyInfo}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <rect x="4" y="2" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />

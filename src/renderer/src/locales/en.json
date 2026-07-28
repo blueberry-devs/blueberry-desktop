@@ -363,5 +363,22 @@
   "language.name.en": "English",
 
   "contextMenu.play": "Play",
-  "contextMenu.copy": "Copy"
+  "contextMenu.copy": "Copy",
+
+  "comments.title": "Comments",
+  "comments.placeholder": "Write a comment…",
+  "comments.send": "Send",
+  "comments.loginRequired": "Sign in to write comments",
+  "comments.empty": "No comments yet",
+  "comments.loadMore": "Load more",
+  "comments.translate": "Translate",
+  "comments.original": "Original",
+  "comments.delete": "Delete",
+  "comments.reply": "Reply",
+  "comments.like": "Like",
+  "comments.dislike": "Dislike",
+  "comments.justNow": "just now",
+  "comments.minutesAgo": "{n}m ago",
+  "comments.hoursAgo": "{n}h ago",
+  "comments.daysAgo": "{n}d ago"
 }

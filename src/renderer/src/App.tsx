@@ -10,6 +10,7 @@ import SplashScreen from './components/SplashScreen'
 // exit animation — closing it would flash back to fullscreen for a frame
 // before actually disappearing.
 import NowPlayingFullscreen from './components/NowPlayingFullscreen'
+import CommentsFullscreen from './components/CommentsFullscreen'
 import AuthView from './components/AuthView'
 import { PlayerProvider, usePlayer } from './player/PlayerContext'
 import { usePendingSearch } from './store/searchQuery'
@@ -50,7 +51,7 @@ function AppInner(): JSX.Element {
   const [appReady, setAppReady] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
   const [authClosing, setAuthClosing] = useState(false)
-  const { isPlaying, isLyricsOpen, currentTrack, getFrequencyBands, togglePlay, next, previous, closeLyrics } = usePlayer()
+  const { isPlaying, isLyricsOpen, isCommentsOpen, currentTrack, getFrequencyBands, togglePlay, next, previous, closeLyrics, closeComments } = usePlayer()
   const pendingSearch = usePendingSearch()
   const profile = useProfile()
 
@@ -118,9 +119,9 @@ function AppInner(): JSX.Element {
   // field so Space/K/L etc. still work normally in search boxes and forms.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape' && isLyricsOpen) {
-        closeLyrics()
-        return
+      if (e.key === 'Escape') {
+        if (isLyricsOpen) { closeLyrics(); return }
+        if (isCommentsOpen) { closeComments(); return }
       }
 
       const target = e.target as HTMLElement | null
@@ -215,6 +216,7 @@ function AppInner(): JSX.Element {
 
       <AnimatePresenceLazy>
         {isLyricsOpen && <NowPlayingFullscreen />}
+        {isCommentsOpen && <CommentsFullscreen />}
       </AnimatePresenceLazy>
     </div>
   )
