@@ -153,7 +153,7 @@ function AppInner(): JSX.Element {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isLyricsOpen, closeLyrics, togglePlay, next, previous, currentTrack])
+  }, [isLyricsOpen, isCommentsOpen, closeLyrics, closeComments, togglePlay, next, previous, currentTrack, toggleLike])
 
   const showMiniPlayer = activeTab !== 'wave'
 

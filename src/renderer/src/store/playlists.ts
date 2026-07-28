@@ -15,35 +15,48 @@ export interface Playlist {
   cover: string | null
   tracks: TrackResult[]
   createdAt: number
-  /** Server-side UUID if this playlist has been synced to the cloud */
-  cloudId?: string
+}
+
+/** Rough UUID check — id is a UUID if it matches standard format */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export function isUuid(id: string): boolean {
+  return UUID_RE.test(id)
 }
 
 let cache: Playlist[] = load()
 const listeners = new Set<() => void>()
 
-/** Tracks in-flight API requests per cloud playlist ID to prevent races */
+/** Tracks in-flight API requests per playlist ID to prevent races */
 const pendingCloudRequests = new Set<string>()
 
-/** Check if a cloud playlist has an in-flight API request */
-export function hasPendingCloudRequest(cloudId: string): boolean {
-  return pendingCloudRequests.has(cloudId)
+/** Check if a playlist has an in-flight API request */
+export function hasPendingCloudRequest(playlistId: string): boolean {
+  return pendingCloudRequests.has(playlistId)
 }
 
-/** Run a fire-and-forget cloud API call, but skip if one is already in-flight for this cloudId */
-function cloudRequest(cloudId: string, fn: () => Promise<unknown>): void {
-  if (pendingCloudRequests.has(cloudId)) {
-    console.log('[playlists] skipping duplicate cloud request for', cloudId)
+/** Run a fire-and-forget cloud API call, but skip if one is already in-flight for this playlist */
+function cloudRequest(id: string, fn: () => Promise<unknown>): void {
+  if (pendingCloudRequests.has(id)) {
+    console.log('[playlists] skipping duplicate cloud request for', id)
     return
   }
-  pendingCloudRequests.add(cloudId)
-  fn().finally(() => pendingCloudRequests.delete(cloudId))
+  pendingCloudRequests.add(id)
+  fn().finally(() => pendingCloudRequests.delete(id))
 }
 
 function load(): Playlist[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as Playlist[]) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as Array<Playlist & { cloudId?: string }>
+    // Migrate: old playlists had cloudId separate from id
+    return parsed.map((p) => {
+      if (p.cloudId) {
+        // Old format: id was pl_*, cloudId was UUID
+        return { id: p.cloudId, name: p.name, cover: p.cover, tracks: p.tracks, createdAt: p.createdAt }
+      }
+      return { id: p.id, name: p.name, cover: p.cover, tracks: p.tracks, createdAt: p.createdAt }
+    })
   } catch {
     return []
   }
@@ -72,30 +85,33 @@ export function getPlaylists(): Playlist[] {
 }
 
 export function createPlaylist(name: string, cover: string | null = null): Playlist {
+  const uuid = crypto.randomUUID()
   const playlist: Playlist = {
-    id: `pl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: uuid,
     name: name.trim() || 'Новый плейлист',
     cover,
     tracks: [],
-    createdAt: Date.now()
+    createdAt: Date.now(),
   }
   cache = [playlist, ...cache]
   markUnsynced()
   emit()
 
   // Fire-and-forget: create on server immediately if authenticated
+  // Server accepts our UUID — idempotent, creates with the same UUID
   const auth = getAuth()
   if (auth.accessToken) {
-    cloudRequest(playlist.id, async () => {
+    cloudRequest(uuid, async () => {
       const detail = await apiCreateCloudPlaylist(auth.accessToken, {
+        id: uuid,
         title: playlist.name,
         description: null,
         imageUrl: playlist.cover,
         isPublic: false,
       })
       if (!detail) return
-      setPlaylistCloudId(playlist.id, detail.id)
-      setPlaylistVersion(detail.id, detail.version)
+      // detail.id === uuid (server created with our id), so no id change needed
+      setPlaylistVersion(uuid, detail.version)
     })
   }
 
@@ -113,11 +129,11 @@ export function deletePlaylist(id: string): void {
   emit()
 
   // Soft delete on API if synced (moves to server-side trash)
-  if (pl.cloudId) {
-    removeCloudPlaylist(pl.cloudId)
+  if (isUuid(id)) {
+    removeCloudPlaylist(id)
     const auth = getAuth()
     if (auth.accessToken) {
-      cloudRequest(pl.cloudId, () => apiDeleteCloudPlaylist(auth.accessToken, pl.cloudId!))
+      cloudRequest(id, () => apiDeleteCloudPlaylist(auth.accessToken, id))
     }
   }
 }
@@ -137,14 +153,12 @@ export function restorePlaylist(id: string): void {
   markUnsynced()
   emit()
 
-  // Restore on server if it had a cloudId
-  const cloudId = cacheDeleted.playlist.cloudId
-  if (cloudId) {
+  // Restore on server if it was synced
+  if (isUuid(id)) {
     const auth = getAuth()
     if (auth.accessToken) {
-      cloudRequest(cloudId, async () => {
-        await apiRestoreCloudPlaylist(auth.accessToken, cloudId)
-        // Re-fetch cloud playlists to re-add to display
+      cloudRequest(id, async () => {
+        await apiRestoreCloudPlaylist(auth.accessToken, id)
         const cloudPls = await fetchCloudPlaylists(auth.accessToken)
         setCloudPlaylists(cloudPls)
       })
@@ -158,15 +172,12 @@ export function restorePlaylist(id: string): void {
  */
 export function forceDeletePlaylist(id: string): void {
   const deleted = getDeletedPlaylists().find((d) => d.playlist.id === id)
-
   removeDeletedPlaylist(id)
 
-  // Force delete on API if synced (permanent, bypasses trash)
-  if (deleted?.playlist.cloudId) {
-    const cloudId = deleted.playlist.cloudId
+  if (deleted && isUuid(id)) {
     const auth = getAuth()
     if (auth.accessToken) {
-      cloudRequest(cloudId, () => apiForceDeleteCloudPlaylist(auth.accessToken, cloudId))
+      cloudRequest(id, () => apiForceDeleteCloudPlaylist(auth.accessToken, id))
     }
   }
 }
@@ -193,12 +204,12 @@ export function addTrackToPlaylist(id: string, track: TrackResult): void {
   markUnsynced()
   emit()
 
-  // Fire-and-forget: push to cloud immediately if playlist has cloudId
+  // Fire-and-forget: push to cloud immediately if playlist has UUID (is synced)
   const auth = getAuth()
-  if (pl.cloudId && auth.accessToken) {
-    cloudRequest(pl.cloudId, async () => {
-      const newVersion = await apiAddTrackToCloudPlaylist(auth.accessToken, pl.cloudId!, track)
-      if (newVersion != null) setPlaylistVersion(pl.cloudId!, newVersion)
+  if (isUuid(id) && auth.accessToken) {
+    cloudRequest(id, async () => {
+      const newVersion = await apiAddTrackToCloudPlaylist(auth.accessToken, id, track)
+      if (newVersion != null) setPlaylistVersion(id, newVersion)
     })
   }
 }
@@ -207,22 +218,18 @@ export function removeTrackFromPlaylist(id: string, trackId: string): void {
   const pl = cache.find((p) => p.id === id)
   const track = pl?.tracks.find((t) => t.id === trackId)
 
-  console.log('[playlists] removeTrackFromPlaylist called', { id, trackId, plName: pl?.name, cloudId: pl?.cloudId, trackTitle: track?.title })
-
   cache = cache.map((p) => (p.id === id ? { ...p, tracks: p.tracks.filter((t) => t.id !== trackId) } : p))
   markUnsynced()
   emit()
 
   // Fire-and-forget: delete from cloud immediately if playlist is synced
-  if (track && pl?.cloudId) {
+  if (track && isUuid(id)) {
     const auth = getAuth()
     if (auth.accessToken) {
-      console.log('[playlists] calling apiRemoveTrackFromCloudPlaylist', { cloudId: pl.cloudId, trackId, trackTitle: track.title })
-      cloudRequest(pl.cloudId, async () => {
-        const newVersion = await apiRemoveTrackFromCloudPlaylist(auth.accessToken, pl.cloudId!, track)
+      cloudRequest(id, async () => {
+        const newVersion = await apiRemoveTrackFromCloudPlaylist(auth.accessToken, id, track)
         if (newVersion != null) {
-          console.log('[playlists] remove from cloud done, newVersion:', newVersion)
-          setPlaylistVersion(pl.cloudId!, newVersion)
+          setPlaylistVersion(id, newVersion)
         } else {
           console.warn('[playlists] remove from cloud returned null — track may not exist on server or resolve failed')
         }
@@ -233,7 +240,7 @@ export function removeTrackFromPlaylist(id: string, trackId: string): void {
   } else {
     console.warn('[playlists] skipping cloud delete —', {
       noTrack: !track,
-      noCloudId: !pl?.cloudId,
+      noUuid: !isUuid(id),
       playlistExists: !!pl,
     })
   }
@@ -258,18 +265,19 @@ export function moveTrackInPlaylist(id: string, fromIndex: number, toIndex: numb
  */
 export function addPlaylistFromCloud(playlist: Playlist): void {
   if (cache.some((p) => p.id === playlist.id)) return
-  // Auto-link cloudId for cloud_ prefixed playlists
-  const cloudId = playlist.id.startsWith('cloud_') ? playlist.id.slice(6) : undefined
-  cache = [...cache, cloudId ? { ...playlist, cloudId } : playlist]
+  cache = [...cache, playlist]
   emit()
 }
 
 /**
  * Set the cloud playlist UUID for a local playlist.
+ * For old playlists with prefixed id (pl_), changes the id to UUID.
+ * For new playlists that already have UUID as id, this is a no-op.
  * Does NOT mark as unsynced (this is set during cloud sync).
  */
-export function setPlaylistCloudId(id: string, cloudId: string): void {
-  cache = cache.map((p) => (p.id === id ? { ...p, cloudId } : p))
+export function setPlaylistCloudId(oldId: string, newId: string): void {
+  if (oldId === newId) return
+  cache = cache.map((p) => (p.id === oldId ? { ...p, id: newId } : p))
   emit()
 }
 

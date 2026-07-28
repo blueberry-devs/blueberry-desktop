@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { login, register, tryRestoreSession, getAuth } from '../store/auth'
-import { getPlaylists, addTrackToPlaylist, addPlaylistFromCloud, setPlaylistCloudId } from '../store/playlists'
+import { getPlaylists, addTrackToPlaylist, addPlaylistFromCloud, setPlaylistCloudId, isUuid } from '../store/playlists'
 import { setPlaylistVersion } from '../store/playlistVersions'
 import { markSynced } from '../store/playlistSync'
 import { setCloudPlaylists } from '../store/cloudPlaylists'
@@ -152,6 +152,12 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
     const token = getAuth().accessToken
     if (!token) { onClose(); return }
 
+    // Ensure all old playlists have UUID before syncing
+    for (const pl of getPlaylists()) {
+      if (!isUuid(pl.id)) {
+        setPlaylistCloudId(pl.id, crypto.randomUUID())
+      }
+    }
     const localPls = getPlaylists()
     const result = await syncAfterLogin(token, localPls, choice)
 
@@ -215,10 +221,9 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
     }
 
     // Also count new cloud-only playlists (no local match at all)
-    const localCloudIds = new Set(localPls.filter((p) => p.cloudId).map((p) => p.cloudId))
+    const localUuids = new Set(localPls.filter((p) => /^[0-9a-f-]{36}$/i.test(p.id)).map((p) => p.id))
     const newCloudCount = summaries.filter((s) => {
-      if (localCloudIds.has(s.id)) return false
-      if (localPls.some((p) => p.id === `cloud_${s.id}`)) return false
+      if (localUuids.has(s.id)) return false
       return !localByName.has(s.title.toLowerCase().trim())
     }).length
 

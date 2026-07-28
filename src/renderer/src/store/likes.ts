@@ -120,7 +120,7 @@ async function likeTrackOnServer(token: string, track: TrackResult): Promise<voi
     const resolved = await resolveTracks(token, [dto])
     if (!resolved.length || !resolved[0].id) return
 
-    await likeEntity(token, 'track', resolved[0].id)
+    await likeEntity(token, crypto.randomUUID(), 'track', resolved[0].id)
   } catch {
     // Non-critical — next background sync will reconcile
   }

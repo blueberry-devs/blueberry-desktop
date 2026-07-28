@@ -18,6 +18,7 @@ export interface TrackUploadDto {
 }
 
 interface SyncPlaylistRequest {
+  id: string
   title: string
   description: string | null
   imageUrl: string | null
@@ -81,6 +82,7 @@ function mapTrackToDto(track: TrackResult): TrackUploadDto {
 
 function mapPlaylistToSync(p: Playlist): SyncPlaylistRequest {
   return {
+    id: p.id,
     title: p.name,
     description: null,
     imageUrl: p.cover,
@@ -199,6 +201,20 @@ export interface TrackDto {
 
 export type SyncChoice = 'merge' | 'upload-new'
 
+export interface LibraryActionDto {
+  version: number
+  actionType: string
+  playlistId: string | null
+  entityId: string | null
+  playlistTitle: string | null
+  createdAt: string
+}
+
+export interface LibraryDiffResponse {
+  currentVersion: number
+  actions: LibraryActionDto[]
+}
+
 export interface SyncResult {
   /** Cloud playlists that don't exist locally — create these locally */
   newFromCloud: Playlist[]
@@ -267,7 +283,7 @@ export async function syncPlaylists(
  */
 export async function createCloudPlaylist(
   accessToken: string,
-  request: { title: string; description: string | null; imageUrl: string | null; isPublic: boolean },
+  request: { id: string; title: string; description: string | null; imageUrl: string | null; isPublic: boolean },
 ): Promise<CloudPlaylistDetail | null> {
   try {
     const res = await fetch(`${BASE_URL}/api/playlists`, {
@@ -658,6 +674,7 @@ export interface BatchLikeRequest {
 }
 
 export interface ToggleLikeRequest {
+  id: string
   entityType: string
   entityId: string
 }
@@ -766,10 +783,12 @@ export async function batchSyncLikes(
 }
 
 /**
- * Like a track or playlist. Returns the UserLikeDto on success.
+ * Like a track or playlist. Idempotent — server checks by `id`.
+ * Returns the UserLikeDto on success.
  */
 export async function likeEntity(
   accessToken: string,
+  id: string,
   entityType: string,
   entityId: string,
 ): Promise<UserLikeDto | null> {
@@ -780,7 +799,7 @@ export async function likeEntity(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ entityType, entityId } satisfies ToggleLikeRequest),
+      body: JSON.stringify({ id, entityType, entityId } satisfies ToggleLikeRequest),
     })
     if (!res.ok) return null
     return (await res.json()) as UserLikeDto
@@ -805,6 +824,33 @@ export async function unlikeEntity(
     return res.ok
   } catch {
     return false
+  }
+}
+
+/* ========== Library Diff ========== */
+
+/**
+ * Fetch library changes since a given version.
+ * Returns null if the version is too old (410 Gone) or on error.
+ * The client should store currentVersion from the response and pass it
+ * as sinceVersion on the next call.
+ */
+export async function fetchLibraryDiff(
+  accessToken: string,
+  sinceVersion: number,
+): Promise<LibraryDiffResponse | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/library/diff?sinceVersion=${sinceVersion}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (res.status === 410) {
+      // 410 Gone — client data too old, must full-resync
+      return null
+    }
+    if (!res.ok) return null
+    return (await res.json()) as LibraryDiffResponse
+  } catch {
+    return null
   }
 }
 
@@ -922,7 +968,7 @@ async function syncMerge(
     }
 
     result.newFromCloud.push({
-      id: `cloud_${detail.id}`,
+      id: detail.id,
       name: detail.title,
       cover: detail.imageUrl,
       tracks: detail.tracks.map(cloudTrackToLocal),
@@ -941,6 +987,7 @@ async function syncUploadNew(
   for (const pl of localPlaylists) {
     // Create new playlist on server
     const created = await createCloudPlaylist(accessToken, {
+      id: pl.id,
       title: pl.name,
       description: null,
       imageUrl: pl.cover,

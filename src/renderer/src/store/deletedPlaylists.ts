@@ -14,7 +14,19 @@ const listeners = new Set<() => void>()
 function load(): DeletedPlaylistEntry[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as DeletedPlaylistEntry[]) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as Array<{ playlist: Playlist & { cloudId?: string }; deletedAt: number }>
+    // Migrate: old playlists had cloudId separate from id
+    return parsed.map((entry) => {
+      const p = entry.playlist
+      if (p.cloudId) {
+        return {
+          playlist: { id: p.cloudId, name: p.name, cover: p.cover, tracks: p.tracks, createdAt: p.createdAt },
+          deletedAt: entry.deletedAt,
+        }
+      }
+      return entry as DeletedPlaylistEntry
+    })
   } catch {
     return []
   }

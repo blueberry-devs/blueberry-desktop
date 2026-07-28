@@ -29,12 +29,10 @@ function CollectionView(): JSX.Element {
   const downloadedTracks = useMemo(() => Object.values(downloads), [downloads])
   const favoritePlaylists = useFavoritePlaylists()
   const cloudPlaylists = useCloudPlaylists()
-  const localCloudIds = useMemo(() => new Set(playlists.filter((p) => p.cloudId).map((p) => p.cloudId)), [playlists])
+  const localCloudIds = useMemo(() => new Set(playlists.filter((p) => /^[0-9a-f-]{36}$/i.test(p.id)).map((p) => p.id)), [playlists])
   const cloudOnlyPlaylists = useMemo(() => cloudPlaylists.filter((pl) => {
-    if (localCloudIds.has(pl.id)) return false
-    if (playlists.some((p) => p.id === `cloud_${pl.id}`)) return false
-    return true
-  }), [cloudPlaylists, localCloudIds, playlists])
+    return !localCloudIds.has(pl.id)
+  }), [cloudPlaylists, localCloudIds])
   const [openPlaylistId, setOpenPlaylistId] = useState<string | null>(null)
   const [openRemotePlaylist, setOpenRemotePlaylist] = useState<PlaylistResult | null>(null)
   const [openCloudPlaylist, setOpenCloudPlaylist] = useState<Playlist | null>(null)
@@ -128,7 +126,7 @@ function CollectionView(): JSX.Element {
     if (!detail) return
 
     const syntheticPlaylist: Playlist = {
-      id: `cloud_${detail.id}`,
+      id: detail.id,
       name: detail.title,
       cover: detail.imageUrl,
       tracks: detail.tracks.map((t) => ({
@@ -295,7 +293,7 @@ function CollectionView(): JSX.Element {
           ))}
           {cloudOnlyPlaylists.map((pl) => (
             <button
-              key={`cloud_${pl.id}`}
+              key={pl.id}
               className="collection-view__playlist-card"
               onClick={() => handleOpenCloudPlaylist(pl)}
               disabled={cloudLoading === pl.id}

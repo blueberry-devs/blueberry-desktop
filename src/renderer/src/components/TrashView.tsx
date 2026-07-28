@@ -35,8 +35,8 @@ function TrashView({ onBack }: Props): JSX.Element {
     }
   }, [loadDeleted, hasShown])
 
-  // Filter out API items that already have a matching local trash entry (same cloudId)
-  const localCloudIds = new Set(deletedLocal.map((d) => d.playlist.cloudId).filter(Boolean))
+  // Filter out API items that already have a matching local trash entry (same UUID)
+  const localCloudIds = new Set(deletedLocal.filter((d) => /^[0-9a-f-]{36}$/i.test(d.playlist.id)).map((d) => d.playlist.id))
   const dedupedApiDeleted = apiDeletedCloudPls.filter((pl) => !localCloudIds.has(pl.id))
 
   const hasItems = deletedLocal.length > 0 || dedupedApiDeleted.length > 0
