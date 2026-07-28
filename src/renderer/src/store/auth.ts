@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { login as apiLogin, register as apiRegister, refresh as apiRefresh, getMe, type AuthUser } from '../services/auth'
 import { startBackgroundSync, stopBackgroundSync } from './backgroundSync'
 import { clearPlaylistCache } from '../services/playlists'
+import { clearLikedTracks } from './likes'
 
 const STORAGE_KEY = 'ym-clone:auth'
 
@@ -63,6 +64,7 @@ export function setAuth(state: AuthState): void {
 export function clearAuth(): void {
   cache = { accessToken: null, refreshToken: null, user: null }
   clearPlaylistCache()
+  clearLikedTracks()
   emit()
 }
 

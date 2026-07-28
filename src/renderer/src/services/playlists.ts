@@ -641,6 +641,142 @@ export function clearPlaylistCache(): void {
   _detailCache.clear()
 }
 
+/* ========== Likes API ========== */
+
+export interface UserLikeDto {
+  id: string
+  entityType: string
+  entityId: string
+  createdAt: string
+  track: TrackDto | null
+  playlist: PlaylistSummaryDto | null
+}
+
+export interface BatchLikeRequest {
+  clientVersion: number | null
+  actions: ToggleLikeRequest[]
+}
+
+export interface ToggleLikeRequest {
+  entityType: string
+  entityId: string
+}
+
+export interface BatchLikeResult {
+  accepted: boolean
+  newVersion: number
+  results: UserLikeDto[] | null
+  conflictDiff: LibraryDiffResponse | null
+}
+
+/**
+ * Fetch just the set of liked track UUIDs.
+ * Used by the frontend to highlight ❤️ in track-list views.
+ */
+export async function fetchLikedTrackIds(
+  accessToken: string,
+): Promise<string[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/likes/track-ids`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return []
+    return (await res.json()) as string[]
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Fetch full like objects, optionally filtered by entity type.
+ */
+export async function fetchUserLikes(
+  accessToken: string,
+  entityType?: string,
+): Promise<UserLikeDto[]> {
+  try {
+    const params = entityType ? `?entityType=${encodeURIComponent(entityType)}` : ''
+    const res = await fetch(`${BASE_URL}/api/likes${params}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return []
+    return (await res.json()) as UserLikeDto[]
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Batch-like multiple tracks/playlists in one request (offline-to-online sync).
+ * Idempotent — already-liked items are silently skipped.
+ *
+ * If clientVersion doesn't match the server version, returns a result with
+ * accepted: false and a conflictDiff so the client can catch up before retrying.
+ */
+export async function batchSyncLikes(
+  accessToken: string,
+  request: BatchLikeRequest,
+): Promise<BatchLikeResult | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/likes/batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(request),
+    })
+    const body = (await res.json()) as BatchLikeResult
+    if (!body || typeof body.accepted !== 'boolean') return null
+    return body
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Like a track or playlist. Returns the UserLikeDto on success.
+ */
+export async function likeEntity(
+  accessToken: string,
+  entityType: string,
+  entityId: string,
+): Promise<UserLikeDto | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/likes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ entityType, entityId } satisfies ToggleLikeRequest),
+    })
+    if (!res.ok) return null
+    return (await res.json()) as UserLikeDto
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Remove a like from a track or playlist.
+ */
+export async function unlikeEntity(
+  accessToken: string,
+  entityType: string,
+  entityId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/likes/${entityType}/${entityId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 /* ========== Orchestration ========== */
 
 /**
