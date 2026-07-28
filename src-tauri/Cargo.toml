@@ -1,0 +1,27 @@
+[package]
+name = "blueberry-desktop"
+version = "1.400.0"
+description = "Blueberry Desktop — Tauri v2"
+edition = "2021"
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+tokio = { version = "1", features = ["rt", "macros", "fs", "time", "sync"] }
+discord-rich-presence = "0.2"
+dirs = "6"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

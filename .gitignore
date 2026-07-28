@@ -8,6 +8,7 @@ build/
 
 # Rust
 server/target/
+src-tauri/target/
 
 # Python
 __pycache__/
@@ -22,6 +23,7 @@ venv/
 # Environment
 .env
 server/.env
+src-tauri/resources/.env
 
 # OS
 .DS_Store

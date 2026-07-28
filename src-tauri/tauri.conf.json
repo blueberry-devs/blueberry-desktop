@@ -1,0 +1,71 @@
+{
+  "productName": "Blueberry Desktop",
+  "version": "1.400.0",
+  "identifier": "com.blueberry.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm vite:dev",
+    "beforeBuildCommand": "pnpm vite:build"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Blueberry Desktop",
+        "width": 1280,
+        "height": 800,
+        "decorations": false,
+        "transparent": false,
+        "center": true,
+        "minWidth": 800,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https: http://localhost:8787 asset: https://asset.localhost; media-src 'self' https: file: http://localhost:8787 asset: https://asset.localhost stream:; connect-src 'self' http://localhost:8787 https: http://ipc.localhost https://ipc.localhost; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com"
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": false,
+      "tooltip": "Blueberry Desktop"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/music-server"
+    ],
+    "resources": [
+      "resources/.env",
+      "resources/artists/*",
+      "resources/moods/*",
+      "resources/images/*",
+      "resources/fonts/*",
+      "resources/discord/*"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/blueberry-devs/blueberry-desktop/releases/latest/download/latest.json"
+      ],
+      "pubkey": ""
+    }
+  }
+}

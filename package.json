@@ -2,26 +2,24 @@
   "name": "blueberry-desktop",
   "version": "1.400.0",
   "description": "Яндекс Музыка",
-  "main": "./out/main/index.js",
   "author": "blueberry team",
   "license": "GPL-3.0",
+  "type": "module",
   "scripts": {
-    "dev": "concurrently -n server,app -c yellow,cyan \"pnpm run dev:server\" \"electron-vite dev\"",
+    "dev": "tauri dev",
+    "build": "tauri build",
     "dev:server": "scripts\\dev-watch.bat",
-    "build": "electron-vite build",
-    "postinstall": "electron-builder install-app-deps",
-    "start": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.web.json",
     "build:server": "scripts\\build-server.bat",
-    "dist:win": "npm run build:server && npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:linux": "npm run build && electron-builder --linux",
-    "dist:all": "npm run build && electron-builder -mwl",
-    "release:win": "npm run build:server && npm run build && electron-builder --win --publish always"
+    "vite:dev": "vite dev",
+    "vite:build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.web.json"
   },
   "dependencies": {
-    "@xhayper/discord-rpc": "^1.3.4",
-    "electron-updater": "^6.8.9",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-process": "^2",
+    "@tauri-apps/plugin-shell": "^2",
+    "@tauri-apps/plugin-updater": "^2",
     "hls.js": "^1.6.16",
     "lucide-react": "1.27.0",
     "motion": "^12.42.2",
@@ -30,52 +28,11 @@
     "react-hot-toast": "^2.6.0",
     "virtua": "^0.50.0"
   },
-  "build": {
-    "appId": "com.blueberry.desktop",
-    "productName": "Blueberry-Desktop",
-    "icon": "resources/icon.png",
-    "extraResources": [
-      {
-        "from": "build/packed-server",
-        "to": "server"
-      },
-      {
-        "from": "resources/artists",
-        "to": "artists"
-      }
-    ],
-    "publish": {
-      "provider": "github",
-      "owner": "blueberry-devs",
-      "repo": "blueberry-desktop"
-    },
-    "win": {
-      "artifactName": "Blueberry-Desktop-Setup.${version}.exe",
-      "icon": "resources/icon.png"
-    },
-    "linux": {
-      "artifactName": "Blueberry-Desktop-${version}.AppImage",
-      "icon": "resources/icon.png"
-    },
-    "mac": {
-      "target": [
-        "zip"
-      ],
-      "artifactName": "Blueberry-Desktop-${version}-${arch}.zip",
-      "icon": "resources/icon-mac.png"
-    }
-  },
   "devDependencies": {
-    "@electron-toolkit/preload": "^3.0.1",
-    "@electron-toolkit/tsconfig": "^2.0.0",
-    "@electron-toolkit/utils": "^4.0.0",
+    "@tauri-apps/cli": "^2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
-    "concurrently": "^10.0.4",
-    "electron": "^43.2.0",
-    "electron-builder": "^26.15.3",
-    "electron-vite": "^5.0.0",
     "typescript": "^7.0.2",
     "vite": "^8.1.5"
   }
