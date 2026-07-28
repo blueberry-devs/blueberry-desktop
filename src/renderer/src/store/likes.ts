@@ -77,6 +77,14 @@ export function clearLikedTracks(): void {
   store.set([])
 }
 
+/**
+ * Replace all liked tracks with server data.
+ * Used when opening the likes page to reconcile with server state.
+ */
+export function setLikedTracks(tracks: TrackResult[]): void {
+  store.set(tracks)
+}
+
 /* ========== Internal API helpers ========== */
 
 function trackToDto(track: TrackResult): TrackUploadDto {

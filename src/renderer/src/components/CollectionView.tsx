@@ -1,12 +1,12 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from '../utils/useTranslation'
-import { useLikedTracks } from '../store/likes'
+import { useLikedTracks, setLikedTracks } from '../store/likes'
 import { usePlaylists, deletePlaylist, renamePlaylist, createPlaylist, addTrackToPlaylist } from '../store/playlists'
 import { useDeletedPlaylists } from '../store/deletedPlaylists'
 import { useFavoritePlaylists } from '../store/favoritePlaylists'
 import { useDownloads } from '../store/downloads'
 import { isAuthenticated, getAuth } from '../store/auth'
-import { fetchCloudPlaylists, fetchAllCloudPlaylistTracks, deleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
+import { fetchCloudPlaylists, fetchAllCloudPlaylistTracks, fetchUserLikes, deleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
 import { setCloudPlaylists, removeCloudPlaylist, useCloudPlaylists } from '../store/cloudPlaylists'
 import type { TrackSource, PlaylistResult } from '../api/yandexMusic'
 import type { Playlist } from '../store/playlists'
@@ -95,6 +95,29 @@ function CollectionView(): JSX.Element {
       setCloudPlaylists(cloud)
     })()
   }, [])
+
+  // Fetch likes from server when opening the likes page
+  useEffect(() => {
+    if (!showLiked) return
+    const token = getAuth().accessToken
+    if (!token) return
+    ;(async () => {
+      const serverLikes = await fetchUserLikes(token, 'track')
+      const tracks = serverLikes
+        .filter((l) => l.track?.externalId)
+        .map((l) => ({
+          id: l.track!.externalId,
+          source: (l.track!.externalSource === 'YouTubeMusic'
+            ? 'youtube' : l.track!.externalSource === 'SoundCloud'
+            ? 'soundcloud' : 'yandex') as 'youtube' | 'soundcloud' | 'yandex',
+          title: l.track!.title,
+          artists: l.track!.artist ? [l.track!.artist] : [],
+          cover: l.track!.albumImageUrl,
+          duration: l.track!.duration ?? undefined,
+        }))
+      setLikedTracks(tracks)
+    })()
+  }, [showLiked])
 
   async function handleOpenCloudPlaylist(pl: CloudPlaylistSummary): Promise<void> {
     const token = getAuth().accessToken

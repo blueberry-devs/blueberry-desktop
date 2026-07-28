@@ -11,7 +11,7 @@ import {
   fetchUserLikes,
   type SyncChoice,
 } from '../services/playlists'
-import { addLikedTracksFromServer } from '../store/likes'
+import { setLikedTracks } from '../store/likes'
 import { useTranslation } from '../utils/useTranslation'
 import './AuthView.css'
 
@@ -90,8 +90,9 @@ interface AuthViewProps {
   onClose: () => void
 }
 
-/** Fetch server-side liked tracks and add them locally after login. */
+/** Fetch server-side liked tracks and replace local store after login. */
 async function syncLikesAfterLogin(token: string): Promise<void> {
+  if (!token) return
   try {
     const serverLikes = await fetchUserLikes(token, 'track')
     const tracks = serverLikes
@@ -106,7 +107,7 @@ async function syncLikesAfterLogin(token: string): Promise<void> {
         cover: l.track!.albumImageUrl,
         duration: l.track!.duration ?? undefined,
       }))
-    addLikedTracksFromServer(tracks)
+    setLikedTracks(tracks)
   } catch {
     // Non-critical — background sync will catch up next cycle
   }
@@ -260,6 +261,9 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
         if (err) {
           setError(err)
         } else {
+          // Always sync likes from server
+          const loginToken = getAuth().accessToken
+          if (loginToken) syncLikesAfterLogin(loginToken)
           // Check if there are local playlists to sync
           if (getPlaylists().length > 0) {
             startSyncCheck()
@@ -275,6 +279,9 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
         } else if (result.emailConfirmationRequired) {
           setRegisteredEmail(email.trim())
         } else {
+          // Always sync likes from server
+          const regToken = getAuth().accessToken
+          if (regToken) syncLikesAfterLogin(regToken)
           // Check if there are local playlists to sync
           if (getPlaylists().length > 0) {
             startSyncCheck()
