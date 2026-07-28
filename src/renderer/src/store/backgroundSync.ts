@@ -1,7 +1,7 @@
 import { getPlaylists, addTracksSilently, addPlaylistFromCloud, setPlaylistCloudId, hasPendingCloudRequest, isUuid } from './playlists'
 import { getPlaylistVersion, setPlaylistVersion } from './playlistVersions'
 import { isSynced, markSynced, getUnsyncedGeneration } from './playlistSync'
-import { isAuthenticated, getAuth } from './auth'
+import { isAuthenticated } from './auth'
 import {
   resolveTracks,
   syncPlaylists as bulkSyncPlaylists,
@@ -107,11 +107,11 @@ function ensureAllUuids(): void {
  * so this is only needed on app startup / login to pick up cross-device likes.
  * Safe to call manually on critical desync.
  */
-export async function syncLikes(token: string): Promise<void> {
+export async function syncLikes(): Promise<void> {
   try {
     const currentLikes = getLikedTracks()
     const localIds = new Set(currentLikes.map((t) => t.id))
-    const serverLikes = await fetchUserLikes(token, 'track')
+    const serverLikes = await fetchUserLikes('track')
     const newTracks: TrackResult[] = []
 
     for (const like of serverLikes) {
@@ -147,9 +147,6 @@ async function runSync(): Promise<void> {
   isSyncing = true
   const genBefore = getUnsyncedGeneration()
   try {
-    const token = getAuth().accessToken
-    if (!token) return
-
     // Ensure all playlists have UUID as id BEFORE we fetch server data
     // (so old pl_ prefixed playlists get a UUID and become syncable)
     ensureAllUuids()
@@ -163,14 +160,14 @@ async function runSync(): Promise<void> {
 
     // 1. Resolve all unique tracks
     const allDtos = collectTrackDtos(localPlaylists)
-    const resolved = allDtos.length > 0 ? await resolveTracks(token, allDtos) : []
+    const resolved = allDtos.length > 0 ? await resolveTracks(allDtos) : []
     const extToUuid = new Map<string, string>()
     for (const rt of resolved) {
       extToUuid.set(rt.externalId, rt.id)
     }
 
     // 2. Fetch all server playlists
-    const allSummaries = await fetchCloudPlaylists(token)
+    const allSummaries = await fetchCloudPlaylists()
     const serverIds = new Set(allSummaries.map((s) => s.id))
 
     // 3. Match local UUIDs to server UUIDs
@@ -184,7 +181,7 @@ async function runSync(): Promise<void> {
 
     // 4. Upload truly new playlists (UUID exists locally but not on server)
     if (newLocal.length > 0) {
-      const created = await bulkSyncPlaylists(token, newLocal)
+      const created = await bulkSyncPlaylists(newLocal)
       for (const detail of created) {
         const local = newLocal.find(
           (p) => p.name.toLowerCase().trim() === detail.title.toLowerCase().trim(),
@@ -207,7 +204,7 @@ async function runSync(): Promise<void> {
     ]
     const details = await Promise.all(
       detailTargets.map((t) =>
-        fetchAllCloudPlaylistTracks(token, t.id).then((d) => ({ ...t, detail: d })),
+        fetchAllCloudPlaylistTracks(t.id).then((d) => ({ ...t, detail: d })),
       ),
     )
 
@@ -251,7 +248,7 @@ async function runSync(): Promise<void> {
           }))
 
         if (localAdds.length > 0) {
-          const resp = await syncPlaylist(token, id, Math.max(getPlaylistVersion(id), 1), localAdds)
+          const resp = await syncPlaylist(id, Math.max(getPlaylistVersion(id), 1), localAdds)
           if (resp) {
             setPlaylistVersion(id, resp.newVersion)
           }
@@ -282,7 +279,7 @@ async function runSync(): Promise<void> {
                 .map((t) => ({ uuid: extToUuid.get(t.id) ?? null }))
                 .filter((a) => a.uuid)
               if (actions.length > 0) {
-                const resp = await syncPlaylist(token, id, Math.max(cloudDetail.version, 1),
+                const resp = await syncPlaylist(id, Math.max(cloudDetail.version, 1),
                   actions.map((a) => ({ actionType: 'add' as const, trackId: a.uuid, position: null as number | null })))
                 if (resp) setPlaylistVersion(id, resp.newVersion)
               }

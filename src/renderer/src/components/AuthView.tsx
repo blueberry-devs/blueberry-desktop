@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { login, register, tryRestoreSession, getAuth } from '../store/auth'
+import { login, register, tryRestoreSession, isAuthenticated } from '../store/auth'
 import { getPlaylists, addTrackToPlaylist, addPlaylistFromCloud, setPlaylistCloudId, isUuid } from '../store/playlists'
 import { setPlaylistVersion } from '../store/playlistVersions'
 import { markSynced } from '../store/playlistSync'
@@ -91,10 +91,9 @@ interface AuthViewProps {
 }
 
 /** Fetch server-side liked tracks and replace local store after login. */
-async function syncLikesAfterLogin(token: string): Promise<void> {
-  if (!token) return
+async function syncLikesAfterLogin(): Promise<void> {
   try {
-    const serverLikes = await fetchUserLikes(token, 'track')
+    const serverLikes = await fetchUserLikes('track')
     const tracks = serverLikes
       .filter((l) => l.track?.externalId)
       .map((l) => ({
@@ -149,8 +148,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
 
   const executeSync = useCallback(async (choice: SyncChoice) => {
     setSyncState('syncing')
-    const token = getAuth().accessToken
-    if (!token) { onClose(); return }
+    if (!isAuthenticated()) { onClose(); return }
 
     // Ensure all old playlists have UUID before syncing
     for (const pl of getPlaylists()) {
@@ -159,7 +157,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
       }
     }
     const localPls = getPlaylists()
-    const result = await syncAfterLogin(token, localPls, choice)
+    const result = await syncAfterLogin(localPls, choice)
 
     // Apply merge results: extra tracks from cloud
     for (const { localId, tracks } of result.extraTracks) {
@@ -180,22 +178,21 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
     }
 
     // Refresh cloud playlists for display elsewhere
-    const fresh = await fetchCloudPlaylists(token)
+    const fresh = await fetchCloudPlaylists()
     setCloudPlaylists(fresh)
 
     // Sync likes from server
-    await syncLikesAfterLogin(token)
+    await syncLikesAfterLogin()
 
     markSynced()
     onClose()
   }, [onClose])
 
   const startSyncCheck = useCallback(async () => {
-    const token = getAuth().accessToken
-    if (!token) { onClose(); return }
+    if (!isAuthenticated()) { onClose(); return }
 
     setSyncState('checking')
-    const summaries = await fetchCloudPlaylists(token)
+    const summaries = await fetchCloudPlaylists()
 
     const localPls = getPlaylists()
     const localByName = new Map(localPls.map((p) => [p.name.toLowerCase().trim(), p]))
@@ -204,7 +201,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
     // Fetch details for matched playlists to compare content
     let realDiffCount = 0
     for (const s of matched) {
-      const detail = await fetchAllCloudPlaylistTracks(token, s.id)
+      const detail = await fetchAllCloudPlaylistTracks(s.id)
       if (!detail) continue
       const local = localByName.get(s.title.toLowerCase().trim())
       if (!local) continue
@@ -267,8 +264,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
           setError(err)
         } else {
           // Always sync likes from server
-          const loginToken = getAuth().accessToken
-          if (loginToken) syncLikesAfterLogin(loginToken)
+          if (isAuthenticated()) syncLikesAfterLogin()
           // Check if there are local playlists to sync
           if (getPlaylists().length > 0) {
             startSyncCheck()
@@ -285,8 +281,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
           setRegisteredEmail(email.trim())
         } else {
           // Always sync likes from server
-          const regToken = getAuth().accessToken
-          if (regToken) syncLikesAfterLogin(regToken)
+          if (isAuthenticated()) syncLikesAfterLogin()
           // Check if there are local playlists to sync
           if (getPlaylists().length > 0) {
             startSyncCheck()

@@ -5,7 +5,7 @@ import { usePlaylists, deletePlaylist, renamePlaylist, createPlaylist, addTrackT
 import { useDeletedPlaylists } from '../store/deletedPlaylists'
 import { useFavoritePlaylists } from '../store/favoritePlaylists'
 import { useDownloads } from '../store/downloads'
-import { isAuthenticated, getAuth } from '../store/auth'
+import { isAuthenticated } from '../store/auth'
 import { fetchCloudPlaylists, fetchAllCloudPlaylistTracks, fetchUserLikes, deleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
 import { setCloudPlaylists, removeCloudPlaylist, useCloudPlaylists } from '../store/cloudPlaylists'
 import type { TrackSource, PlaylistResult } from '../api/yandexMusic'
@@ -89,9 +89,8 @@ function CollectionView(): JSX.Element {
   // Refresh cloud playlists display on mount
   useEffect(() => {
     if (!isAuthenticated()) return
-    const token = getAuth().accessToken!
     ;(async () => {
-      const cloud = await fetchCloudPlaylists(token)
+      const cloud = await fetchCloudPlaylists()
       setCloudPlaylists(cloud)
     })()
   }, [])
@@ -99,10 +98,9 @@ function CollectionView(): JSX.Element {
   // Fetch likes from server when opening the likes page
   useEffect(() => {
     if (!showLiked) return
-    const token = getAuth().accessToken
-    if (!token) return
+    if (!isAuthenticated()) return
     ;(async () => {
-      const serverLikes = await fetchUserLikes(token, 'track')
+      const serverLikes = await fetchUserLikes('track')
       const tracks = serverLikes
         .filter((l) => l.track?.externalId)
         .map((l) => ({
@@ -120,10 +118,8 @@ function CollectionView(): JSX.Element {
   }, [showLiked])
 
   async function handleOpenCloudPlaylist(pl: CloudPlaylistSummary): Promise<void> {
-    const token = getAuth().accessToken
-    if (!token) return
     setCloudLoading(pl.id)
-    const detail = await fetchAllCloudPlaylistTracks(token, pl.id)
+    const detail = await fetchAllCloudPlaylistTracks(pl.id)
     setCloudLoading(null)
     if (!detail) return
 
@@ -242,9 +238,8 @@ function CollectionView(): JSX.Element {
         playlist={openCloudPlaylist}
         onBack={() => { setOpenCloudPlaylist(null); setOpenCloudPlaylistServerId(null) }}
         onDelete={async () => {
-          const token = getAuth().accessToken
-          if (!token || !openCloudPlaylistServerId) return
-          await deleteCloudPlaylist(token, openCloudPlaylistServerId)
+          if (!openCloudPlaylistServerId) return
+          await deleteCloudPlaylist(openCloudPlaylistServerId)
           removeCloudPlaylist(openCloudPlaylistServerId)
           setOpenCloudPlaylist(null)
           setOpenCloudPlaylistServerId(null)

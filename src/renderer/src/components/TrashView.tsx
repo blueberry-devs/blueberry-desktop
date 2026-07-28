@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { isAuthenticated, getAuth } from '../store/auth'
+import { isAuthenticated } from '../store/auth'
 import { restorePlaylist, forceDeletePlaylist } from '../store/playlists'
 import { useDeletedPlaylists } from '../store/deletedPlaylists'
 import { fetchDeletedCloudPlaylists, fetchCloudPlaylists, restoreCloudPlaylist as apiRestoreCloudPlaylist, forceDeleteCloudPlaylist as apiForceDeleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
@@ -21,8 +21,7 @@ function TrashView({ onBack }: Props): JSX.Element {
 
   const loadDeleted = useCallback(async () => {
     if (!isAuthenticated()) return
-    const token = getAuth().accessToken!
-    const result = await fetchDeletedCloudPlaylists(token)
+    const result = await fetchDeletedCloudPlaylists()
     if (result && Array.isArray(result.items)) {
       setApiDeletedCloudPls(result.items)
     }
@@ -128,12 +127,10 @@ function TrashView({ onBack }: Props): JSX.Element {
               <button
                 className="trash-view__restore"
                 onClick={async () => {
-                  const token = getAuth().accessToken
-                  if (!token) return
-                  const ok = await apiRestoreCloudPlaylist(token, pl.id)
+                  const ok = await apiRestoreCloudPlaylist(pl.id)
                   if (ok) {
                     setApiDeletedCloudPls((prev) => prev.filter((p) => p.id !== pl.id))
-                    const cloud = await fetchCloudPlaylists(token)
+                    const cloud = await fetchCloudPlaylists()
                     setCloudPlaylists(cloud)
                   }
                 }}
@@ -171,12 +168,9 @@ function TrashView({ onBack }: Props): JSX.Element {
             if (forceConfirm.type === 'local') {
               forceDeletePlaylist(forceConfirm.id)
             } else {
-              const token = getAuth().accessToken
-              if (token) {
-                apiForceDeleteCloudPlaylist(token, forceConfirm.id).then(() => {
-                  setApiDeletedCloudPls((prev) => prev.filter((p) => p.id !== forceConfirm.id))
-                })
-              }
+              apiForceDeleteCloudPlaylist(forceConfirm.id).then(() => {
+                setApiDeletedCloudPls((prev) => prev.filter((p) => p.id !== forceConfirm.id))
+              })
             }
             setForceConfirm(null)
           }}

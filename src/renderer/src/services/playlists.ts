@@ -1,7 +1,6 @@
 import type { Playlist } from '../store/playlists'
 import type { TrackResult } from '../api/yandexMusic'
-
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+import { apiFetch, apiFetchJson } from './apiClient'
 
 /* ========== Internal DTOs matching v1.yaml ========== */
 
@@ -232,24 +231,14 @@ export interface SyncResult {
  * Resolve external track references to server-side TrackDto (with UUIDs).
  */
 export async function resolveTracks(
-  accessToken: string,
   tracks: TrackUploadDto[],
 ): Promise<TrackDto[]> {
   if (tracks.length === 0) return []
-  try {
-    const res = await fetch(`${BASE_URL}/api/tracks/resolve`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(tracks),
-    })
-    if (!res.ok) return []
-    return (await res.json()) as TrackDto[]
-  } catch {
-    return []
-  }
+  return (await apiFetchJson<TrackDto[]>('/api/tracks/resolve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(tracks),
+  })) ?? []
 }
 
 /**
@@ -257,65 +246,34 @@ export async function resolveTracks(
  * Returns full details with current version and tracks.
  */
 export async function syncPlaylists(
-  accessToken: string,
   playlists: Playlist[],
 ): Promise<CloudPlaylistDetail[]> {
   if (playlists.length === 0) return []
-  try {
-    const body = playlists.map(mapPlaylistToSync)
-    const res = await fetch(`${BASE_URL}/api/playlists/sync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(body),
-    })
-    if (!res.ok) return []
-    return (await res.json()) as CloudPlaylistDetail[]
-  } catch {
-    return []
-  }
+  return (await apiFetchJson<CloudPlaylistDetail[]>('/api/playlists/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(playlists.map(mapPlaylistToSync)),
+  })) ?? []
 }
 
 /**
  * Create a single new playlist (no title-based matching).
  */
 export async function createCloudPlaylist(
-  accessToken: string,
   request: { id: string; title: string; description: string | null; imageUrl: string | null; isPublic: boolean },
 ): Promise<CloudPlaylistDetail | null> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/playlists`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(request),
-    })
-    if (!res.ok) return null
-    return (await res.json()) as CloudPlaylistDetail
-  } catch {
-    return null
-  }
+  return await apiFetchJson<CloudPlaylistDetail>('/api/playlists', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
 }
 
 /**
  * Fetch all cloud playlist summaries.
  */
-export async function fetchCloudPlaylists(
-  accessToken: string,
-): Promise<CloudPlaylistSummary[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/playlists`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!res.ok) return []
-    return (await res.json()) as CloudPlaylistSummary[]
-  } catch {
-    return []
-  }
+export async function fetchCloudPlaylists(): Promise<CloudPlaylistSummary[]> {
+  return (await apiFetchJson<CloudPlaylistSummary[]>('/api/playlists')) ?? []
 }
 
 /**
@@ -332,20 +290,19 @@ function _detailCacheKey(playlistId: string, page: number, pageSize: number): st
 }
 
 export async function fetchCloudPlaylistDetail(
-  accessToken: string,
   playlistId: string,
   page = 1,
   pageSize = 30,
 ): Promise<CloudPlaylistDetail | null> {
   try {
     const key = _detailCacheKey(playlistId, page, pageSize)
-    const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` }
+    const headers: Record<string, string> = {}
     const etag = _detailEtags.get(key)
     if (etag) {
       headers['If-None-Match'] = etag
     }
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
-    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}?${params}`, { headers })
+    const res = await apiFetch(`/api/playlists/${playlistId}?${params}`, { headers })
     if (res.status === 304) {
       return _detailCache.get(key) ?? null
     }
@@ -368,17 +325,16 @@ export async function fetchCloudPlaylistDetail(
  * Returns null if any page fails.
  */
 export async function fetchAllCloudPlaylistTracks(
-  accessToken: string,
   playlistId: string,
 ): Promise<CloudPlaylistDetail | null> {
   try {
-    const first = await fetchCloudPlaylistDetail(accessToken, playlistId, 1, 30)
+    const first = await fetchCloudPlaylistDetail(playlistId, 1, 30)
     if (!first) return null
 
     const allTracks = [...first.tracks]
 
     for (let p = 2; p <= first.totalPages; p++) {
-      const page = await fetchCloudPlaylistDetail(accessToken, playlistId, p, 30)
+      const page = await fetchCloudPlaylistDetail(playlistId, p, 30)
       if (!page) return null
       allTracks.push(...page.tracks)
     }
@@ -394,18 +350,17 @@ export async function fetchAllCloudPlaylistTracks(
  * Handles 304 (no changes) by returning null (caller treats null as "no diff").
  */
 export async function diffPlaylist(
-  accessToken: string,
   playlistId: string,
   sinceVersion: number,
 ): Promise<PlaylistDiffResponse | null> {
   try {
-    const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` }
+    const headers: Record<string, string> = {}
     const etag = _detailEtags.get(playlistId)
     if (etag) {
       headers['If-None-Match'] = etag
     }
-    const res = await fetch(
-      `${BASE_URL}/api/playlists/${playlistId}/diff?sinceVersion=${sinceVersion}`,
+    const res = await apiFetch(
+      `/api/playlists/${playlistId}/diff?sinceVersion=${sinceVersion}`,
       { headers },
     )
     if (res.status === 304) return null
@@ -422,18 +377,14 @@ export async function diffPlaylist(
  * current state even when versions clash.
  */
 export async function syncPlaylist(
-  accessToken: string,
   playlistId: string,
   clientVersion: number,
   localActions: PlaylistSyncActionDto[],
 ): Promise<PlaylistSyncResponse | null> {
   try {
-    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}/sync`, {
+    const res = await apiFetch(`/api/playlists/${playlistId}/sync`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientVersion, localActions } satisfies PlaylistSyncRequest),
     })
     // 409 still has a valid body with newVersion + serverActions
@@ -451,18 +402,14 @@ export async function syncPlaylist(
  * Returns the new playlist version, or null on failure.
  */
 export async function addTrackToCloudPlaylist(
-  accessToken: string,
   playlistId: string,
   track: TrackResult,
 ): Promise<number | null> {
   try {
     const dto = mapTrackToDto(track)
-    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}/tracks`, {
+    const res = await apiFetch(`/api/playlists/${playlistId}/tracks`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dto),
     })
     if (!res.ok) return null
@@ -479,28 +426,22 @@ export async function addTrackToCloudPlaylist(
  * Returns the new playlist version (may be null if the response has no body).
  */
 export async function removeTrackFromCloudPlaylist(
-  accessToken: string,
   playlistId: string,
   track: TrackResult,
 ): Promise<number | null> {
   try {
     console.log('[removeTrack] resolving external track:', track.id, track.title)
     const dto = mapTrackToDto(track)
-    const resolved = await resolveTracks(accessToken, [dto])
+    const resolved = await resolveTracks([dto])
     if (resolved.length === 0 || !resolved[0].id) {
       console.warn('[removeTrack] failed to resolve track to server UUID', track.id)
       return null
     }
     console.log('[removeTrack] resolved to server UUID:', resolved[0].id)
 
-    const url = `${BASE_URL}/api/playlists/${playlistId}/tracks/${resolved[0].id}`
+    const url = `/api/playlists/${playlistId}/tracks/${resolved[0].id}`
     console.log('[removeTrack] DELETE', url)
-    const res = await fetch(url, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    })
+    const res = await apiFetch(url, { method: 'DELETE' })
     console.log('[removeTrack] response status:', res.status)
     if (!res.ok) {
       const text = await res.text().catch(() => '')
@@ -527,13 +468,11 @@ export async function removeTrackFromCloudPlaylist(
  * Returns true if the server accepted the deletion.
  */
 export async function deleteCloudPlaylist(
-  accessToken: string,
   playlistId: string,
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}`, {
+    const res = await apiFetch(`/api/playlists/${playlistId}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${accessToken}` },
     })
     return res.ok
   } catch {
@@ -558,7 +497,6 @@ function _deletedCacheKey(page: number, pageSize: number, sortBy: DeletedPlaylis
 }
 
 export async function fetchDeletedCloudPlaylists(
-  accessToken: string,
   page = 1,
   pageSize = 20,
   sortBy: DeletedPlaylistSortBy = 0,
@@ -566,7 +504,7 @@ export async function fetchDeletedCloudPlaylists(
 ): Promise<PaginatedResult<CloudPlaylistSummary> | null> {
   try {
     const key = _deletedCacheKey(page, pageSize, sortBy, sortDirection)
-    const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` }
+    const headers: Record<string, string> = {}
     const etag = _deletedEtags.get(key)
     if (etag) {
       headers['If-None-Match'] = etag
@@ -577,7 +515,7 @@ export async function fetchDeletedCloudPlaylists(
       sortBy: String(sortBy),
       sortDirection: String(sortDirection),
     })
-    const res = await fetch(`${BASE_URL}/api/playlists/deleted?${params}`, { headers })
+    const res = await apiFetch(`/api/playlists/deleted?${params}`, { headers })
     if (res.status === 304) {
       // Not modified — return cached data
       return _deletedCacheMap.get(key) ?? null
@@ -617,13 +555,11 @@ export async function fetchDeletedCloudPlaylists(
  * Restore a soft-deleted cloud playlist from trash.
  */
 export async function restoreCloudPlaylist(
-  accessToken: string,
   playlistId: string,
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}/restore`, {
+    const res = await apiFetch(`/api/playlists/${playlistId}/restore`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
     })
     return res.ok
   } catch {
@@ -635,13 +571,11 @@ export async function restoreCloudPlaylist(
  * Permanently delete a cloud playlist (force delete, bypasses trash).
  */
 export async function forceDeleteCloudPlaylist(
-  accessToken: string,
   playlistId: string,
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}/force`, {
+    const res = await apiFetch(`/api/playlists/${playlistId}/force`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${accessToken}` },
     })
     return res.ok
   } catch {
@@ -690,18 +624,8 @@ export interface BatchLikeResult {
  * Fetch just the set of liked track UUIDs.
  * Used by the frontend to highlight ❤️ in track-list views.
  */
-export async function fetchLikedTrackIds(
-  accessToken: string,
-): Promise<string[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/likes/track-ids`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!res.ok) return []
-    return (await res.json()) as string[]
-  } catch {
-    return []
-  }
+export async function fetchLikedTrackIds(): Promise<string[]> {
+  return (await apiFetchJson<string[]>('/api/likes/track-ids')) ?? []
 }
 
 /**
@@ -710,22 +634,13 @@ export async function fetchLikedTrackIds(
  * Max pageSize is 30 (enforced by server).
  */
 export async function fetchUserLikesPage(
-  accessToken: string,
   page = 1,
   pageSize = 30,
   entityType?: string,
 ): Promise<PaginatedResult<UserLikeDto> | null> {
-  try {
-    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
-    if (entityType) params.set('entityType', entityType)
-    const res = await fetch(`${BASE_URL}/api/likes?${params}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!res.ok) return null
-    return (await res.json()) as PaginatedResult<UserLikeDto>
-  } catch {
-    return null
-  }
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  if (entityType) params.set('entityType', entityType)
+  return await apiFetchJson<PaginatedResult<UserLikeDto>>(`/api/likes?${params}`)
 }
 
 /**
@@ -733,17 +648,16 @@ export async function fetchUserLikesPage(
  * Iterates over all pages and merges results into a flat array.
  */
 export async function fetchUserLikes(
-  accessToken: string,
   entityType?: string,
 ): Promise<UserLikeDto[]> {
   try {
-    const first = await fetchUserLikesPage(accessToken, 1, 30, entityType)
+    const first = await fetchUserLikesPage(1, 30, entityType)
     if (!first) return []
 
     const allItems = [...first.items]
 
     for (let p = 2; p <= first.totalPages; p++) {
-      const page = await fetchUserLikesPage(accessToken, p, 30, entityType)
+      const page = await fetchUserLikesPage(p, 30, entityType)
       if (!page) break
       allItems.push(...page.items)
     }
@@ -762,16 +676,12 @@ export async function fetchUserLikes(
  * accepted: false and a conflictDiff so the client can catch up before retrying.
  */
 export async function batchSyncLikes(
-  accessToken: string,
   request: BatchLikeRequest,
 ): Promise<BatchLikeResult | null> {
   try {
-    const res = await fetch(`${BASE_URL}/api/likes/batch`, {
+    const res = await apiFetch('/api/likes/batch', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request),
     })
     const body = (await res.json()) as BatchLikeResult
@@ -787,39 +697,27 @@ export async function batchSyncLikes(
  * Returns the UserLikeDto on success.
  */
 export async function likeEntity(
-  accessToken: string,
   id: string,
   entityType: string,
   entityId: string,
 ): Promise<UserLikeDto | null> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/likes`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ id, entityType, entityId } satisfies ToggleLikeRequest),
-    })
-    if (!res.ok) return null
-    return (await res.json()) as UserLikeDto
-  } catch {
-    return null
-  }
+  return await apiFetchJson<UserLikeDto>('/api/likes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, entityType, entityId } satisfies ToggleLikeRequest),
+  })
 }
 
 /**
  * Remove a like from a track or playlist.
  */
 export async function unlikeEntity(
-  accessToken: string,
   entityType: string,
   entityId: string,
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/api/likes/${entityType}/${entityId}`, {
+    const res = await apiFetch(`/api/likes/${entityType}/${entityId}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${accessToken}` },
     })
     return res.ok
   } catch {
@@ -836,13 +734,10 @@ export async function unlikeEntity(
  * as sinceVersion on the next call.
  */
 export async function fetchLibraryDiff(
-  accessToken: string,
   sinceVersion: number,
 ): Promise<LibraryDiffResponse | null> {
   try {
-    const res = await fetch(`${BASE_URL}/api/library/diff?sinceVersion=${sinceVersion}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+    const res = await apiFetch(`/api/library/diff?sinceVersion=${sinceVersion}`)
     if (res.status === 410) {
       // 410 Gone — client data too old, must full-resync
       return null
@@ -867,7 +762,6 @@ export async function fetchLibraryDiff(
  *      then uploads tracks via per-playlist sync.
  */
 export async function syncAfterLogin(
-  accessToken: string,
   localPlaylists: Playlist[],
   choice: SyncChoice,
 ): Promise<SyncResult> {
@@ -894,7 +788,7 @@ export async function syncAfterLogin(
 
   let resolved: TrackDto[] = []
   if (allDtos.length > 0) {
-    resolved = await resolveTracks(accessToken, allDtos)
+    resolved = await resolveTracks(allDtos)
   }
 
   // Map externalId → server UUID
@@ -904,22 +798,32 @@ export async function syncAfterLogin(
   }
 
   if (choice === 'merge') {
-    await syncMerge(accessToken, localPlaylists, extToUuid, result)
+    await syncMerge(localPlaylists, extToUuid, result)
   } else {
-    await syncUploadNew(accessToken, localPlaylists, extToUuid, result)
+    await syncUploadNew(localPlaylists, extToUuid, result)
   }
 
   return result
 }
 
+export interface PlaylistSummaryDto {
+  id: string
+  title: string
+  description: string | null
+  imageUrl: string | null
+  trackCount: number
+  isPublic: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 async function syncMerge(
-  accessToken: string,
   localPlaylists: Playlist[],
   extToUuid: Map<string, string>,
   result: SyncResult,
 ): Promise<void> {
   // Bulk upload — server matches by title, returns full current state
-  const cloudDetails = await syncPlaylists(accessToken, localPlaylists)
+  const cloudDetails = await syncPlaylists(localPlaylists)
   if (!cloudDetails.length) return
 
   const localByName = new Map(
@@ -979,14 +883,13 @@ async function syncMerge(
 }
 
 async function syncUploadNew(
-  accessToken: string,
   localPlaylists: Playlist[],
   extToUuid: Map<string, string>,
   result: SyncResult,
 ): Promise<void> {
   for (const pl of localPlaylists) {
     // Create new playlist on server
-    const created = await createCloudPlaylist(accessToken, {
+    const created = await createCloudPlaylist({
       id: pl.id,
       title: pl.name,
       description: null,
@@ -1004,7 +907,7 @@ async function syncUploadNew(
 
     const syncResp =
       actions.length > 0
-        ? await syncPlaylist(accessToken, created.id, 1, actions)
+        ? await syncPlaylist(created.id, 1, actions)
         : null
 
     result.cloudIdMap[pl.id] = created.id

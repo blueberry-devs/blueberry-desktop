@@ -1,6 +1,5 @@
 import { TrackResult } from '../api/yandexMusic'
 import { createStore } from '../services/store'
-import { getAuth } from './auth'
 import { resolveTracks, likeEntity, unlikeEntity } from '../services/playlists'
 import type { TrackUploadDto } from '../services/playlists'
 
@@ -25,8 +24,6 @@ export function isLiked(id: string): boolean {
  * the server API in the background (fire-and-forget).
  */
 export function toggleLike(track: TrackResult): void {
-  const token = getAuth().accessToken
-
   store.update((prev) => {
     const wasLiked = prev.some((t) => t.id === track.id)
 
@@ -34,16 +31,12 @@ export function toggleLike(track: TrackResult): void {
       // Unlike: remove from local store, fire DELETE in background
       const next = prev.filter((t) => t.id !== track.id)
 
-      if (token) {
-        unlikeTrackOnServer(token, track)
-      }
+      unlikeTrackOnServer(track)
 
       return next
     } else {
       // Like: add to local store, fire POST in background
-      if (token) {
-        likeTrackOnServer(token, track)
-      }
+      likeTrackOnServer(track)
 
       return [track, ...prev]
     }
@@ -114,25 +107,25 @@ function trackToDto(track: TrackResult): TrackUploadDto {
   }
 }
 
-async function likeTrackOnServer(token: string, track: TrackResult): Promise<void> {
+async function likeTrackOnServer(track: TrackResult): Promise<void> {
   try {
     const dto = trackToDto(track)
-    const resolved = await resolveTracks(token, [dto])
+    const resolved = await resolveTracks([dto])
     if (!resolved.length || !resolved[0].id) return
 
-    await likeEntity(token, crypto.randomUUID(), 'track', resolved[0].id)
+    await likeEntity(crypto.randomUUID(), 'track', resolved[0].id)
   } catch {
     // Non-critical — next background sync will reconcile
   }
 }
 
-async function unlikeTrackOnServer(token: string, track: TrackResult): Promise<void> {
+async function unlikeTrackOnServer(track: TrackResult): Promise<void> {
   try {
     const dto = trackToDto(track)
-    const resolved = await resolveTracks(token, [dto])
+    const resolved = await resolveTracks([dto])
     if (!resolved.length || !resolved[0].id) return
 
-    await unlikeEntity(token, 'track', resolved[0].id)
+    await unlikeEntity('track', resolved[0].id)
   } catch {
     // Non-critical — next background sync will reconcile
   }

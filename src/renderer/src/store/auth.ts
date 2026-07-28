@@ -218,7 +218,7 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 const REFRESH_INTERVAL_MS = 50 * 60 * 1000 // refresh 10 min before 1-hour expiry
 let isRefreshing = false
 
-async function doRefresh(): Promise<boolean> {
+export async function doRefresh(): Promise<boolean> {
   if (isRefreshing) return false
   isRefreshing = true
   try {

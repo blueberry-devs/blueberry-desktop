@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { TrackResult } from '../api/yandexMusic'
 import { markUnsynced } from './playlistSync'
-import { getAuth } from './auth'
 import { setPlaylistVersion } from './playlistVersions'
 import { addTrackToCloudPlaylist as apiAddTrackToCloudPlaylist, removeTrackFromCloudPlaylist as apiRemoveTrackFromCloudPlaylist, deleteCloudPlaylist as apiDeleteCloudPlaylist, createCloudPlaylist as apiCreateCloudPlaylist, restoreCloudPlaylist as apiRestoreCloudPlaylist, forceDeleteCloudPlaylist as apiForceDeleteCloudPlaylist, fetchCloudPlaylists } from '../services/playlists'
 import { removeCloudPlaylist, setCloudPlaylists } from './cloudPlaylists'
@@ -99,21 +98,18 @@ export function createPlaylist(name: string, cover: string | null = null): Playl
 
   // Fire-and-forget: create on server immediately if authenticated
   // Server accepts our UUID — idempotent, creates with the same UUID
-  const auth = getAuth()
-  if (auth.accessToken) {
-    cloudRequest(uuid, async () => {
-      const detail = await apiCreateCloudPlaylist(auth.accessToken, {
-        id: uuid,
-        title: playlist.name,
-        description: null,
-        imageUrl: playlist.cover,
-        isPublic: false,
-      })
-      if (!detail) return
-      // detail.id === uuid (server created with our id), so no id change needed
-      setPlaylistVersion(uuid, detail.version)
+  cloudRequest(uuid, async () => {
+    const detail = await apiCreateCloudPlaylist({
+      id: uuid,
+      title: playlist.name,
+      description: null,
+      imageUrl: playlist.cover,
+      isPublic: false,
     })
-  }
+    if (!detail) return
+    // detail.id === uuid (server created with our id), so no id change needed
+    setPlaylistVersion(uuid, detail.version)
+  })
 
   return playlist
 }
@@ -131,10 +127,7 @@ export function deletePlaylist(id: string): void {
   // Soft delete on API if synced (moves to server-side trash)
   if (isUuid(id)) {
     removeCloudPlaylist(id)
-    const auth = getAuth()
-    if (auth.accessToken) {
-      cloudRequest(id, () => apiDeleteCloudPlaylist(auth.accessToken, id))
-    }
+    cloudRequest(id, () => apiDeleteCloudPlaylist(id))
   }
 }
 
@@ -155,14 +148,11 @@ export function restorePlaylist(id: string): void {
 
   // Restore on server if it was synced
   if (isUuid(id)) {
-    const auth = getAuth()
-    if (auth.accessToken) {
-      cloudRequest(id, async () => {
-        await apiRestoreCloudPlaylist(auth.accessToken, id)
-        const cloudPls = await fetchCloudPlaylists(auth.accessToken)
-        setCloudPlaylists(cloudPls)
-      })
-    }
+    cloudRequest(id, async () => {
+      await apiRestoreCloudPlaylist(id)
+      const cloudPls = await fetchCloudPlaylists()
+      setCloudPlaylists(cloudPls)
+    })
   }
 }
 
@@ -175,10 +165,7 @@ export function forceDeletePlaylist(id: string): void {
   removeDeletedPlaylist(id)
 
   if (deleted && isUuid(id)) {
-    const auth = getAuth()
-    if (auth.accessToken) {
-      cloudRequest(id, () => apiForceDeleteCloudPlaylist(auth.accessToken, id))
-    }
+    cloudRequest(id, () => apiForceDeleteCloudPlaylist(id))
   }
 }
 
@@ -205,10 +192,9 @@ export function addTrackToPlaylist(id: string, track: TrackResult): void {
   emit()
 
   // Fire-and-forget: push to cloud immediately if playlist has UUID (is synced)
-  const auth = getAuth()
-  if (isUuid(id) && auth.accessToken) {
+  if (isUuid(id)) {
     cloudRequest(id, async () => {
-      const newVersion = await apiAddTrackToCloudPlaylist(auth.accessToken, id, track)
+      const newVersion = await apiAddTrackToCloudPlaylist(id, track)
       if (newVersion != null) setPlaylistVersion(id, newVersion)
     })
   }
@@ -224,19 +210,14 @@ export function removeTrackFromPlaylist(id: string, trackId: string): void {
 
   // Fire-and-forget: delete from cloud immediately if playlist is synced
   if (track && isUuid(id)) {
-    const auth = getAuth()
-    if (auth.accessToken) {
-      cloudRequest(id, async () => {
-        const newVersion = await apiRemoveTrackFromCloudPlaylist(auth.accessToken, id, track)
-        if (newVersion != null) {
-          setPlaylistVersion(id, newVersion)
-        } else {
-          console.warn('[playlists] remove from cloud returned null — track may not exist on server or resolve failed')
-        }
-      })
-    } else {
-      console.warn('[playlists] not authenticated — skipping cloud delete')
-    }
+    cloudRequest(id, async () => {
+      const newVersion = await apiRemoveTrackFromCloudPlaylist(id, track)
+      if (newVersion != null) {
+        setPlaylistVersion(id, newVersion)
+      } else {
+        console.warn('[playlists] remove from cloud returned null — track may not exist on server or resolve failed')
+      }
+    })
   } else {
     console.warn('[playlists] skipping cloud delete —', {
       noTrack: !track,

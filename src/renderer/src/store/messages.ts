@@ -215,7 +215,8 @@ export async function loadCommentsFromServer(
   const meta = ensureMeta(trackId)
   if (meta.fetchedFromServer) return // already loaded
 
-  const result = await apiFetchComments(auth.accessToken, trackId, 'track', undefined, PAGE_SIZE)
+  // apiFetchJson inside apiFetchComments already handles 401 → auto-refresh
+  const result = await apiFetchComments(trackId, 'track', undefined, PAGE_SIZE)
   if (!result) {
     // Server unavailable — keep local cache as-is
     return
@@ -240,7 +241,6 @@ export async function loadMoreCommentsFromServer(
   if (meta.nextCursor == null) return false
 
   const result = await apiFetchComments(
-    auth.accessToken,
     trackId,
     'track',
     meta.nextCursor,
@@ -279,7 +279,7 @@ export async function addComment(
 
   // Try server first with client-supplied UUID for idempotency
   if (auth.accessToken) {
-    const created = await apiCreateComment(auth.accessToken, {
+    const created = await apiCreateComment({
       id: commentId,
       entityType: 'track',
       entityId: trackId,
@@ -315,7 +315,7 @@ export async function deleteComment(
 ): Promise<void> {
   const auth = getAuth()
   if (auth.accessToken) {
-    await apiDeleteComment(auth.accessToken, commentId)
+    await apiDeleteComment(commentId)
   }
   // Always remove locally regardless of server result
   const all = cache[trackId] ?? []
@@ -361,8 +361,8 @@ export async function toggleLike(
   // Try server
   if (auth.accessToken) {
     const dto = wasLiked
-      ? await apiUnlikeComment(auth.accessToken, commentId)
-      : await apiLikeComment(auth.accessToken, commentId)
+      ? await apiUnlikeComment(commentId)
+      : await apiLikeComment(commentId)
     if (dto) {
       // Apply server state
       cache = {
