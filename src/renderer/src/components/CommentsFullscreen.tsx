@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { VList, type VListHandle } from 'virtua'
 import { usePlayer } from '../player/PlayerContext'
@@ -59,7 +59,6 @@ function CommentsFullscreen(): JSX.Element | null {
   const [input, setInput] = useState('')
   const [serverLoading, setServerLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [repliesMap, setRepliesMap] = useState<Record<string, Comment[]>>({})
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const vlistRef = useRef<VListHandle>(null)
@@ -97,13 +96,13 @@ function CommentsFullscreen(): JSX.Element | null {
   useCommentsRev(trackId ?? '')
 
   // Build replies map
-  useEffect(() => {
-    if (!trackId) return
+  const repliesMap = useMemo<Record<string, Comment[]>>(() => {
+    if (!trackId) return {}
     const map: Record<string, Comment[]> = {}
     for (const c of allComments) {
       map[c.id] = getReplies(trackId, c.id)
     }
-    setRepliesMap(map)
+    return map
   }, [allComments, trackId])
 
   // Initial load: show local then fetch server
