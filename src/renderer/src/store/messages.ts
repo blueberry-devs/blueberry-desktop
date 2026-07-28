@@ -307,17 +307,19 @@ export async function addComment(
 }
 
 /**
- * Delete a comment and its replies. Tries server, always removes locally.
+ * Delete a comment and its replies. Optimistic local remove,
+ * rolls back on server failure.
  */
 export async function deleteComment(
   trackId: string,
   commentId: string,
 ): Promise<void> {
   const auth = getAuth()
-  if (auth.accessToken) {
-    await apiDeleteComment(commentId)
-  }
-  // Always remove locally regardless of server result
+
+  // Snapshot for rollback
+  const prev = cache[trackId]
+
+  // Optimistic local remove
   const all = cache[trackId] ?? []
   cache = {
     ...cache,
@@ -325,6 +327,18 @@ export async function deleteComment(
   }
   bumpRev(trackId)
   emit()
+
+  // Try server
+  if (auth.accessToken) {
+    try {
+      await apiDeleteComment(commentId)
+    } catch {
+      // Rollback on failure
+      cache = { ...cache, [trackId]: prev ?? [] }
+      bumpRev(trackId)
+      emit()
+    }
+  }
 }
 
 /**
