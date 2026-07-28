@@ -1,19 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
+import { VList, type VListHandle } from 'virtua'
 import { usePlayer } from '../player/PlayerContext'
 import { useTranslation } from '../utils/useTranslation'
-import { isAuthenticated, openAuth } from '../store/auth'
-import { getAuth } from '../store/auth'
+import { isAuthenticated, openAuth, getAuth } from '../store/auth'
 import {
-  getCommentsPage,
+  getComments,
   getReplies,
   addComment,
   deleteComment,
   toggleLike,
   toggleDislike,
+  getCommentCount,
+  loadCommentsFromServer,
+  loadMoreCommentsFromServer,
+  hasServerFetched,
+  hasMoreServerPages,
+  useCommentsRev,
   type Comment,
 } from '../store/messages'
 import './CommentsFullscreen.css'
+
+/* ========== Helpers ========== */
 
 const _avatarColors = [
   '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981',
@@ -38,144 +46,169 @@ function formatTime(ts: number, t: (k: string) => string): string {
   const hours = Math.floor(mins / 60)
   if (hours < 24) return t('comments.hoursAgo').replace('{n}', String(hours))
   const days = Math.floor(hours / 24)
-  return t('comments.daysAgo').replace('{n}', String(days))
+  if (days < 7) return t('comments.daysAgo').replace('{n}', String(days))
+  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(ts)
 }
+
+/* ========== Component ========== */
 
 function CommentsFullscreen(): JSX.Element | null {
   const { commentsTrack, closeComments } = usePlayer()
   const { t } = useTranslation()
-  const [page, setPage] = useState(0)
-  const [comments, setComments] = useState<Comment[]>([])
-  const [repliesMap, setRepliesMap] = useState<Record<string, Comment[]>>({})
-  const [hasMore, setHasMore] = useState(false)
-  const [input, setInput] = useState('')
+
   const [replyTo, setReplyTo] = useState<{ parentId: string; author: string } | null>(null)
-  const [translated, setTranslated] = useState<Record<string, boolean>>({})
+  const [input, setInput] = useState('')
   const [closing, setClosing] = useState(false)
-  const sentinelRef = useRef<HTMLDivElement>(null)
+  const [serverLoading, setServerLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const [repliesMap, setRepliesMap] = useState<Record<string, Comment[]>>({})
+
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const vlistRef = useRef<VListHandle>(null)
+  const mountedRef = useRef(true)
+  const loadingMoreRef = useRef(false)
 
   const handleClose = useCallback(() => {
     if (closing) return
     setClosing(true)
-    setTimeout(closeComments, 320)
+    setTimeout(() => {
+      if (mountedRef.current) closeComments()
+    }, 320)
   }, [closing, closeComments])
 
-  // Intercept Escape before App.tsx global handler so animation plays fully
+  // Capture-phase Escape interception
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       const target = e.target as HTMLElement | null
-      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') {
+        if (replyTo) {
+          setReplyTo(null)
+          setInput('')
+          return
+        }
+        return
+      }
       e.stopImmediatePropagation()
       handleClose()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [handleClose])
+  }, [handleClose, replyTo])
 
   const trackId = commentsTrack?.id
   const authed = isAuthenticated()
   const currentUser = getAuth().user?.username ?? getAuth().user?.email ?? ''
 
-  useEffect(() => {
-    if (!trackId) return
-    setPage(0)
-    const res = getCommentsPage(trackId, 0)
-    setComments(res.comments)
-    setHasMore(res.hasMore)
-    setTranslated({})
-    setReplyTo(null)
-    setInput('')
-  }, [trackId])
+  // All top-level comments (VList handles virtualisation)
+  const allComments: Comment[] = trackId ? getComments(trackId) : []
+  const totalComments = trackId ? getCommentCount(trackId) : 0
 
-  useEffect(() => {
-    if (!trackId || page === 0) return
-    const res = getCommentsPage(trackId, page)
-    setComments((prev) => [...prev, ...res.comments])
-    setHasMore(res.hasMore)
-  }, [page, trackId])
+  // Reactively update from store
+  useCommentsRev(trackId ?? '')
 
-  useEffect(() => {
-    if (!hasMore) return
-    const el = sentinelRef.current
-    if (!el) return
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setPage((p) => p + 1)
-      },
-      { rootMargin: '200px' },
-    )
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [hasMore])
-
+  // Build replies map
   useEffect(() => {
     if (!trackId) return
     const map: Record<string, Comment[]> = {}
-    for (const c of comments) {
+    for (const c of allComments) {
       map[c.id] = getReplies(trackId, c.id)
     }
     setRepliesMap(map)
-  }, [comments, trackId])
+  }, [allComments, trackId])
 
-  const refreshComments = (): void => {
+  // Initial load: show local then fetch server
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+
+  useEffect(() => {
     if (!trackId) return
-    setPage(0)
-    const res = getCommentsPage(trackId, 0)
-    setComments(res.comments)
-    setHasMore(res.hasMore)
-  }
-
-  const handleSend = (): void => {
-    const text = input.trim()
-    if (!text || !trackId) return
-    addComment(trackId, currentUser || 'Anonymous', text, replyTo?.parentId)
-    setInput('')
     setReplyTo(null)
-    refreshComments()
-    inputRef.current?.focus()
-  }
+    setInput('')
+    setServerLoading(true)
 
-  const handleReply = (commentId: string, author: string): void => {
+    if (!hasServerFetched(trackId)) {
+      loadCommentsFromServer(trackId)
+        .catch(() => {})
+        .finally(() => {
+          if (mountedRef.current) setServerLoading(false)
+        })
+    } else {
+      setServerLoading(false)
+    }
+  }, [trackId])
+
+  const hasMoreServer = trackId ? hasMoreServerPages(trackId) : false
+
+  // VList scroll handler: load more when near bottom
+  const handleScroll = useCallback((_offset: number): void => {
+    if (!hasMoreServer || loadingMoreRef.current || !vlistRef.current) return
+    const vs = vlistRef.current.viewportSize
+    const ss = vlistRef.current.scrollSize
+    const off = vlistRef.current.scrollOffset
+    if (off + vs >= ss - 500) {
+      loadingMoreRef.current = true
+      loadMoreCommentsFromServer(trackId ?? '').finally(() => {
+        loadingMoreRef.current = false
+      })
+    }
+  }, [hasMoreServer, trackId])
+
+  const handleSend = useCallback(async (): Promise<void> => {
+    const text = input.trim()
+    if (!text || !trackId || sending) return
+    setSending(true)
+    try {
+      const comment = await addComment(trackId, currentUser || 'Anonymous', text, replyTo?.parentId)
+      setInput('')
+      setReplyTo(null)
+      // Scroll to top to see new comment
+      vlistRef.current?.scrollTo(0)
+    } finally {
+      setSending(false)
+      inputRef.current?.focus()
+    }
+  }, [input, trackId, sending, currentUser, replyTo])
+
+  const handleReply = useCallback((commentId: string, author: string): void => {
     setInput(`@${author} `)
     setReplyTo({ parentId: commentId, author })
     inputRef.current?.focus()
-  }
+  }, [])
 
-  const handleKeyDown = (e: React.KeyboardEvent): void => {
+  const cancelReply = useCallback((): void => {
+    setReplyTo(null)
+    setInput('')
+    inputRef.current?.focus()
+  }, [])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent): void => {
     if (e.key === 'Escape' && replyTo) {
-      setReplyTo(null)
-      setInput('')
+      cancelReply()
       return
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
-  }
+  }, [handleSend, replyTo, cancelReply])
 
-  const handleDelete = (commentId: string): void => {
+  const handleDelete = useCallback(async (commentId: string): Promise<void> => {
     if (!trackId) return
-    deleteComment(trackId, commentId)
-    refreshComments()
-  }
+    await deleteComment(trackId, commentId)
+  }, [trackId])
 
-  const handleLike = (commentId: string): void => {
+  const handleLike = useCallback(async (commentId: string): Promise<void> => {
     if (!trackId || !currentUser) return
-    toggleLike(trackId, commentId, currentUser)
-    refreshComments()
-  }
+    await toggleLike(trackId, commentId, currentUser)
+  }, [trackId, currentUser])
 
-  const handleDislike = (commentId: string): void => {
+  const handleDislike = useCallback(async (commentId: string): Promise<void> => {
     if (!trackId || !currentUser) return
-    toggleDislike(trackId, commentId, currentUser)
-    refreshComments()
-  }
-
-  const handleTranslate = (commentId: string): void => {
-    setTranslated((prev) => ({ ...prev, [commentId]: !prev[commentId] }))
-  }
+    await toggleDislike(trackId, commentId, currentUser)
+  }, [trackId, currentUser])
 
   if (!commentsTrack) return null
 
@@ -187,38 +220,98 @@ function CommentsFullscreen(): JSX.Element | null {
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
     >
       {commentsTrack.cover && (
-        <div className="comments-fullscreen__bg" style={{ backgroundImage: `url(${commentsTrack.cover})` }} />
+        <div
+          className="comments-fullscreen__bg"
+          style={{ backgroundImage: `url(${commentsTrack.cover})` }}
+        />
       )}
       <div className="comments-fullscreen__scrim" onClick={handleClose} />
 
-      <button className="comments-fullscreen__close" onClick={handleClose}>
-        <svg width="18" height="18" viewBox="0 0 8 18" fill="none">
-          <path d="M7 1l-6 8 6 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+      <div className="comments-fullscreen__layout">
+        {/* ===== Left sidebar ===== */}
+        <div className="comments-fullscreen__sidebar">
+          <div className="comments-fullscreen__cover">
+            {commentsTrack.cover ? (
+              <img src={commentsTrack.cover} alt="" />
+            ) : (
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                <circle cx="20" cy="20" r="8" stroke="currentColor" strokeWidth="1.4" />
+              </svg>
+            )}
+          </div>
+          <div className="comments-fullscreen__track-title">{commentsTrack.title}</div>
+          <div className="comments-fullscreen__track-artist">{commentsTrack.artists.join(', ')}</div>
+          <div className="comments-fullscreen__track-meta">
+            {totalComments} {totalComments === 1 ? t('comments.commentOne') : t('comments.commentMany')}
+          </div>
+        </div>
 
-      <div className="comments-fullscreen__body">
-        <div className="comments-fullscreen__left">
-          <div className="comments-fullscreen__left-top">
-            <div className="comments-fullscreen__cover">
-              {commentsTrack.cover ? (
-                <img src={commentsTrack.cover} alt="" />
-              ) : (
-                <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-                  <circle cx="20" cy="20" r="8" stroke="currentColor" strokeWidth="1.4" />
-                </svg>
-              )}
-            </div>
-            <div className="comments-fullscreen__title">{commentsTrack.title}</div>
-            <div className="comments-fullscreen__artist">{commentsTrack.artists.join(', ')}</div>
+        {/* ===== Right panel ===== */}
+        <div className="comments-fullscreen__main">
+          {/* Header with back button */}
+          <div className="comments-fullscreen__header">
+            <button className="comments-fullscreen__back" onClick={handleClose}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {t('comments.title')}
+            </button>
+            <span className="comments-fullscreen__header-count">{totalComments}</span>
           </div>
 
+          {/* Comments list with virtual scroll */}
+          <div className="comments-fullscreen__list">
+            {serverLoading && allComments.length === 0 ? (
+              <div className="comments-fullscreen__loading">
+                <div className="comments-fullscreen__skeleton" />
+                <div className="comments-fullscreen__skeleton" />
+                <div className="comments-fullscreen__skeleton" />
+              </div>
+            ) : allComments.length === 0 ? (
+              <div className="comments-fullscreen__empty">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="comments-fullscreen__empty-icon">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <span>{t('comments.empty')}</span>
+              </div>
+            ) : (
+              <VList
+                ref={vlistRef}
+                data={allComments}
+                onScroll={handleScroll}
+                style={{ height: '100%' }}
+              >
+                {(comment) => (
+                  <CommentRow
+                    key={comment.id}
+                    comment={comment}
+                    replies={repliesMap[comment.id] ?? []}
+                    trackId={trackId!}
+                    authed={authed}
+                    currentUser={currentUser}
+                    onReply={handleReply}
+                    onDelete={handleDelete}
+                    onLike={handleLike}
+                    onDislike={handleDislike}
+                    t={t}
+                  />
+                )}
+              </VList>
+            )}
+            {hasMoreServer && loadingMoreRef.current && (
+              <div className="comments-fullscreen__loading-more" />
+            )}
+          </div>
+
+          {/* Input at bottom */}
           {authed ? (
-            <div className="comments-fullscreen__form-wrap">
+            <div className="comments-fullscreen__input-area">
               {replyTo && (
                 <div className="comments-fullscreen__replying">
-                  {t('comments.reply')} — @{replyTo.author}
-                  <button onClick={() => { setReplyTo(null); setInput('') }}>
+                  <span className="comments-fullscreen__replying-text">
+                    {t('comments.replyingTo')} <strong>@{replyTo.author}</strong>
+                  </span>
+                  <button className="comments-fullscreen__replying-cancel" onClick={cancelReply}>
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                       <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                     </svg>
@@ -234,17 +327,22 @@ function CommentsFullscreen(): JSX.Element | null {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   rows={1}
+                  disabled={sending}
                 />
                 <button
                   className="comments-fullscreen__send-btn"
-                  disabled={!input.trim()}
+                  disabled={!input.trim() || sending}
                   onClick={handleSend}
                   title={t('comments.send')}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <polyline points="19 12 12 19 5 12" />
-                  </svg>
+                  {sending ? (
+                    <span className="comments-fullscreen__sending-spinner" />
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <polyline points="19 12 12 19 5 12" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>
@@ -254,35 +352,12 @@ function CommentsFullscreen(): JSX.Element | null {
             </div>
           )}
         </div>
-
-        <div className="comments-fullscreen__right">
-          {comments.length === 0 ? (
-            <div className="comments-fullscreen__status">{t('comments.empty')}</div>
-          ) : (
-            comments.map((comment) => (
-              <CommentRow
-                key={comment.id}
-                comment={comment}
-                replies={repliesMap[comment.id] ?? []}
-                trackId={trackId!}
-                authed={authed}
-                currentUser={currentUser}
-                translated={translated}
-                onTranslate={handleTranslate}
-                onReply={handleReply}
-                onDelete={handleDelete}
-                onLike={handleLike}
-                onDislike={handleDislike}
-                t={t}
-              />
-            ))
-          )}
-          {hasMore && <div ref={sentinelRef} className="comments-fullscreen__sentinel" />}
-        </div>
       </div>
     </motion.div>
   )
 }
+
+/* ========== Comment Row ========== */
 
 function CommentRow({
   comment,
@@ -290,8 +365,6 @@ function CommentRow({
   trackId,
   authed,
   currentUser,
-  translated,
-  onTranslate,
   onReply,
   onDelete,
   onLike,
@@ -303,8 +376,6 @@ function CommentRow({
   trackId: string
   authed: boolean
   currentUser: string
-  translated: Record<string, boolean>
-  onTranslate: (id: string) => void
   onReply: (commentId: string, author: string) => void
   onDelete: (id: string) => void
   onLike: (id: string) => void
@@ -314,9 +385,11 @@ function CommentRow({
   const isOwner = authed && (currentUser === comment.author)
   const liked = authed && comment.likes.includes(currentUser)
   const disliked = authed && comment.dislikes.includes(currentUser)
+  const [showReplies, setShowReplies] = useState(false)
+  const hasReplies = replies.length > 0
 
   return (
-    <>
+    <div className="comments-fullscreen__comment-wrap">
       <div className="comments-fullscreen__comment">
         <div className="comments-fullscreen__avatar" style={{ background: avatarColor(comment.author) }}>
           {avatarLetter(comment.author)}
@@ -329,7 +402,7 @@ function CommentRow({
           <div className="comments-fullscreen__comment-text">{comment.text}</div>
           <div className="comments-fullscreen__comment-actions">
             <button
-              className={`comments-fullscreen__comment-action${liked ? ' comments-fullscreen__comment-action--liked' : ''}`}
+              className={`comments-fullscreen__action${liked ? ' comments-fullscreen__action--liked' : ''}`}
               onClick={() => onLike(comment.id)}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -338,7 +411,7 @@ function CommentRow({
               {comment.likes.length > 0 && <span>{comment.likes.length}</span>}
             </button>
             <button
-              className={`comments-fullscreen__comment-action${disliked ? ' comments-fullscreen__comment-action--disliked' : ''}`}
+              className={`comments-fullscreen__action${disliked ? ' comments-fullscreen__action--disliked' : ''}`}
               onClick={() => onDislike(comment.id)}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill={disliked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -347,7 +420,7 @@ function CommentRow({
               {comment.dislikes.length > 0 && <span>{comment.dislikes.length}</span>}
             </button>
             {authed && (
-              <button className="comments-fullscreen__comment-action" onClick={() => onReply(comment.id, comment.author)}>
+              <button className="comments-fullscreen__action" onClick={() => onReply(comment.id, comment.author)}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 9 9 15 15 21" />
                 </svg>
@@ -355,16 +428,32 @@ function CommentRow({
               </button>
             )}
             {isOwner && (
-              <button className="comments-fullscreen__comment-action comments-fullscreen__comment-action--danger" onClick={() => onDelete(comment.id)}>
+              <button className="comments-fullscreen__action comments-fullscreen__action--danger" onClick={() => onDelete(comment.id)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
                 {t('comments.delete')}
               </button>
             )}
           </div>
         </div>
       </div>
-      {replies.length > 0 && (
+
+      {hasReplies && (
+        <div className="comments-fullscreen__replies-toggle">
+          <button className="comments-fullscreen__replies-btn" onClick={() => setShowReplies(!showReplies)}>
+            <span className="comments-fullscreen__replies-line" />
+            {showReplies
+              ? t('comments.hideReplies')
+              : t('comments.showReplies').replace('{n}', String(replies.length))}
+          </button>
+        </div>
+      )}
+
+      {hasReplies && showReplies && (
         <div className="comments-fullscreen__replies">
-          {replies.map((reply) => (
+          {replies.slice(0, 5).map((reply) => (
             <ReplyRow
               key={reply.id}
               comment={reply}
@@ -376,11 +465,18 @@ function CommentRow({
               t={t}
             />
           ))}
+          {replies.length > 5 && (
+            <div className="comments-fullscreen__replies-more">
+              {t('comments.moreReplies').replace('{n}', String(replies.length - 5))}
+            </div>
+          )}
         </div>
       )}
-    </>
+    </div>
   )
 }
+
+/* ========== Reply Row ========== */
 
 function ReplyRow({
   comment,
@@ -405,7 +501,15 @@ function ReplyRow({
 
   return (
     <div className="comments-fullscreen__comment comments-fullscreen__comment--reply">
-      <div className="comments-fullscreen__avatar" style={{ background: avatarColor(comment.author), width: 28, height: 28, fontSize: 11 }}>
+      <div
+        className="comments-fullscreen__avatar"
+        style={{
+          background: avatarColor(comment.author),
+          width: 28,
+          height: 28,
+          fontSize: 11,
+        }}
+      >
         {avatarLetter(comment.author)}
       </div>
       <div className="comments-fullscreen__comment-body">
@@ -416,7 +520,7 @@ function ReplyRow({
         <div className="comments-fullscreen__comment-text">{comment.text}</div>
         <div className="comments-fullscreen__comment-actions">
           <button
-            className={`comments-fullscreen__comment-action${liked ? ' comments-fullscreen__comment-action--liked' : ''}`}
+            className={`comments-fullscreen__action${liked ? ' comments-fullscreen__action--liked' : ''}`}
             onClick={() => onLike(comment.id)}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -425,7 +529,7 @@ function ReplyRow({
             {comment.likes.length > 0 && <span>{comment.likes.length}</span>}
           </button>
           <button
-            className={`comments-fullscreen__comment-action${disliked ? ' comments-fullscreen__comment-action--disliked' : ''}`}
+            className={`comments-fullscreen__action${disliked ? ' comments-fullscreen__action--disliked' : ''}`}
             onClick={() => onDislike(comment.id)}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill={disliked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -434,7 +538,11 @@ function ReplyRow({
             {comment.dislikes.length > 0 && <span>{comment.dislikes.length}</span>}
           </button>
           {isOwner && (
-            <button className="comments-fullscreen__comment-action comments-fullscreen__comment-action--danger" onClick={() => onDelete(comment.id)}>
+            <button className="comments-fullscreen__action comments-fullscreen__action--danger" onClick={() => onDelete(comment.id)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
               {t('comments.delete')}
             </button>
           )}

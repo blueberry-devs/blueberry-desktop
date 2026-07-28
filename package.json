@@ -26,7 +26,8 @@
     "lucide-react": "1.27.0",
     "motion": "^12.42.2",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "virtua": "^0.50.0"
   },
   "build": {
     "appId": "com.blueberry.desktop",
