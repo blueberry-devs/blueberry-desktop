@@ -156,7 +156,6 @@ function CommentsFullscreen(): JSX.Element | null {
   }, [input, trackId, sending, currentUser, replyTo])
 
   const handleReply = useCallback((commentId: string, author: string): void => {
-    setInput(`@${author} `)
     setReplyTo({ parentId: commentId, author })
     inputRef.current?.focus()
   }, [])
@@ -303,7 +302,7 @@ function CommentsFullscreen(): JSX.Element | null {
                 <textarea
                   ref={inputRef}
                   className="comments-fullscreen__input"
-                  placeholder={replyTo ? `${t('comments.reply')}...` : t('comments.placeholder')}
+                  placeholder={replyTo ? `${t('comments.reply')} @${replyTo.author}` : t('comments.placeholder')}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
