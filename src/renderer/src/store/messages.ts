@@ -377,6 +377,7 @@ export async function toggleLike(
       }
     }),
   }
+  bumpRev(trackId)
   emit()
 
   // Try server
@@ -397,6 +398,7 @@ export async function toggleLike(
           }
         }),
       }
+      bumpRev(trackId)
       emit()
       return
     }
