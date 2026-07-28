@@ -6,7 +6,7 @@ import {
   resolveTracks,
   syncPlaylists as bulkSyncPlaylists,
   fetchCloudPlaylists,
-  fetchCloudPlaylistDetail,
+  fetchAllCloudPlaylistTracks,
   diffPlaylist,
   syncPlaylist,
 } from '../services/playlists'
@@ -135,7 +135,7 @@ async function runSync(): Promise<void> {
       if (!pl.cloudId) continue
       if (hasPendingCloudRequest(pl.cloudId)) continue // skip — user action in flight
 
-      const cloudDetail = await fetchCloudPlaylistDetail(token, pl.cloudId)
+      const cloudDetail = await fetchAllCloudPlaylistTracks(token, pl.cloudId)
       if (!cloudDetail) continue
 
       let storedVersion = getPlaylistVersion(pl.cloudId)
@@ -230,7 +230,7 @@ async function runSync(): Promise<void> {
       if (localCloudIds.has(summary.id)) continue
 
       // Fetch detail to compare tracks
-      const detail = await fetchCloudPlaylistDetail(token, summary.id)
+      const detail = await fetchAllCloudPlaylistTracks(token, summary.id)
       if (!detail) continue
 
       const cloudTrackIds = new Set(detail.tracks.map((t) => t.externalId))

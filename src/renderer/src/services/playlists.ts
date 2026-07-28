@@ -139,6 +139,14 @@ export interface CloudTrackDto {
   externalUrl: string
 }
 
+export interface PaginatedResult<T> {
+  items: T[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 export interface CloudPlaylistDetail {
   id: string
   title: string
@@ -146,6 +154,10 @@ export interface CloudPlaylistDetail {
   imageUrl: string | null
   isPublic: boolean
   version: number
+  totalTracks: number
+  currentPage: number
+  pageSize: number
+  totalPages: number
   tracks: CloudTrackDto[]
   createdAt: string
   updatedAt: string
@@ -291,8 +303,9 @@ export async function fetchCloudPlaylists(
 }
 
 /**
- * Fetch a single playlist full detail (with tracks + version).
+ * Fetch a single playlist full detail (with paginated tracks).
  * Supports If-None-Match conditional requests using playlist version ETag.
+ * Page numbers are 1-based; pageSize is capped at 30 by the server.
  */
 const _detailEtags = new Map<string, string>()
 const _detailCache = new Map<string, CloudPlaylistDetail>()
@@ -300,6 +313,8 @@ const _detailCache = new Map<string, CloudPlaylistDetail>()
 export async function fetchCloudPlaylistDetail(
   accessToken: string,
   playlistId: string,
+  page = 1,
+  pageSize = 30,
 ): Promise<CloudPlaylistDetail | null> {
   try {
     const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` }
@@ -307,7 +322,8 @@ export async function fetchCloudPlaylistDetail(
     if (etag) {
       headers['If-None-Match'] = etag
     }
-    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}`, { headers })
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}?${params}`, { headers })
     if (res.status === 304) {
       return _detailCache.get(playlistId) ?? null
     }
@@ -319,6 +335,33 @@ export async function fetchCloudPlaylistDetail(
     const detail = (await res.json()) as CloudPlaylistDetail
     _detailCache.set(playlistId, detail)
     return detail
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch ALL tracks from a cloud playlist by iterating pages.
+ * Merges tracks from every page into a single CloudPlaylistDetail.
+ * Returns null if any page fails.
+ */
+export async function fetchAllCloudPlaylistTracks(
+  accessToken: string,
+  playlistId: string,
+): Promise<CloudPlaylistDetail | null> {
+  try {
+    const first = await fetchCloudPlaylistDetail(accessToken, playlistId, 1, 30)
+    if (!first) return null
+
+    const allTracks = [...first.tracks]
+
+    for (let p = 2; p <= first.totalPages; p++) {
+      const page = await fetchCloudPlaylistDetail(accessToken, playlistId, p, 30)
+      if (!page) return null
+      allTracks.push(...page.tracks)
+    }
+
+    return { ...first, tracks: allTracks }
   } catch {
     return null
   }
@@ -476,42 +519,68 @@ export async function deleteCloudPlaylist(
   }
 }
 
+export type DeletedPlaylistSortBy = 0 | 1 | 2 // 0 = deletedAt, 1 = name, 2 = trackCount
+export type SortDirection = 0 | 1 // 0 = asc, 1 = desc
+
 /**
- * Fetch list of soft-deleted cloud playlists (trash).
+ * Fetch a page of soft-deleted cloud playlists (trash).
  * Supports If-None-Match conditional requests using LibraryVersion ETag.
+ * Returns the paginated result, or null on failure.
  */
 let _deletedEtag: string | null = null
-let _deletedCache: CloudPlaylistSummary[] = []
+let _deletedCache: PaginatedResult<CloudPlaylistSummary> | null = null
 
 export async function fetchDeletedCloudPlaylists(
   accessToken: string,
-): Promise<CloudPlaylistSummary[]> {
+  page = 1,
+  pageSize = 20,
+  sortBy: DeletedPlaylistSortBy = 0,
+  sortDirection: SortDirection = 1,
+): Promise<PaginatedResult<CloudPlaylistSummary> | null> {
   try {
     const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` }
     if (_deletedEtag) {
       headers['If-None-Match'] = _deletedEtag
     }
-    const res = await fetch(`${BASE_URL}/api/playlists/deleted`, { headers })
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      sortBy: String(sortBy),
+      sortDirection: String(sortDirection),
+    })
+    const res = await fetch(`${BASE_URL}/api/playlists/deleted?${params}`, { headers })
     if (res.status === 304) {
       // Not modified — return cached data
       return _deletedCache
     }
-    if (!res.ok) return []
+    if (!res.ok) return null
 
     // Update ETag from response
     const etag = res.headers.get('ETag')
     if (etag) _deletedEtag = etag
 
     const body = await res.json()
-    let items: CloudPlaylistSummary[] = []
-    if (Array.isArray(body)) items = body as CloudPlaylistSummary[]
-    else if (body && Array.isArray(body.items)) items = body.items as CloudPlaylistSummary[]
+    // Handle both array (old) and PaginatedResult (new) response shapes
+    let result: PaginatedResult<CloudPlaylistSummary>
+    if (Array.isArray(body)) {
+      result = {
+        items: body as CloudPlaylistSummary[],
+        totalCount: body.length,
+        page: 1,
+        pageSize: body.length,
+        totalPages: 1,
+      }
+    } else if (body && Array.isArray(body.items)) {
+      result = body as PaginatedResult<CloudPlaylistSummary>
+    } else {
+      result = { items: [], totalCount: 0, page: 1, pageSize: 20, totalPages: 0 }
+    }
 
     // Cache for 304 handling
-    _deletedCache = items
-    return items
+    _deletedCache = result
+    return result
   } catch {
-    return []
+    return null
   }
 }
 

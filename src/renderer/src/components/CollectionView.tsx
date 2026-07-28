@@ -6,7 +6,7 @@ import { useDeletedPlaylists } from '../store/deletedPlaylists'
 import { useFavoritePlaylists } from '../store/favoritePlaylists'
 import { useDownloads } from '../store/downloads'
 import { isAuthenticated, getAuth } from '../store/auth'
-import { fetchCloudPlaylists, fetchCloudPlaylistDetail, deleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
+import { fetchCloudPlaylists, fetchAllCloudPlaylistTracks, deleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
 import { setCloudPlaylists, removeCloudPlaylist, useCloudPlaylists } from '../store/cloudPlaylists'
 import type { TrackSource, PlaylistResult } from '../api/yandexMusic'
 import type { Playlist } from '../store/playlists'
@@ -100,7 +100,7 @@ function CollectionView(): JSX.Element {
     const token = getAuth().accessToken
     if (!token) return
     setCloudLoading(pl.id)
-    const detail = await fetchCloudPlaylistDetail(token, pl.id)
+    const detail = await fetchAllCloudPlaylistTracks(token, pl.id)
     setCloudLoading(null)
     if (!detail) return
 

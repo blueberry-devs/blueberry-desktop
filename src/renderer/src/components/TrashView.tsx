@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { isAuthenticated, getAuth } from '../store/auth'
 import { restorePlaylist, forceDeletePlaylist } from '../store/playlists'
 import { useDeletedPlaylists } from '../store/deletedPlaylists'
-import { fetchDeletedCloudPlaylists, fetchCloudPlaylists, restoreCloudPlaylist as apiRestoreCloudPlaylist, forceDeleteCloudPlaylist as apiForceDeleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
+import { fetchDeletedCloudPlaylists, fetchCloudPlaylists, restoreCloudPlaylist as apiRestoreCloudPlaylist, forceDeleteCloudPlaylist as apiForceDeleteCloudPlaylist, type CloudPlaylistSummary, type PaginatedResult } from '../services/playlists'
 import { setCloudPlaylists } from '../store/cloudPlaylists'
 import { useTranslation } from '../utils/useTranslation'
 import Modal from './Modal'
@@ -22,8 +22,10 @@ function TrashView({ onBack }: Props): JSX.Element {
   const loadDeleted = useCallback(async () => {
     if (!isAuthenticated()) return
     const token = getAuth().accessToken!
-    const deleted = await fetchDeletedCloudPlaylists(token)
-    if (Array.isArray(deleted)) setApiDeletedCloudPls(deleted)
+    const result = await fetchDeletedCloudPlaylists(token)
+    if (result && Array.isArray(result.items)) {
+      setApiDeletedCloudPls(result.items)
+    }
   }, [])
 
   useEffect(() => {

@@ -7,7 +7,7 @@ import { setCloudPlaylists } from '../store/cloudPlaylists'
 import {
   syncAfterLogin,
   fetchCloudPlaylists,
-  fetchCloudPlaylistDetail,
+  fetchAllCloudPlaylistTracks,
   type SyncChoice,
 } from '../services/playlists'
 import { useTranslation } from '../utils/useTranslation'
@@ -169,7 +169,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
     // Fetch details for matched playlists to compare content
     let realDiffCount = 0
     for (const s of matched) {
-      const detail = await fetchCloudPlaylistDetail(token, s.id)
+      const detail = await fetchAllCloudPlaylistTracks(token, s.id)
       if (!detail) continue
       const local = localByName.get(s.title.toLowerCase().trim())
       if (!local) continue
