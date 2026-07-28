@@ -364,12 +364,6 @@ function tick(): void {
 export function startBackgroundSync(): void {
   stopBackgroundSync()
 
-  // Fetch server-side likes once at startup/login
-  const token = getAuth().accessToken
-  if (token) {
-    syncLikes(token)
-  }
-
   // Initial playlist check
   tick()
   bgInterval = setInterval(tick, POLL_INTERVAL_MS)
