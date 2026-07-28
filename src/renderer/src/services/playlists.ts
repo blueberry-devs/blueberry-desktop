@@ -306,9 +306,14 @@ export async function fetchCloudPlaylists(
  * Fetch a single playlist full detail (with paginated tracks).
  * Supports If-None-Match conditional requests using playlist version ETag.
  * Page numbers are 1-based; pageSize is capped at 30 by the server.
+ * Cache is keyed by playlistId + page + pageSize so 304 works correctly across pages.
  */
 const _detailEtags = new Map<string, string>()
 const _detailCache = new Map<string, CloudPlaylistDetail>()
+
+function _detailCacheKey(playlistId: string, page: number, pageSize: number): string {
+  return `${playlistId}:p${page}:s${pageSize}`
+}
 
 export async function fetchCloudPlaylistDetail(
   accessToken: string,
@@ -317,23 +322,24 @@ export async function fetchCloudPlaylistDetail(
   pageSize = 30,
 ): Promise<CloudPlaylistDetail | null> {
   try {
+    const key = _detailCacheKey(playlistId, page, pageSize)
     const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` }
-    const etag = _detailEtags.get(playlistId)
+    const etag = _detailEtags.get(key)
     if (etag) {
       headers['If-None-Match'] = etag
     }
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
     const res = await fetch(`${BASE_URL}/api/playlists/${playlistId}?${params}`, { headers })
     if (res.status === 304) {
-      return _detailCache.get(playlistId) ?? null
+      return _detailCache.get(key) ?? null
     }
     if (!res.ok) return null
 
     const newEtag = res.headers.get('ETag')
-    if (newEtag) _detailEtags.set(playlistId, newEtag)
+    if (newEtag) _detailEtags.set(key, newEtag)
 
     const detail = (await res.json()) as CloudPlaylistDetail
-    _detailCache.set(playlistId, detail)
+    _detailCache.set(key, detail)
     return detail
   } catch {
     return null
@@ -526,9 +532,14 @@ export type SortDirection = 0 | 1 // 0 = asc, 1 = desc
  * Fetch a page of soft-deleted cloud playlists (trash).
  * Supports If-None-Match conditional requests using LibraryVersion ETag.
  * Returns the paginated result, or null on failure.
+ * Cache is keyed by page + pageSize + sort params.
  */
-let _deletedEtag: string | null = null
-let _deletedCache: PaginatedResult<CloudPlaylistSummary> | null = null
+const _deletedEtags = new Map<string, string>()
+const _deletedCacheMap = new Map<string, PaginatedResult<CloudPlaylistSummary>>()
+
+function _deletedCacheKey(page: number, pageSize: number, sortBy: DeletedPlaylistSortBy, sortDirection: SortDirection): string {
+  return `p${page}:s${pageSize}:b${sortBy}:d${sortDirection}`
+}
 
 export async function fetchDeletedCloudPlaylists(
   accessToken: string,
@@ -538,9 +549,11 @@ export async function fetchDeletedCloudPlaylists(
   sortDirection: SortDirection = 1,
 ): Promise<PaginatedResult<CloudPlaylistSummary> | null> {
   try {
+    const key = _deletedCacheKey(page, pageSize, sortBy, sortDirection)
     const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` }
-    if (_deletedEtag) {
-      headers['If-None-Match'] = _deletedEtag
+    const etag = _deletedEtags.get(key)
+    if (etag) {
+      headers['If-None-Match'] = etag
     }
     const params = new URLSearchParams({
       page: String(page),
@@ -551,13 +564,13 @@ export async function fetchDeletedCloudPlaylists(
     const res = await fetch(`${BASE_URL}/api/playlists/deleted?${params}`, { headers })
     if (res.status === 304) {
       // Not modified — return cached data
-      return _deletedCache
+      return _deletedCacheMap.get(key) ?? null
     }
     if (!res.ok) return null
 
     // Update ETag from response
-    const etag = res.headers.get('ETag')
-    if (etag) _deletedEtag = etag
+    const responseEtag = res.headers.get('ETag')
+    if (responseEtag) _deletedEtags.set(key, responseEtag)
 
     const body = await res.json()
     // Handle both array (old) and PaginatedResult (new) response shapes
@@ -577,7 +590,7 @@ export async function fetchDeletedCloudPlaylists(
     }
 
     // Cache for 304 handling
-    _deletedCache = result
+    _deletedCacheMap.set(key, result)
     return result
   } catch {
     return null
@@ -622,8 +635,8 @@ export async function forceDeleteCloudPlaylist(
 
 /** Clear all conditional-request ETag caches (call on logout). */
 export function clearPlaylistCache(): void {
-  _deletedEtag = null
-  _deletedCache = []
+  _deletedEtags.clear()
+  _deletedCacheMap.clear()
   _detailEtags.clear()
   _detailCache.clear()
 }
