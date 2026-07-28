@@ -4,6 +4,7 @@ import { VList, type VListHandle } from 'virtua'
 import { usePlayer } from '../player/PlayerContext'
 import { useTranslation } from '../utils/useTranslation'
 import { isAuthenticated, openAuth, getAuth } from '../store/auth'
+import Modal from './Modal'
 import {
   getComments,
   getReplies,
@@ -59,6 +60,7 @@ function CommentsFullscreen(): JSX.Element | null {
   const [input, setInput] = useState('')
   const [serverLoading, setServerLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const vlistRef = useRef<VListHandle>(null)
@@ -177,10 +179,19 @@ function CommentsFullscreen(): JSX.Element | null {
     }
   }, [handleSend, replyTo, cancelReply])
 
-  const handleDelete = useCallback(async (commentId: string): Promise<void> => {
-    if (!trackId) return
-    await deleteComment(trackId, commentId)
-  }, [trackId])
+  const handleDelete = useCallback((commentId: string): void => {
+    setConfirmDelete(commentId)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async (): Promise<void> => {
+    if (!trackId || !confirmDelete) return
+    await deleteComment(trackId, confirmDelete)
+    setConfirmDelete(null)
+  }, [trackId, confirmDelete])
+
+  const handleCancelDelete = useCallback((): void => {
+    setConfirmDelete(null)
+  }, [])
 
   const handleLike = useCallback(async (commentId: string): Promise<void> => {
     if (!trackId) return
@@ -333,6 +344,16 @@ function CommentsFullscreen(): JSX.Element | null {
           )}
         </div>
       </div>
+
+      <Modal
+        open={confirmDelete !== null}
+        title={t('comments.deleteTitle')}
+        message={t('comments.deleteMessage')}
+        confirmLabel={t('comments.deleteConfirm')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
     </motion.div>
   )
 }
