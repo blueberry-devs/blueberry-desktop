@@ -388,6 +388,7 @@
   "comments.deleteTitle": "Удалить комментарий",
   "comments.deleteMessage": "Вы уверены, что хотите удалить этот комментарий?",
   "comments.deleteConfirm": "Удалить",
+  "comments.sending": "Отправка…",
   "comments.justNow": "только что",
   "comments.minutesAgo": "{n} мин. назад",
   "comments.hoursAgo": "{n} ч. назад",

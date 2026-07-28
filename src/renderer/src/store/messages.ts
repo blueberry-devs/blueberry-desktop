@@ -262,11 +262,12 @@ export async function addComment(
   author: string,
   text: string,
   parentId?: string,
+  commentId?: string,
 ): Promise<Comment> {
   const auth = getAuth()
-  const commentId = crypto.randomUUID()
+  const id = commentId ?? crypto.randomUUID()
   const comment: Comment = {
-    id: commentId,
+    id,
     trackId,
     author,
     authorId: auth.user?.id ?? '',
@@ -288,7 +289,7 @@ export async function addComment(
   if (auth.accessToken) {
     try {
       const created = await apiCreateComment({
-        id: commentId,
+        id,
         entityType: 'track',
         entityId: trackId,
         parentId: parentId ?? null,
@@ -299,7 +300,7 @@ export async function addComment(
         cache = {
           ...cache,
           [trackId]: (cache[trackId] ?? []).map((c) =>
-            c.id === commentId
+            c.id === id
               ? {
                   ...c,
                   id: created.id,
@@ -324,19 +325,20 @@ export async function addComment(
 }
 
 /**
- * Delete a comment and its replies. Optimistic local remove,
- * rolls back on server failure.
+ * Delete a comment and its replies. Server-first — removes locally
+ * only after server confirms. Throws on server failure so the UI
+ * can show visual feedback.
  */
 export async function deleteComment(
   trackId: string,
   commentId: string,
 ): Promise<void> {
   const auth = getAuth()
-
-  // Snapshot for rollback
-  const prev = cache[trackId]
-
-  // Optimistic local remove
+  if (auth.accessToken) {
+    const ok = await apiDeleteComment(commentId)
+    if (!ok) throw new Error('Failed to delete comment on server')
+  }
+  // Remove locally after server success
   const all = cache[trackId] ?? []
   cache = {
     ...cache,
@@ -344,18 +346,6 @@ export async function deleteComment(
   }
   bumpRev(trackId)
   emit()
-
-  // Try server
-  if (auth.accessToken) {
-    try {
-      await apiDeleteComment(commentId)
-    } catch {
-      // Rollback on failure
-      cache = { ...cache, [trackId]: prev ?? [] }
-      bumpRev(trackId)
-      emit()
-    }
-  }
 }
 
 /**

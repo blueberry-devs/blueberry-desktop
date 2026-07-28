@@ -61,6 +61,8 @@ function CommentsFullscreen(): JSX.Element | null {
   const [serverLoading, setServerLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+  const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set())
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const vlistRef = useRef<VListHandle>(null)
@@ -144,15 +146,22 @@ function CommentsFullscreen(): JSX.Element | null {
   const handleSend = useCallback(async (): Promise<void> => {
     const text = input.trim()
     if (!text || !trackId || sending) return
+    const localId = crypto.randomUUID()
+    setSyncingIds((prev) => new Set(prev).add(localId))
     setSending(true)
     try {
-      const comment = await addComment(trackId, currentUser || 'Anonymous', text, replyTo?.parentId)
+      const comment = await addComment(trackId, currentUser || 'Anonymous', text, replyTo?.parentId, localId)
       setInput('')
       setReplyTo(null)
       // Scroll to top to see new comment
       vlistRef.current?.scrollTo(0)
     } finally {
       setSending(false)
+      setSyncingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(localId)
+        return next
+      })
       inputRef.current?.focus()
     }
   }, [input, trackId, sending, currentUser, replyTo])
@@ -185,8 +194,20 @@ function CommentsFullscreen(): JSX.Element | null {
 
   const handleConfirmDelete = useCallback(async (): Promise<void> => {
     if (!trackId || !confirmDelete) return
-    await deleteComment(trackId, confirmDelete)
-    setConfirmDelete(null)
+    const id = confirmDelete
+    setConfirmDelete(null) // close modal
+    setDeletingIds((prev) => new Set(prev).add(id))
+    try {
+      await deleteComment(trackId, id)
+      // Comment removed from cache by store — component re-renders without it
+    } catch {
+      // Server failed — remove deleting state, comment stays visible
+      setDeletingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
   }, [trackId, confirmDelete])
 
   const handleCancelDelete = useCallback((): void => {
@@ -284,6 +305,8 @@ function CommentsFullscreen(): JSX.Element | null {
                     onReply={handleReply}
                     onDelete={handleDelete}
                     onLike={handleLike}
+                    deletingIds={deletingIds}
+                    syncingIds={syncingIds}
                     t={t}
                   />
                 )}
@@ -369,6 +392,8 @@ function CommentRow({
   onReply,
   onDelete,
   onLike,
+  deletingIds,
+  syncingIds,
   t,
 }: {
   comment: Comment
@@ -379,53 +404,72 @@ function CommentRow({
   onReply: (commentId: string, author: string) => void
   onDelete: (id: string) => void
   onLike: (id: string) => void
+  deletingIds: Set<string>
+  syncingIds: Set<string>
   t: (k: string) => string
 }): JSX.Element {
   const isOwner = authed && (currentUser === comment.author)
   const liked = authed && comment.isLikedByMe
   const [showReplies, setShowReplies] = useState(false)
   const hasReplies = replies.length > 0
+  const deleting = deletingIds.has(comment.id)
+  const syncing = syncingIds.has(comment.id)
+  const deletingOrSyncing = deleting || syncing
 
   return (
     <div className="comments-fullscreen__comment-wrap">
-      <div className="comments-fullscreen__comment">
+      <div
+        className={`comments-fullscreen__comment${deleting ? ' comments-fullscreen__comment--deleting' : ''}${syncing ? ' comments-fullscreen__comment--syncing' : ''}`}
+      >
+        {deleting && <div className="comments-fullscreen__comment-overlay"><span className="comments-fullscreen__sending-spinner" /></div>}
         <div className="comments-fullscreen__avatar" style={{ background: avatarColor(comment.author) }}>
           {avatarLetter(comment.author)}
         </div>
         <div className="comments-fullscreen__comment-body">
           <div className="comments-fullscreen__comment-header">
             <span className="comments-fullscreen__comment-author">{comment.author}</span>
-            <span className="comments-fullscreen__comment-time">{formatTime(comment.timestamp, t)}</span>
+            <span className="comments-fullscreen__comment-time">
+              {syncing ? (
+                <span className="comments-fullscreen__syncing-badge">
+                  <span className="comments-fullscreen__sending-spinner" />
+                  {t('comments.sending')}
+                </span>
+              ) : (
+                formatTime(comment.timestamp, t)
+              )}
+            </span>
           </div>
           <div className="comments-fullscreen__comment-text">{comment.text}</div>
-          <div className="comments-fullscreen__comment-actions">
-            <button
-              className={`comments-fullscreen__action${liked ? ' comments-fullscreen__action--liked' : ''}`}
-              onClick={() => onLike(comment.id)}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14Z" />
-              </svg>
-              {comment.likeCount > 0 && <span>{comment.likeCount}</span>}
-            </button>
-            {authed && (
-              <button className="comments-fullscreen__action" onClick={() => onReply(comment.id, comment.author)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 9 9 15 15 21" />
+          {!deletingOrSyncing && (
+            <div className="comments-fullscreen__comment-actions">
+              <button
+                className={`comments-fullscreen__action${liked ? ' comments-fullscreen__action--liked' : ''}`}
+                onClick={() => onLike(comment.id)}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14Z" />
                 </svg>
-                {t('comments.reply')}
+                {comment.likeCount > 0 && <span>{comment.likeCount}</span>}
               </button>
-            )}
-            {isOwner && (
-              <button className="comments-fullscreen__action comments-fullscreen__action--danger" onClick={() => onDelete(comment.id)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                </svg>
-                {t('comments.delete')}
-              </button>
-            )}
-          </div>
+              {authed && (
+                <button className="comments-fullscreen__action" onClick={() => onReply(comment.id, comment.author)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 9 9 15 15 21" />
+                  </svg>
+                  {t('comments.reply')}
+                </button>
+              )}
+              {isOwner && (
+                <button className="comments-fullscreen__action comments-fullscreen__action--danger" onClick={() => onDelete(comment.id)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                  {t('comments.delete')}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -450,6 +494,8 @@ function CommentRow({
               currentUser={currentUser}
               onDelete={onDelete}
               onLike={onLike}
+              syncingIds={syncingIds}
+              deletingIds={deletingIds}
               t={t}
             />
           ))}
@@ -472,6 +518,8 @@ function ReplyRow({
   currentUser,
   onDelete,
   onLike,
+  deletingIds,
+  syncingIds,
   t,
 }: {
   comment: Comment
@@ -479,13 +527,21 @@ function ReplyRow({
   currentUser: string
   onDelete: (id: string) => void
   onLike: (id: string) => void
+  deletingIds: Set<string>
+  syncingIds: Set<string>
   t: (k: string) => string
 }): JSX.Element {
   const isOwner = authed && (currentUser === comment.author)
   const liked = authed && comment.isLikedByMe
+  const deleting = deletingIds.has(comment.id)
+  const syncing = syncingIds.has(comment.id)
+  const deletingOrSyncing = deleting || syncing
 
   return (
-    <div className="comments-fullscreen__comment comments-fullscreen__comment--reply">
+    <div
+      className={`comments-fullscreen__comment comments-fullscreen__comment--reply${deleting ? ' comments-fullscreen__comment--deleting' : ''}${syncing ? ' comments-fullscreen__comment--syncing' : ''}`}
+    >
+      {deleting && <div className="comments-fullscreen__comment-overlay"><span className="comments-fullscreen__sending-spinner" /></div>}
       <div
         className="comments-fullscreen__avatar"
         style={{
@@ -500,29 +556,40 @@ function ReplyRow({
       <div className="comments-fullscreen__comment-body">
         <div className="comments-fullscreen__comment-header">
           <span className="comments-fullscreen__comment-author">{comment.author}</span>
-          <span className="comments-fullscreen__comment-time">{formatTime(comment.timestamp, t)}</span>
+          <span className="comments-fullscreen__comment-time">
+            {syncing ? (
+              <span className="comments-fullscreen__syncing-badge">
+                <span className="comments-fullscreen__sending-spinner" />
+                {t('comments.sending')}
+              </span>
+            ) : (
+              formatTime(comment.timestamp, t)
+            )}
+          </span>
         </div>
         <div className="comments-fullscreen__comment-text">{comment.text}</div>
-        <div className="comments-fullscreen__comment-actions">
-          <button
-            className={`comments-fullscreen__action${liked ? ' comments-fullscreen__action--liked' : ''}`}
-            onClick={() => onLike(comment.id)}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14Z" />
-            </svg>
-            {comment.likeCount > 0 && <span>{comment.likeCount}</span>}
-          </button>
-          {isOwner && (
-            <button className="comments-fullscreen__action comments-fullscreen__action--danger" onClick={() => onDelete(comment.id)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        {!deletingOrSyncing && (
+          <div className="comments-fullscreen__comment-actions">
+            <button
+              className={`comments-fullscreen__action${liked ? ' comments-fullscreen__action--liked' : ''}`}
+              onClick={() => onLike(comment.id)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14Z" />
               </svg>
-              {t('comments.delete')}
+              {comment.likeCount > 0 && <span>{comment.likeCount}</span>}
             </button>
-          )}
-        </div>
+            {isOwner && (
+              <button className="comments-fullscreen__action comments-fullscreen__action--danger" onClick={() => onDelete(comment.id)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                {t('comments.delete')}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
