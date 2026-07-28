@@ -17,13 +17,6 @@ on:
         type: string
         required: false
 
-env:
-  SOUNDCLOUD_CLIENT_ID: ${{ secrets.SOUNDCLOUD_CLIENT_ID }}
-  YANDEX_TOKEN: ${{ secrets.YANDEX_TOKEN }}
-  YANDEX_PROXY_URL: ${{ secrets.YANDEX_PROXY_URL }}
-  SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
-  SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
-
 jobs:
   bump-version:
     runs-on: ubuntu-latest
@@ -62,8 +55,24 @@ jobs:
           fi
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          npm version ${{ inputs.version_bump }} -m "v%s"
+
+          # Bump in package.json
+          npm version ${{ inputs.version_bump }} --no-git-tag-version
           VERSION=$(node -p "require('./package.json').version")
+
+          # Sync version into tauri.conf.json
+          node -e "
+            const fs = require('fs');
+            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+            conf.version = '$VERSION';
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+          "
+          # Sync version into Cargo.toml
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+
+          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+          git commit -m "v${VERSION}"
+          git tag "v${VERSION}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           git push
           git push --tags
@@ -74,17 +83,14 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            dist-flag: --win
             artifact: blueberry-win
             server-script: scripts\build-server.bat
 
           - os: macos-latest
-            dist-flag: --mac
             artifact: blueberry-mac
             server-script: bash scripts/build-server.sh
 
-          - os: ubuntu-latest
-            dist-flag: --linux
+          - os: ubuntu-22.04
             artifact: blueberry-linux
             server-script: bash scripts/build-server.sh
 
@@ -103,6 +109,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
+          ref: v${{ needs.bump-version.outputs.version }}
           fetch-tags: true
           submodules: recursive
           token: ${{ steps.app-token.outputs.token }}
@@ -119,9 +126,19 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            patchelf libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: server
+          workspaces: |
+            server
+            src-tauri
 
       - name: Install Node deps
         run: pnpm install --frozen-lockfile
@@ -129,28 +146,23 @@ jobs:
       - name: Build server sidecar
         run: ${{ matrix.server-script }}
 
-      - name: Build and package
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WIN_CERT_BASE64: ${{ secrets.WIN_CERT_BASE64 }}
-          WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Write .env for sidecar
         shell: bash
         run: |
-          # Decode and set signing vars per-platform
-          if [ "$RUNNER_OS" = "Windows" ] && [ -n "$WIN_CERT_BASE64" ]; then
-            echo "$WIN_CERT_BASE64" | base64 -d > "$RUNNER_TEMP/cert.pfx"
-            export CSC_LINK="$RUNNER_TEMP/cert.pfx"
-            export CSC_KEY_PASSWORD="$WIN_CERT_PASSWORD"
-            echo "[signing] Windows certificate configured"
-          fi
-          # macOS signing uses APPLE_ID/APPLE_ID_PASSWORD/APPLE_TEAM_ID directly
-          pnpm run build
-          npx electron-builder ${{ matrix.dist-flag }} --publish never
+          cat > src-tauri/resources/.env <<EOF
+          SOUNDCLOUD_CLIENT_ID=${{ secrets.SOUNDCLOUD_CLIENT_ID }}
+          YANDEX_TOKEN=${{ secrets.YANDEX_TOKEN }}
+          YANDEX_PROXY_URL=${{ secrets.YANDEX_PROXY_URL }}
+          EOF
 
-      - name: Delete old artifact (keep only latest)
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Delete old artifact
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -163,53 +175,49 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: dist/
+          path: src-tauri/target/release/bundle/
           if-no-files-found: warn
 
   create-release:
-    needs: build
+    needs: [bump-version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-tags: true
-
-      - name: Get version
-        id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          ref: v${{ needs.bump-version.outputs.version }}
 
       - uses: actions/download-artifact@v4
         with:
           path: release-artifacts
 
-      - name: Collect artifacts
+      - name: Collect release files
         run: |
           mkdir release
-
-          # Only the actual distributables — skip helpers (elevate, music-server, portable exe)
-          find release-artifacts -type f \( -name '*.exe' -o -name '*.AppImage' -o -name '*.zip' -o -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name 'latest*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
-
+          find release-artifacts -type f \( \
+            -name '*.exe' -o -name '*.msi' -o -name '*.nsis.zip' \
+            -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \
+            -o -name '*.dmg' -o -name '*.app.tar.gz' \
+            -o -name '*.sig' -o -name 'latest.json' \
+          \) -exec cp {} release/ \;
           ls -la release/
 
       - name: Build release body
         id: body
         run: |
-          NOTES_FILE="RELEASE_NOTES.md"
-          SUMMARY="${{ inputs.release_notes }}"
           BODY_FILE="${{ runner.temp }}/release_body.md"
+          SUMMARY="${{ inputs.release_notes }}"
 
           if [ -n "$SUMMARY" ]; then
             echo "$SUMMARY" > "$BODY_FILE"
-            echo "" >> "$BODY_FILE"
             echo "" >> "$BODY_FILE"
           else
             > "$BODY_FILE"
           fi
 
-          if [ -f "$NOTES_FILE" ]; then
-            cat "$NOTES_FILE" >> "$BODY_FILE"
+          if [ -f "RELEASE_NOTES.md" ]; then
+            cat RELEASE_NOTES.md >> "$BODY_FILE"
           fi
 
           echo "path=$BODY_FILE" >> "$GITHUB_OUTPUT"
@@ -217,8 +225,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: v${{ steps.version.outputs.version }}
+          tag_name: v${{ needs.bump-version.outputs.version }}
+          name: v${{ needs.bump-version.outputs.version }}
           body_path: ${{ steps.body.outputs.path }}
           files: release/*
           generate_release_notes: true

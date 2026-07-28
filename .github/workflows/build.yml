@@ -3,16 +3,9 @@ name: Build
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
     branches: [main]
   workflow_dispatch:
-
-env:
-  YANDEX_TOKEN: ${{ secrets.YANDEX_TOKEN }}
-  YANDEX_PROXY_URL: ${{ secrets.YANDEX_PROXY_URL }}
-  SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
-  SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
 
 jobs:
   build:
@@ -20,17 +13,14 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            dist-flag: --win
             artifact: blueberry-win
             server-script: scripts\build-server.bat
 
           - os: macos-latest
-            dist-flag: --mac
             artifact: blueberry-mac
             server-script: bash scripts/build-server.sh
 
-          - os: ubuntu-latest
-            dist-flag: --linux
+          - os: ubuntu-22.04
             artifact: blueberry-linux
             server-script: bash scripts/build-server.sh
 
@@ -52,6 +42,14 @@ jobs:
           submodules: recursive
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            patchelf libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9
@@ -66,7 +64,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: server
+          workspaces: |
+            server
+            src-tauri
 
       - name: Install Node deps
         run: pnpm install --frozen-lockfile
@@ -74,12 +74,19 @@ jobs:
       - name: Build server sidecar
         run: ${{ matrix.server-script }}
 
-      - name: Build and package
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Write .env for sidecar
+        shell: bash
         run: |
-          pnpm run build
-          npx electron-builder ${{ matrix.dist-flag }} --publish onTagOrDraft
+          cat > src-tauri/resources/.env <<EOF
+          SOUNDCLOUD_CLIENT_ID=${{ secrets.SOUNDCLOUD_CLIENT_ID }}
+          YANDEX_TOKEN=${{ secrets.YANDEX_TOKEN }}
+          YANDEX_PROXY_URL=${{ secrets.YANDEX_PROXY_URL }}
+          EOF
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Delete old artifact (keep only latest)
         shell: bash
@@ -94,5 +101,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: dist/
+          path: src-tauri/target/release/bundle/
           if-no-files-found: warn

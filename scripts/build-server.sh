@@ -2,22 +2,29 @@
 set -euo pipefail
 
 SERVER_DIR="$(cd "$(dirname "$0")/../server" && pwd)"
-OUT_DIR="$(cd "$(dirname "$0")/.." && pwd)/build/packed-server"
+BIN_DIR="$(cd "$(dirname "$0")/.." && pwd)/src-tauri/binaries"
 
-echo "Building server sidecar with cargo..."
-
-rm -rf "$OUT_DIR"
+echo "Building server sidecar..."
 
 if ! command -v cargo &>/dev/null; then
   echo "cargo not found — install Rust via https://rustup.rs"
   exit 1
 fi
 
+TARGET_TRIPLE=$(rustc -vV | grep '^host:' | cut -d' ' -f2)
+echo "Target: ${TARGET_TRIPLE}"
+
 pushd "$SERVER_DIR" >/dev/null
 cargo build --release
 popd >/dev/null
 
-mkdir -p "$OUT_DIR"
-cp "$SERVER_DIR/target/release/music-server" "$OUT_DIR/music-server"
+mkdir -p "$BIN_DIR"
 
-echo "Server build complete: ${OUT_DIR}/music-server"
+# Platform-specific binary name
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+  cp "$SERVER_DIR/target/release/music-server.exe" "$BIN_DIR/music-server-${TARGET_TRIPLE}.exe"
+else
+  cp "$SERVER_DIR/target/release/music-server" "$BIN_DIR/music-server-${TARGET_TRIPLE}"
+fi
+
+echo "Sidecar ready: music-server-${TARGET_TRIPLE}"

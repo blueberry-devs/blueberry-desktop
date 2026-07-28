@@ -16,5 +16,27 @@ updates:
       vite:
         patterns:
           - 'vite*'
-          - 'electron-vite'
           - '@vitejs/*'
+      tauri:
+        patterns:
+          - '@tauri-apps/*'
+
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Europe/Moscow
+    groups:
+      tauri:
+        patterns:
+          - 'tauri*'
+
+  - package-ecosystem: cargo
+    directory: /server
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Europe/Moscow
