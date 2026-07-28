@@ -688,19 +688,50 @@ export async function fetchLikedTrackIds(
 }
 
 /**
- * Fetch full like objects, optionally filtered by entity type.
+ * Fetch a single page of liked entities, optionally filtered by type.
+ * Returns the paginated result or null on failure.
+ * Max pageSize is 30 (enforced by server).
+ */
+export async function fetchUserLikesPage(
+  accessToken: string,
+  page = 1,
+  pageSize = 30,
+  entityType?: string,
+): Promise<PaginatedResult<UserLikeDto> | null> {
+  try {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    if (entityType) params.set('entityType', entityType)
+    const res = await fetch(`${BASE_URL}/api/likes?${params}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return null
+    return (await res.json()) as PaginatedResult<UserLikeDto>
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch ALL liked entities, optionally filtered by type.
+ * Iterates over all pages and merges results into a flat array.
  */
 export async function fetchUserLikes(
   accessToken: string,
   entityType?: string,
 ): Promise<UserLikeDto[]> {
   try {
-    const params = entityType ? `?entityType=${encodeURIComponent(entityType)}` : ''
-    const res = await fetch(`${BASE_URL}/api/likes${params}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!res.ok) return []
-    return (await res.json()) as UserLikeDto[]
+    const first = await fetchUserLikesPage(accessToken, 1, 30, entityType)
+    if (!first) return []
+
+    const allItems = [...first.items]
+
+    for (let p = 2; p <= first.totalPages; p++) {
+      const page = await fetchUserLikesPage(accessToken, p, 30, entityType)
+      if (!page) break
+      allItems.push(...page.items)
+    }
+
+    return allItems
   } catch {
     return []
   }
