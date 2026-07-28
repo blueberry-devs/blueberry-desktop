@@ -157,12 +157,32 @@ async function runSync(): Promise<void> {
         extToUuid.set(rt.externalId, rt.id)
       }
 
-      // 2. Handle new playlists (no cloudId yet) — bulk upload
-      const newPls = localPlaylists.filter((p) => !p.cloudId)
+      // 2. Fetch all server playlists FIRST to match by name — prevents duplicates
+      const allSummaries = await fetchCloudPlaylists(token)
+      const localByName = new Map<string, typeof localPlaylists[0]>()
+      for (const pl of localPlaylists) {
+        if (!pl.cloudId) {
+          const key = pl.name.toLowerCase().trim()
+          if (!localByName.has(key)) localByName.set(key, pl)
+        }
+      }
+
+      const serverTitleSet = new Set<string>()
+      for (const s of allSummaries) {
+        const key = s.title.toLowerCase().trim()
+        serverTitleSet.add(key)
+        const local = localByName.get(key)
+        if (local && !getPlaylists().find((p) => p.cloudId === s.id)) {
+          linkMatchedPlaylist(local.id, s.id, 0)
+        }
+      }
+
+      // 3. Only upload playlists that have no cloudId AND no name match on server
+      const updatedLocal = getPlaylists()
+      const newPls = updatedLocal.filter((p) => !p.cloudId && !serverTitleSet.has(p.name.toLowerCase().trim()))
       if (newPls.length > 0) {
         const created = await bulkSyncPlaylists(token, newPls)
         for (const detail of created) {
-          // Match back by title
           const local = newPls.find(
             (p) => p.name.toLowerCase().trim() === detail.title.toLowerCase().trim(),
           )
@@ -172,10 +192,11 @@ async function runSync(): Promise<void> {
         }
       }
 
-      // 3. Handle existing playlists — per-playlist diff+sync
-      for (const pl of localPlaylists) {
+      // 4. Handle existing (linked) playlists — per-playlist diff+sync
+      const syncedLocal = getPlaylists()
+      for (const pl of syncedLocal) {
         if (!pl.cloudId) continue
-        if (hasPendingCloudRequest(pl.cloudId)) continue // skip — user action in flight
+        if (hasPendingCloudRequest(pl.cloudId)) continue
 
         const cloudDetail = await fetchAllCloudPlaylistTracks(token, pl.cloudId)
         if (!cloudDetail) continue
@@ -183,7 +204,6 @@ async function runSync(): Promise<void> {
         let storedVersion = getPlaylistVersion(pl.cloudId)
         let effectiveVersion = storedVersion
 
-        // Apply server changes if version advanced
         if (storedVersion > 0 && storedVersion < cloudDetail.version) {
           const diff = await diffPlaylist(token, pl.cloudId, storedVersion)
           if (diff) {
@@ -193,12 +213,8 @@ async function runSync(): Promise<void> {
               if (action.actionType === 'add_track' && action.trackExternalId) {
                 newTracks.push({
                   id: action.trackExternalId,
-                  source:
-                    action.trackExternalSource === 'YouTubeMusic'
-                      ? 'youtube'
-                      : action.trackExternalSource === 'SoundCloud'
-                      ? 'soundcloud'
-                      : 'yandex',
+                  source: action.trackExternalSource === 'YouTubeMusic' ? 'youtube'
+                    : action.trackExternalSource === 'SoundCloud' ? 'soundcloud' : 'yandex',
                   title: action.trackTitle ?? '',
                   artists: action.trackArtist ? [action.trackArtist] : [],
                   cover: null,
@@ -210,7 +226,6 @@ async function runSync(): Promise<void> {
           }
         }
 
-        // Build local add actions for tracks server doesn't have
         const serverIds = new Set(cloudDetail.tracks.map((t) => t.externalId))
         const localAdds = pl.tracks
           .filter((t) => !serverIds.has(t.id))
@@ -221,27 +236,17 @@ async function runSync(): Promise<void> {
           }))
 
         if (localAdds.length > 0 || storedVersion < cloudDetail.version) {
-          const resp = await syncPlaylist(
-            token,
-            pl.cloudId,
-            Math.max(effectiveVersion, 1),
-            localAdds,
-          )
+          const resp = await syncPlaylist(token, pl.cloudId, Math.max(effectiveVersion, 1), localAdds)
           if (resp) {
             setPlaylistVersion(pl.cloudId, resp.newVersion)
-            // Apply any server-side actions from response
             if (resp.serverActions) {
-              const newTracks: TrackResult[] = []
+              const serverAdds: TrackResult[] = []
               for (const action of resp.serverActions) {
                 if (action.actionType === 'add_track' && action.trackExternalId) {
-                  newTracks.push({
+                  serverAdds.push({
                     id: action.trackExternalId,
-                    source:
-                      action.trackExternalSource === 'YouTubeMusic'
-                        ? 'youtube'
-                        : action.trackExternalSource === 'SoundCloud'
-                        ? 'soundcloud'
-                        : 'yandex',
+                    source: action.trackExternalSource === 'YouTubeMusic' ? 'youtube'
+                      : action.trackExternalSource === 'SoundCloud' ? 'soundcloud' : 'yandex',
                     title: action.trackTitle ?? '',
                     artists: action.trackArtist ? [action.trackArtist] : [],
                     cover: null,
@@ -249,7 +254,7 @@ async function runSync(): Promise<void> {
                   })
                 }
               }
-              addTracksSilently(pl.id, newTracks)
+              addTracksSilently(pl.id, serverAdds)
             }
           }
         } else {
@@ -257,52 +262,39 @@ async function runSync(): Promise<void> {
         }
       }
 
-      // 4. Check for cloud-only playlists (created on other device or not yet linked)
-      const allSummaries = await fetchCloudPlaylists(token)
+      // 5. Check for cloud-only playlists (created on other device, not yet linked)
       const localCloudIds = new Set(
-        getPlaylists()
-          .filter((p) => p.cloudId)
-          .map((p) => p.cloudId),
+        getPlaylists().filter((p) => p.cloudId).map((p) => p.cloudId),
       )
-
-      // Refresh local playlists reference after potential mutations from steps 2-3
-      const updatedLocal = getPlaylists()
+      const finalLocal = getPlaylists()
 
       for (const summary of allSummaries) {
         if (localCloudIds.has(summary.id)) continue
 
-        // Fetch detail to compare tracks
         const detail = await fetchAllCloudPlaylistTracks(token, summary.id)
         if (!detail) continue
 
         const cloudTrackIds = new Set(detail.tracks.map((t) => t.externalId))
 
-        // Check by name + track content against unlinked local playlists
-        const matched = findMatchedLocal(updatedLocal, summary.title, cloudTrackIds)
+        const matched = findMatchedLocal(finalLocal, summary.title, cloudTrackIds)
         if (matched) {
           linkMatchedPlaylist(matched.localId, summary.id, detail.version)
           continue
         }
 
-        // Name match but different tracks — could be the same playlist with
-        // server additions. Link and let step 3 handle the diff on next cycle.
-        const nameMatch = updatedLocal.find(
+        const nameMatch = finalLocal.find(
           (p) => !p.cloudId && p.name.toLowerCase().trim() === summary.title.toLowerCase().trim(),
         )
         if (nameMatch) {
           linkMatchedPlaylist(nameMatch.id, summary.id, detail.version)
-          // Send local-only tracks to server
           const localOnly = nameMatch.tracks.filter((t) => !cloudTrackIds.has(t.id))
           if (localOnly.length > 0 && !hasPendingCloudRequest(summary.id)) {
-            const addActions = localOnly
-              .map((t) => ({ extId: t.id, uuid: extToUuid.get(t.id) ?? null }))
+            const actions = localOnly
+              .map((t) => ({ uuid: extToUuid.get(t.id) ?? null }))
               .filter((a) => a.uuid)
-            if (addActions.length > 0) {
-              const resp = await syncPlaylist(token, summary.id, Math.max(detail.version, 1), addActions.map((a) => ({
-                actionType: 'add' as const,
-                trackId: a.uuid,
-                position: null as number | null,
-              })))
+            if (actions.length > 0) {
+              const resp = await syncPlaylist(token, summary.id, Math.max(detail.version, 1),
+                actions.map((a) => ({ actionType: 'add' as const, trackId: a.uuid, position: null as number | null })))
               if (resp) setPlaylistVersion(summary.id, resp.newVersion)
             }
           }
@@ -316,12 +308,8 @@ async function runSync(): Promise<void> {
           cover: detail.imageUrl,
           tracks: detail.tracks.map((t) => ({
             id: t.externalId,
-            source:
-              t.externalSource === 'YouTubeMusic'
-                ? 'youtube' as const
-                : t.externalSource === 'SoundCloud'
-                ? 'soundcloud' as const
-                : 'yandex' as const,
+            source: t.externalSource === 'YouTubeMusic' ? 'youtube' as const
+              : t.externalSource === 'SoundCloud' ? 'soundcloud' as const : 'yandex' as const,
             title: t.title,
             artists: t.artist ? [t.artist] : [],
             cover: t.albumImageUrl,
@@ -333,19 +321,9 @@ async function runSync(): Promise<void> {
       }
     }
 
-    // ===== Likes sync =====
-    // Likes are synced once at startup via startBackgroundSync.
-    // Individual likes/unlikes are sent immediately by toggleLike,
-    // and cross-device likes are fetched in AuthView after login.
-
-    // Only mark synced if no real local changes happened during the sync.
-    // addTracksSilently does NOT increment the generation, so this only
-    // catches actual user mutations that fired markUnsynced.
     if (genBefore === getUnsyncedGeneration()) {
       markSynced()
     }
-    // else: user made changes during sync — leave unsynced flag as-is so
-    // the next tick picks them up to upload.
   } catch {
     // leave unsynced — next tick retries
   } finally {
