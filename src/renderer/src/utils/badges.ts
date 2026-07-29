@@ -8,18 +8,27 @@ export interface VerificationTier {
   level: number
   label: string
   color: string
+  descRu: string
+  descEn: string
 }
 
 export const VERIFICATION_TIERS: VerificationTier[] = [
-  { level: 0, label: 'No Status', color: 'transparent' },
-  { level: 1, label: 'Verified Artist', color: '#3b82f6' },
-  { level: 2, label: 'Trusted Curator', color: '#10b981' },
-  { level: 3, label: 'Brand/Official', color: '#f59e0b' },
-  { level: 4, label: 'Staff', color: '#7a00b8' },
+  { level: 0, label: 'No Status', color: 'transparent', descRu: '', descEn: '' },
+  { level: 1, label: 'Verified Artist', color: '#3b82f6', descRu: 'Подтверждённый музыкант', descEn: 'Confirmed artist' },
+  { level: 2, label: 'Trusted Curator', color: '#10b981', descRu: 'Мастер плейлистов', descEn: 'Playlist expert' },
+  { level: 3, label: 'Brand/Official', color: '#f59e0b', descRu: 'Лейбл или студия', descEn: 'Label or studio' },
+  { level: 4, label: 'Staff', color: '#7a00b8', descRu: 'Команда Blueberry', descEn: 'Blueberry team' },
 ]
 
 export function getVerificationTier(level: number): VerificationTier {
   return VERIFICATION_TIERS[level] ?? VERIFICATION_TIERS[0]
+}
+
+export function getVerificationTooltip(level: number, lang: string): string {
+  const tier = getVerificationTier(level)
+  if (level === 0) return ''
+  const desc = lang === 'ru' ? tier.descRu : tier.descEn
+  return `${tier.label} — ${desc}`
 }
 
 /* ---------- Badges bitmask ---------- */
