@@ -222,17 +222,41 @@ function dtoToLocal(dto: CommentDto): Comment {
   }
 }
 
+/**
+ * Merge/replace server comments into local cache.
+ *
+ * @param replace - When true (initial load), replace the entire cache for
+ *   this track with server data. Local-only comments (optimistic adds that
+ *   the server hasn't returned yet) are preserved. When false (pagination),
+ *   merge server data into existing cache.
+ */
 function mergeFromServer(
   trackId: string,
   dtos: CommentDto[],
+  replace?: boolean,
 ): void {
   const existing = new Map(
-    (cache[trackId] ?? []).map((c) => [c.id, c]),
+    replace
+      ? []
+      : (cache[trackId] ?? []).map((c) => [c.id, c] as const),
   )
   for (const dto of dtos) {
     const local = dtoToLocal(dto)
     existing.set(local.id, local)
   }
+
+  // On replace: re-add local-only comments that aren't in the server response.
+  // These are optimistically-added comments that haven't been confirmed yet
+  // (server call still in-flight or failed).
+  if (replace) {
+    const serverIds = new Set(dtos.map((d) => d.id))
+    for (const c of cache[trackId] ?? []) {
+      if (!serverIds.has(c.id) && c.authorId === getAuth().user?.id) {
+        existing.set(c.id, c)
+      }
+    }
+  }
+
   const merged = [...existing.values()]
   // Sort: newest first for top-level, chronological for replies
   merged.sort((a, b) => b.timestamp - a.timestamp)
@@ -266,7 +290,14 @@ export async function loadCommentsFromServer(
   meta.fetchedFromServer = true
   meta.nextCursor = result.nextCursor
 
-  mergeFromServer(trackId, result.comments)
+  mergeFromServer(trackId, result.comments, true) // replace on initial load
+
+  // Clear reply meta for affected root comments so replies re-fetch
+  for (const root of result.comments) {
+    if (replyMeta[root.id]) {
+      delete replyMeta[root.id]
+    }
+  }
 
   // Auto-load first page of replies for root comments with replies
   for (const root of result.comments) {
