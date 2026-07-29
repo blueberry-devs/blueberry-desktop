@@ -8,13 +8,17 @@ import Modal from './Modal'
 import Tooltip from './Tooltip'
 import {
   getComments,
-  getReplies,
+  getAllComments,
   addComment,
   deleteComment,
   toggleLike,
   getCommentCount,
   loadCommentsFromServer,
   loadMoreCommentsFromServer,
+  loadRepliesFromServer,
+  loadMoreRepliesFromServer,
+  areRepliesLoaded,
+  hasMoreReplyPages,
   hasServerFetched,
   hasMoreServerPages,
   useCommentsRev,
@@ -93,6 +97,7 @@ function CommentsFullscreen(): JSX.Element | null {
 
   const trackId = commentsTrack?.id
   const authed = isAuthenticated()
+  const currentUserId = getAuth().user?.id ?? ''
   const currentUser = getAuth().user?.username ?? getAuth().user?.email ?? ''
 
   // All top-level comments (VList handles virtualisation)
@@ -102,15 +107,35 @@ function CommentsFullscreen(): JSX.Element | null {
   // Reactively update from store
   useCommentsRev(trackId ?? '')
 
-  // Build replies map
-  const repliesMap = useMemo<Record<string, Comment[]>>(() => {
-    if (!trackId) return {}
-    const map: Record<string, Comment[]> = {}
-    for (const c of allComments) {
-      map[c.id] = getReplies(trackId, c.id)
+  // Build reply tree for each root comment
+  const allTrackComments = trackId ? getAllComments(trackId) : []
+
+  function buildReplyTree(
+    rootId: string,
+    allComments: Comment[],
+    commentsMap: Map<string, Comment>,
+    depth: number = 1,
+  ): ReplyNode[] {
+    return allComments
+      .filter((c) => c.parentId === rootId)
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map((c) => ({
+        comment: c,
+        children: buildReplyTree(c.id, allComments, commentsMap, depth + 1),
+        indentLevel: Math.min(depth, 2) - 1,
+      }))
+  }
+
+  const replyTreeMap = useMemo(() => {
+    const map = new Map<string, ReplyNode[]>()
+    if (!trackId) return map
+    const commentsMap = new Map(allTrackComments.map((c) => [c.id, c]))
+    for (const c of allTrackComments) {
+      if (c.parentId) continue
+      map.set(c.id, buildReplyTree(c.id, allTrackComments, commentsMap))
     }
     return map
-  }, [allComments, trackId])
+  }, [allTrackComments, trackId])
 
   // Initial load: show local then fetch server
   useEffect(() => {
@@ -301,10 +326,10 @@ function CommentsFullscreen(): JSX.Element | null {
                   <CommentRow
                     key={comment.id}
                     comment={comment}
-                    replies={repliesMap[comment.id] ?? []}
+                    replyNodes={replyTreeMap.get(comment.id) ?? []}
                     trackId={trackId!}
                     authed={authed}
-                    currentUser={currentUser}
+                    currentUserId={currentUserId}
                     onReply={handleReply}
                     onDelete={handleDelete}
                     onLike={handleLike}
@@ -388,10 +413,10 @@ function CommentsFullscreen(): JSX.Element | null {
 
 function CommentRow({
   comment,
-  replies,
+  replyNodes,
   trackId,
   authed,
-  currentUser,
+  currentUserId,
   onReply,
   onDelete,
   onLike,
@@ -400,10 +425,10 @@ function CommentRow({
   t,
 }: {
   comment: Comment
-  replies: Comment[]
+  replyNodes: ReplyNode[]
   trackId: string
   authed: boolean
-  currentUser: string
+  currentUserId: string
   onReply: (commentId: string, author: string) => void
   onDelete: (id: string) => void
   onLike: (id: string) => void
@@ -411,13 +436,42 @@ function CommentRow({
   syncingIds: Set<string>
   t: (k: string) => string
 }): JSX.Element {
-  const isOwner = authed && (currentUser === comment.author)
+  const isOwner = authed && currentUserId && (currentUserId === comment.authorId)
   const liked = authed && comment.isLikedByMe
   const [showReplies, setShowReplies] = useState(false)
-  const hasReplies = replies.length > 0
+  const [repliesLoading, setRepliesLoading] = useState(false)
+  const repliesLoaded = areRepliesLoaded(comment.id)
+  const hasMoreReplies = hasMoreReplyPages(comment.id)
   const deleting = deletingIds.has(comment.id)
   const syncing = syncingIds.has(comment.id)
   const deletingOrSyncing = deleting || syncing
+  const hasReplies = replyNodes.length > 0
+
+  // Total reply count including all descendants
+  function countNodes(nodes: ReplyNode[]): number {
+    let n = 0
+    for (const node of nodes) n += 1 + countNodes(node.children)
+    return n
+  }
+  const totalReplies = hasReplies ? countNodes(replyNodes) : 0
+
+  const handleToggleReplies = useCallback(() => {
+    if (!showReplies && !repliesLoaded && trackId) {
+      setRepliesLoading(true)
+      loadRepliesFromServer(trackId, comment.id)
+        .catch(() => {})
+        .finally(() => setRepliesLoading(false))
+    }
+    setShowReplies((s) => !s)
+  }, [showReplies, repliesLoaded, trackId, comment.id])
+
+  const handleLoadMoreReplies = useCallback(() => {
+    if (!trackId) return
+    setRepliesLoading(true)
+    loadMoreRepliesFromServer(trackId, comment.id)
+      .catch(() => {})
+      .finally(() => setRepliesLoading(false))
+  }, [trackId, comment.id])
 
   return (
     <div className="comments-fullscreen__comment-wrap">
@@ -496,35 +550,45 @@ function CommentRow({
         </div>
       </div>
 
-      {hasReplies && (
+      {/* Reply toggle — show count from server replyCount */}
+      {(hasReplies || comment.replyCount > 0) && (
         <div className="comments-fullscreen__replies-toggle">
-          <button className="comments-fullscreen__replies-btn" onClick={() => setShowReplies(!showReplies)}>
+          <button className="comments-fullscreen__replies-btn" onClick={handleToggleReplies} disabled={repliesLoading}>
             <span className="comments-fullscreen__replies-line" />
-            {showReplies
-              ? t('comments.hideReplies')
-              : t('comments.showReplies').replace('{n}', String(replies.length))}
+            {repliesLoading ? (
+              <span className="comments-fullscreen__sending-spinner" style={{ width: 12, height: 12 }} />
+            ) : showReplies ? (
+              t('comments.hideReplies')
+            ) : (
+              t('comments.showReplies').replace('{n}', String(totalReplies || comment.replyCount || 0))
+            )}
           </button>
         </div>
       )}
 
-      {hasReplies && showReplies && (
+      {showReplies && (replyNodes.length > 0 || repliesLoading) && (
         <div className="comments-fullscreen__replies">
-          {replies.slice(0, 5).map((reply) => (
-            <ReplyRow
-              key={reply.id}
-              comment={reply}
+          {replyNodes.length > 0 && (
+            <ReplyTree
+              nodes={replyNodes}
               authed={authed}
-              currentUser={currentUser}
+              currentUserId={currentUserId}
+              onReply={onReply}
               onDelete={onDelete}
               onLike={onLike}
-              syncingIds={syncingIds}
               deletingIds={deletingIds}
+              syncingIds={syncingIds}
               t={t}
             />
-          ))}
-          {replies.length > 5 && (
-            <div className="comments-fullscreen__replies-more">
-              {t('comments.moreReplies').replace('{n}', String(replies.length - 5))}
+          )}
+          {hasMoreReplies && !repliesLoading && (
+            <button className="comments-fullscreen__load-more" onClick={handleLoadMoreReplies}>
+              {t('comments.showReplies').replace('{n}', '')}
+            </button>
+          )}
+          {repliesLoading && (
+            <div className="comments-fullscreen__replies-loading">
+              <span className="comments-fullscreen__sending-spinner" />
             </div>
           )}
         </div>
@@ -533,28 +597,90 @@ function CommentRow({
   )
 }
 
-/* ========== Reply Row ========== */
+/* ========== Reply Tree (recursive threaded replies) ========== */
 
-function ReplyRow({
-  comment,
+interface ReplyNode {
+  comment: Comment
+  children: ReplyNode[]
+  indentLevel: number
+}
+
+function ReplyTree({
+  nodes,
   authed,
-  currentUser,
+  currentUserId,
+  onReply,
   onDelete,
   onLike,
   deletingIds,
   syncingIds,
   t,
 }: {
-  comment: Comment
+  nodes: ReplyNode[]
   authed: boolean
-  currentUser: string
+  currentUserId: string
+  onReply: (commentId: string, author: string) => void
   onDelete: (id: string) => void
   onLike: (id: string) => void
   deletingIds: Set<string>
   syncingIds: Set<string>
   t: (k: string) => string
 }): JSX.Element {
-  const isOwner = authed && (currentUser === comment.author)
+  const flatTree = useMemo(() => {
+    const result: ReplyNode[] = []
+    function walk(list: ReplyNode[]) {
+      for (const n of list) {
+        result.push(n)
+        walk(n.children)
+      }
+    }
+    walk(nodes)
+    return result
+  }, [nodes])
+
+  return (
+    <div className="comments-fullscreen__reply-tree">
+      {flatTree.map((node) => (
+        <TreeRow
+          key={node.comment.id}
+          node={node}
+          authed={authed}
+          currentUserId={currentUserId}
+          onReply={onReply}
+          onDelete={onDelete}
+          onLike={onLike}
+          deletingIds={deletingIds}
+          syncingIds={syncingIds}
+          t={t}
+        />
+      ))}
+    </div>
+  )
+}
+
+function TreeRow({
+  node,
+  authed,
+  currentUserId,
+  onReply,
+  onDelete,
+  onLike,
+  deletingIds,
+  syncingIds,
+  t,
+}: {
+  node: ReplyNode
+  authed: boolean
+  currentUserId: string
+  onReply: (commentId: string, author: string) => void
+  onDelete: (id: string) => void
+  onLike: (id: string) => void
+  deletingIds: Set<string>
+  syncingIds: Set<string>
+  t: (k: string) => string
+}): JSX.Element {
+  const { comment, indentLevel } = node
+  const isOwner = authed && currentUserId && (currentUserId === comment.authorId)
   const liked = authed && comment.isLikedByMe
   const deleting = deletingIds.has(comment.id)
   const syncing = syncingIds.has(comment.id)
@@ -562,20 +688,16 @@ function ReplyRow({
 
   return (
     <div
-      className={`comments-fullscreen__comment comments-fullscreen__comment--reply${deleting ? ' comments-fullscreen__comment--deleting' : ''}${syncing ? ' comments-fullscreen__comment--syncing' : ''}`}
+      className={`comments-fullscreen__tree-row comments-fullscreen__tree-row--depth-${indentLevel}${deleting ? ' comments-fullscreen__comment--deleting' : ''}${syncing ? ' comments-fullscreen__comment--syncing' : ''}`}
     >
       {deleting && <div className="comments-fullscreen__comment-overlay"><span className="comments-fullscreen__sending-spinner" /></div>}
+      {indentLevel >= 1 && <div className="comments-fullscreen__tree-line" />}
       <div
-        className="comments-fullscreen__avatar"
-        style={{
-          background: comment.avatarUrl ? 'transparent' : avatarColor(comment.author),
-          width: 28,
-          height: 28,
-          fontSize: 11,
-        }}
+        className="comments-fullscreen__avatar comments-fullscreen__avatar--small"
+        style={{ background: comment.avatarUrl ? 'transparent' : avatarColor(comment.author) }}
       >
         {comment.avatarUrl ? (
-          <img className="comments-fullscreen__avatar-img" src={comment.avatarUrl} alt="" style={{ width: 28, height: 28 }} />
+          <img className="comments-fullscreen__avatar-img" src={comment.avatarUrl} alt="" />
         ) : (
           avatarLetter(comment.author)
         )}
@@ -605,7 +727,9 @@ function ReplyRow({
             )}
           </span>
         </div>
-        <div className="comments-fullscreen__comment-text">{comment.text}</div>
+        <div className="comments-fullscreen__comment-text">
+          {comment.text}
+        </div>
         {!deletingOrSyncing && (
           <div className="comments-fullscreen__comment-actions">
             <button
@@ -617,6 +741,14 @@ function ReplyRow({
               </svg>
               {comment.likeCount > 0 && <span>{comment.likeCount}</span>}
             </button>
+            {authed && (
+              <button className="comments-fullscreen__action" onClick={() => onReply(comment.id, comment.author)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 9 9 15 15 21" />
+                </svg>
+                {t('comments.reply')}
+              </button>
+            )}
             {isOwner && (
               <button className="comments-fullscreen__action comments-fullscreen__action--danger" onClick={() => onDelete(comment.id)}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

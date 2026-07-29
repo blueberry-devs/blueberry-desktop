@@ -411,20 +411,91 @@
 /* ===== Replies ===== */
 
 .comments-fullscreen__replies {
-  margin-left: 46px;
-  padding-left: 12px;
-  border-left: 2px solid rgba(255, 255, 255, 0.06);
+  margin-left: 42px;
   margin-bottom: 4px;
 }
 
-.comments-fullscreen__comment--reply {
-  padding: 6px 12px;
+/* ===== Reply Tree (threaded) ===== */
+
+.comments-fullscreen__reply-tree {
+  position: relative;
 }
 
-.comments-fullscreen__replies-more {
+.comments-fullscreen__tree-row {
+  display: flex;
+  gap: 8px;
+  padding: 6px 12px 6px 0;
+  border-radius: 10px;
+  transition: background 0.1s ease;
+  position: relative;
+}
+
+.comments-fullscreen__tree-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.comments-fullscreen__tree-row--depth-0 {
+  margin-left: 0;
+}
+
+.comments-fullscreen__tree-row--depth-1 {
+  margin-left: 28px;
+}
+
+.comments-fullscreen__tree-row--depth-2 {
+  margin-left: 28px;
+}
+
+.comments-fullscreen__tree-line {
+  position: absolute;
+  left: -14px;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  border-left: 2px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.06);
+  border-bottom-left-radius: 8px;
+  pointer-events: none;
+}
+
+.comments-fullscreen__avatar--small {
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 11px !important;
+  margin-top: 1px;
+}
+
+.comments-fullscreen__avatar--small .comments-fullscreen__avatar-img {
+  width: 28px;
+  height: 28px;
+}
+
+/* ===== Reply loading states ===== */
+
+.comments-fullscreen__load-more {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.3);
-  padding: 4px 12px 8px;
+  font-weight: 600;
+  color: #3b82f6;
+  padding: 6px 12px 6px 36px;
+  border-radius: 6px;
+  transition: background 0.12s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.comments-fullscreen__load-more:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.comments-fullscreen__replies-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.comments-fullscreen__replies-btn:disabled {
+  opacity: 0.5;
   cursor: default;
 }
 

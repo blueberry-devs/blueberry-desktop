@@ -25,6 +25,8 @@ export interface Comment {
   text: string
   timestamp: number
   parentId?: string
+  rootId?: string
+  replyCount: number
   likeCount: number
   isLikedByMe: boolean
 }
@@ -42,8 +44,16 @@ interface TrackMeta {
   _rev: number
 }
 
+interface ReplyMeta {
+  /** Whether replies have been fetched for this root comment */
+  fetched: boolean
+  /** Cursor for next page of replies (null = no more) */
+  nextCursor: number | null
+}
+
 let cache: CommentsData = loadFromDisk()
 const trackMeta: Record<string, TrackMeta> = {}
+const replyMeta: Record<string, ReplyMeta> = {}
 const listeners = new Set<() => void>()
 const pageListeners = new Set<() => void>()
 
@@ -69,6 +79,8 @@ function loadFromDisk(): CommentsData {
         text: c.text ?? '',
         timestamp: c.timestamp ?? Date.now(),
         parentId: c.parentId || undefined,
+        rootId: c.rootId || undefined,
+        replyCount: c.replyCount ?? 0,
         likeCount: c.likeCount ?? (Array.isArray(c.likes) ? c.likes.length : 0),
         isLikedByMe: c.isLikedByMe ?? false,
       }))
@@ -127,6 +139,13 @@ export function getComments(trackId: string): Comment[] {
 }
 
 /**
+ * Get ALL comments for a track, including replies.
+ */
+export function getAllComments(trackId: string): Comment[] {
+  return cache[trackId] ?? []
+}
+
+/**
  * Paginated access to comments. Used for lazy loading.
  */
 export function getCommentsPage(
@@ -169,6 +188,20 @@ export function getCommentCount(trackId: string): number {
   return getComments(trackId).length
 }
 
+/**
+ * Check if replies have been loaded for a specific root comment.
+ */
+export function areRepliesLoaded(rootId: string): boolean {
+  return replyMeta[rootId]?.fetched ?? false
+}
+
+/**
+ * Check if the root comment has more reply pages available.
+ */
+export function hasMoreReplyPages(rootId: string): boolean {
+  return replyMeta[rootId]?.nextCursor != null
+}
+
 /* ========== Server sync helpers ========== */
 
 function dtoToLocal(dto: CommentDto): Comment {
@@ -182,6 +215,8 @@ function dtoToLocal(dto: CommentDto): Comment {
     text: dto.text,
     timestamp: new Date(dto.createdAt).getTime(),
     parentId: dto.parentId ?? undefined,
+    rootId: dto.rootId ?? undefined,
+    replyCount: dto.replyCount,
     likeCount: dto.likeCount,
     isLikedByMe: dto.isLikedByMe,
   }
@@ -232,6 +267,13 @@ export async function loadCommentsFromServer(
   meta.nextCursor = result.nextCursor
 
   mergeFromServer(trackId, result.comments)
+
+  // Auto-load first page of replies for root comments with replies
+  for (const root of result.comments) {
+    if (root.replyCount > 0 && !replyMeta[root.id]?.fetched) {
+      loadRepliesFromServer(trackId, root.id).catch(() => {})
+    }
+  }
 }
 
 /**
@@ -252,6 +294,61 @@ export async function loadMoreCommentsFromServer(
     meta.nextCursor,
     PAGE_SIZE,
   )
+  if (!result) return false
+
+  meta.nextCursor = result.nextCursor
+  mergeFromServer(trackId, result.comments)
+
+  // Auto-load first page of replies for newly loaded root comments
+  for (const root of result.comments) {
+    if (root.replyCount > 0 && !replyMeta[root.id]?.fetched) {
+      loadRepliesFromServer(trackId, root.id).catch(() => {})
+    }
+  }
+
+  return true
+}
+
+/**
+ * Load replies for a root comment from the server.
+ * Uses reply-specific cursor if there's a next page.
+ */
+export async function loadRepliesFromServer(
+  trackId: string,
+  rootId: string,
+): Promise<void> {
+  const auth = getAuth()
+  if (!auth.accessToken) return
+
+  const meta = replyMeta[rootId]
+  if (meta && meta.fetched && meta.nextCursor == null) return // all loaded
+
+  const result = await apiFetchReplies(rootId, meta?.nextCursor ?? undefined)
+  if (!result) return
+
+  if (!replyMeta[rootId]) {
+    replyMeta[rootId] = { fetched: false, nextCursor: null }
+  }
+  replyMeta[rootId].fetched = true
+  replyMeta[rootId].nextCursor = result.nextCursor
+
+  mergeFromServer(trackId, result.comments)
+}
+
+/**
+ * Load next page of replies for a root comment.
+ */
+export async function loadMoreRepliesFromServer(
+  trackId: string,
+  rootId: string,
+): Promise<boolean> {
+  const auth = getAuth()
+  if (!auth.accessToken) return false
+
+  const meta = replyMeta[rootId]
+  if (!meta?.fetched || meta.nextCursor == null) return false
+
+  const result = await apiFetchReplies(rootId, meta.nextCursor)
   if (!result) return false
 
   meta.nextCursor = result.nextCursor
@@ -282,6 +379,7 @@ export async function addComment(
     text,
     timestamp: Date.now(),
     parentId,
+    replyCount: 0,
     likeCount: 0,
     isLikedByMe: false,
   }
@@ -317,6 +415,9 @@ export async function addComment(
                   author: created.userName ?? author,
                   avatarUrl: created.userAvatarUrl ?? undefined,
                   verificationLevel: created.verificationLevel,
+                  rootId: created.rootId ?? undefined,
+                  replyCount: created.replyCount,
+                  parentId: created.parentId ?? undefined,
                   likeCount: created.likeCount,
                   isLikedByMe: created.isLikedByMe,
                 }
