@@ -58,16 +58,18 @@ function TrackRow({ track, queue, index, onArtistClick, onRemoveFromPlaylist }: 
     return () => document.removeEventListener('mousedown', handler)
   }, [showArtistPicker])
 
-  // Close context menu on outside click, scroll, or Escape
+  // Close context menu on outside click, right-click on another row, scroll, or Escape
   useEffect(() => {
     if (!ctxMenu) return
     const close = (): void => closeCtx()
     const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') close() }
     document.addEventListener('click', close)
+    document.addEventListener('contextmenu', close, true)
     document.addEventListener('scroll', close, true)
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('click', close)
+      document.removeEventListener('contextmenu', close, true)
       document.removeEventListener('scroll', close, true)
       document.removeEventListener('keydown', onKey)
     }
