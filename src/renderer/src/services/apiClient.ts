@@ -35,20 +35,17 @@ export async function apiFetch<T = Response>(
   let res = await doFetch()
 
   // 401 → try token refresh once
-  if (res.status === 401 && authRetry && token) {
+  if (res.status === 401 && authRetry) {
     const { doRefresh } = await import('../store/auth')
     const refreshed = await doRefresh()
 
     if (refreshed) {
       const newAuth = (await import('../store/auth')).getAuth()
-      token = newAuth.accessToken
-      headers.set('Authorization', `Bearer ${token}`)
+      headers.set('Authorization', `Bearer ${newAuth.accessToken}`)
       res = await doFetch()
-    } else {
-      const { getAuth: get } = await import('../store/auth')
-      // If doRefresh already cleared auth (401 on refresh), that's handled.
-      // Just return the original 401 response.
     }
+    // else: doRefresh already cleared auth or there's no refreshToken —
+    // return the original 401 response.
   }
 
   // If T extends Response, return raw response for callers that check status themselves
