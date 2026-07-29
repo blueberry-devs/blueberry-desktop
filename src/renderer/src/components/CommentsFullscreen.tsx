@@ -20,7 +20,6 @@ import {
   loadMoreRepliesFromServer,
   areRepliesLoaded,
   hasMoreReplyPages,
-  hasServerFetched,
   hasMoreServerPages,
   useCommentsRev,
   type Comment,
@@ -153,15 +152,11 @@ function CommentsFullscreen(): JSX.Element | null {
     setInput('')
     setServerLoading(true)
 
-    if (!hasServerFetched(trackId)) {
-      loadCommentsFromServer(trackId)
-        .catch(() => {})
-        .finally(() => {
-          setServerLoading(false)
-        })
-    } else {
-      setServerLoading(false)
-    }
+    loadCommentsFromServer(trackId)
+      .catch(() => {})
+      .finally(() => {
+        setServerLoading(false)
+      })
   }, [trackId])
 
   const hasMoreServer = trackId ? hasMoreServerPages(trackId) : false

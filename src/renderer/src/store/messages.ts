@@ -40,6 +40,8 @@ interface TrackMeta {
   fetchedFromServer: boolean
   /** Cursor for the next page (null = no more pages) */
   nextCursor: number | null
+  /** Last server fetch timestamp (ms) — used to throttle re-fetches */
+  lastFetchedAt: number
   /** Nonce to trigger re-render */
   _rev: number
 }
@@ -118,6 +120,7 @@ function ensureMeta(trackId: string): TrackMeta {
     trackMeta[trackId] = {
       fetchedFromServer: false,
       nextCursor: null,
+      lastFetchedAt: 0,
       _rev: 0,
     }
   }
@@ -229,26 +232,41 @@ function dtoToLocal(dto: CommentDto): Comment {
  *   this track with server data. Local-only comments (optimistic adds that
  *   the server hasn't returned yet) are preserved. When false (pagination),
  *   merge server data into existing cache.
+ * @param replaceRootId - When set, replaces only replies belonging to this
+ *   root comment ID. Top-level comments and replies of other roots are
+ *   preserved. Takes precedence over `replace` when both are set.
  */
 function mergeFromServer(
   trackId: string,
   dtos: CommentDto[],
   replace?: boolean,
+  replaceRootId?: string,
 ): void {
   const existing = new Map(
     replace
       ? []
       : (cache[trackId] ?? []).map((c) => [c.id, c] as const),
   )
+
+  // When replacing replies for a specific root, keep everything except
+  // old replies for that root, then add server data.
+  if (replaceRootId) {
+    for (const c of cache[trackId] ?? []) {
+      if (c.rootId !== replaceRootId) {
+        existing.set(c.id, c)
+      }
+    }
+  }
+
   for (const dto of dtos) {
     const local = dtoToLocal(dto)
     existing.set(local.id, local)
   }
 
-  // On replace: re-add local-only comments that aren't in the server response.
-  // These are optimistically-added comments that haven't been confirmed yet
-  // (server call still in-flight or failed).
-  if (replace) {
+  // On full replace: re-add local-only comments that aren't in the server
+  // response. These are optimistically-added comments that haven't been
+  // confirmed yet (server call still in-flight or failed).
+  if (replace && !replaceRootId) {
     const serverIds = new Set(dtos.map((d) => d.id))
     for (const c of cache[trackId] ?? []) {
       if (!serverIds.has(c.id) && c.authorId === getAuth().user?.id) {
@@ -278,9 +296,12 @@ export async function loadCommentsFromServer(
   if (!auth.accessToken) return
 
   const meta = ensureMeta(trackId)
-  if (meta.fetchedFromServer) return // already loaded
 
-  // apiFetchJson inside apiFetchComments already handles 401 → auto-refresh
+  // Always fetch from server — without it, deleted comments stay in cache
+  // forever. The replace:true in mergeFromServer below purges stale data.
+  // Throttle: only re-fetch if the last fetch was more than 60s ago.
+  if (meta.fetchedFromServer && Date.now() - meta.lastFetchedAt < 60_000) return
+
   const result = await apiFetchComments(trackId, 'track', undefined, PAGE_SIZE)
   if (!result) {
     // Server unavailable — keep local cache as-is
@@ -289,6 +310,7 @@ export async function loadCommentsFromServer(
 
   meta.fetchedFromServer = true
   meta.nextCursor = result.nextCursor
+  meta.lastFetchedAt = Date.now()
 
   mergeFromServer(trackId, result.comments, true) // replace on initial load
 
@@ -363,7 +385,8 @@ export async function loadRepliesFromServer(
   replyMeta[rootId].fetched = true
   replyMeta[rootId].nextCursor = result.nextCursor
 
-  mergeFromServer(trackId, result.comments)
+  // Replace only replies for this root — stale deleted replies are purged
+  mergeFromServer(trackId, result.comments, false, rootId)
 }
 
 /**
