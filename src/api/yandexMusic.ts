@@ -87,6 +87,39 @@ export function searchPlaylists(query: string): Promise<PlaylistResult[]> {
   return getJson(`/api/search/playlists?text=${encodeURIComponent(query)}`)
 }
 
+// ---------------------------------------------------------------------------
+// Vector-based recommendations (Моя волна)
+// ---------------------------------------------------------------------------
+
+export interface RecommendResult {
+  mbid: string
+  score: number
+}
+
+export interface RecommendResponse {
+  tracks: RecommendResult[]
+  total: number
+  mood: string | null
+}
+
+export async function recommendTracks(
+  likedTrackIds: string[],
+  mood?: string,
+  limit = 30
+): Promise<RecommendResponse> {
+  const params = new URLSearchParams()
+  params.set('limit', String(limit))
+  if (mood) params.set('mood', mood)
+
+  const res = await fetch(`${BASE_URL}/api/recommend?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ liked_track_ids: likedTrackIds }),
+  })
+  if (!res.ok) throw new Error(`Recommend failed: ${res.status}`)
+  return res.json()
+}
+
 // Searches all selected sources (Yandex → SoundCloud → YouTube), deduped by
 // title+artist. Each source handles its own failure gracefully.
 // Pass `sources` to restrict which services are queried; defaults to all three.
