@@ -49,6 +49,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
     loopMode,
     cycleLoopMode,
     seekTo,
+    openComments,
     queue,
     queueIndex,
     playQueue
@@ -366,6 +367,18 @@ function NowPlayingFullscreen(): JSX.Element | null {
                   title={t('player.lyrics')}
                 >
                   <Mic2Icon size={16} />
+                </button>
+                <button
+                  className="np-fullscreen__icon-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openComments(currentTrack)
+                  }}
+                  title={t('comments.title')}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
                 </button>
                 <button
                   className={`np-fullscreen__icon-btn${liked ? ' np-fullscreen__icon-btn--liked' : ''}`}

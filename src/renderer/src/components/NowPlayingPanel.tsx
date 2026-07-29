@@ -211,6 +211,7 @@ function NowPlayingPanel(): JSX.Element {
     next,
     previous,
     openLyrics,
+    openComments,
     volume,
     setVolume,
     seekTo,
@@ -391,6 +392,17 @@ function NowPlayingPanel(): JSX.Element {
             <Maximize2Icon size={21} />
           </button>
 
+          <button
+            className="now-playing__side-btn"
+            onClick={() => displayTrack && openComments(displayTrack)}
+            disabled={!hasTrack}
+            title={t('comments.title')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
+
           <div className="now-playing__menu-wrap" ref={menuRef}>
             <button
               className="now-playing__side-btn"
@@ -443,6 +455,19 @@ function NowPlayingPanel(): JSX.Element {
                 >
                   <Mic2Icon size={16} />
                   {t('player.lyrics')}
+                </button>
+                <button
+                  className="now-playing__dropdown-item"
+                  onClick={() => {
+                    setShowMenu(false)
+                    displayTrack && openComments(displayTrack)
+                  }}
+                  disabled={!displayTrack?.id}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {t('comments.title')}
                 </button>
                 {currentTrack && (
                   <>
