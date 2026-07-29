@@ -250,6 +250,14 @@
   color: #fff;
   margin-top: 2px;
   user-select: none;
+  overflow: hidden;
+}
+
+.comments-fullscreen__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .comments-fullscreen__comment-body {
@@ -268,6 +276,19 @@
   font-size: 13px;
   font-weight: 700;
   color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.comments-fullscreen__verification-badge {
+  display: inline-flex;
+  align-items: center;
+  color: #3b82f6;
+}
+
+.comments-fullscreen__verification-badge svg {
+  display: block;
 }
 
 .comments-fullscreen__comment-time {

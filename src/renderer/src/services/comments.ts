@@ -7,6 +7,7 @@ export interface CommentDto {
   userId: string
   userName: string | null
   userAvatarUrl: string | null
+  verificationLevel: number
   entityType: string
   entityId: string
   rootId: string | null

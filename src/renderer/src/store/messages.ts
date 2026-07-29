@@ -20,6 +20,8 @@ export interface Comment {
   trackId: string
   author: string
   authorId: string
+  avatarUrl?: string | null
+  verificationLevel: number
   text: string
   timestamp: number
   parentId?: string
@@ -62,6 +64,8 @@ function loadFromDisk(): CommentsData {
         trackId: c.trackId ?? trackId,
         author: c.author ?? '',
         authorId: c.authorId ?? '',
+        avatarUrl: c.avatarUrl ?? undefined,
+        verificationLevel: c.verificationLevel ?? 0,
         text: c.text ?? '',
         timestamp: c.timestamp ?? Date.now(),
         parentId: c.parentId || undefined,
@@ -173,6 +177,8 @@ function dtoToLocal(dto: CommentDto): Comment {
     trackId: dto.entityId,
     author: dto.userName ?? 'Unknown',
     authorId: dto.userId,
+    avatarUrl: dto.userAvatarUrl ?? undefined,
+    verificationLevel: dto.verificationLevel,
     text: dto.text,
     timestamp: new Date(dto.createdAt).getTime(),
     parentId: dto.parentId ?? undefined,
@@ -271,6 +277,8 @@ export async function addComment(
     trackId,
     author,
     authorId: auth.user?.id ?? '',
+    avatarUrl: undefined,
+    verificationLevel: 0,
     text,
     timestamp: Date.now(),
     parentId,
@@ -307,6 +315,8 @@ export async function addComment(
                   timestamp: new Date(created.createdAt).getTime(),
                   authorId: created.userId,
                   author: created.userName ?? author,
+                  avatarUrl: created.userAvatarUrl ?? undefined,
+                  verificationLevel: created.verificationLevel,
                   likeCount: created.likeCount,
                   isLikedByMe: created.isLikedByMe,
                 }

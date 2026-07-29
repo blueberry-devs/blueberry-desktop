@@ -422,12 +422,30 @@ function CommentRow({
         className={`comments-fullscreen__comment${deleting ? ' comments-fullscreen__comment--deleting' : ''}${syncing ? ' comments-fullscreen__comment--syncing' : ''}`}
       >
         {deleting && <div className="comments-fullscreen__comment-overlay"><span className="comments-fullscreen__sending-spinner" /></div>}
-        <div className="comments-fullscreen__avatar" style={{ background: avatarColor(comment.author) }}>
-          {avatarLetter(comment.author)}
+        <div
+          className="comments-fullscreen__avatar"
+          style={{
+            background: comment.avatarUrl ? 'transparent' : avatarColor(comment.author),
+          }}
+        >
+          {comment.avatarUrl ? (
+            <img className="comments-fullscreen__avatar-img" src={comment.avatarUrl} alt="" />
+          ) : (
+            avatarLetter(comment.author)
+          )}
         </div>
         <div className="comments-fullscreen__comment-body">
           <div className="comments-fullscreen__comment-header">
-            <span className="comments-fullscreen__comment-author">{comment.author}</span>
+            <span className="comments-fullscreen__comment-author">
+              {comment.author}
+              {comment.verificationLevel >= 1 && (
+                <span className="comments-fullscreen__verification-badge" title={`Verification level ${comment.verificationLevel}`}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+                  </svg>
+                </span>
+              )}
+            </span>
             <span className="comments-fullscreen__comment-time">
               {syncing ? (
                 <span className="comments-fullscreen__syncing-badge">
@@ -545,17 +563,30 @@ function ReplyRow({
       <div
         className="comments-fullscreen__avatar"
         style={{
-          background: avatarColor(comment.author),
+          background: comment.avatarUrl ? 'transparent' : avatarColor(comment.author),
           width: 28,
           height: 28,
           fontSize: 11,
         }}
       >
-        {avatarLetter(comment.author)}
+        {comment.avatarUrl ? (
+          <img className="comments-fullscreen__avatar-img" src={comment.avatarUrl} alt="" style={{ width: 28, height: 28 }} />
+        ) : (
+          avatarLetter(comment.author)
+        )}
       </div>
       <div className="comments-fullscreen__comment-body">
         <div className="comments-fullscreen__comment-header">
-          <span className="comments-fullscreen__comment-author">{comment.author}</span>
+          <span className="comments-fullscreen__comment-author">
+            {comment.author}
+            {comment.verificationLevel >= 1 && (
+              <span className="comments-fullscreen__verification-badge" title={`Verification level ${comment.verificationLevel}`}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+                </svg>
+              </span>
+            )}
+          </span>
           <span className="comments-fullscreen__comment-time">
             {syncing ? (
               <span className="comments-fullscreen__syncing-badge">
