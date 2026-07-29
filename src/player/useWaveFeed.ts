@@ -129,17 +129,22 @@ async function fetchCandidates(genre: string): Promise<TrackResult[]> {
       // could return full TrackResult objects.
       console.log(`[Wave] Vector recommendations returned ${result.tracks.length} candidates in ${Date.now() - start}ms`)
 
-      // Search for tracks by mbid (which is actually artist+title encoded)
-      // For now, fall through to search-based with the category keyword
+      // Vector API returns track_id + score pairs.
+      // For local files, track_id is the file path; for streaming, it's "source:nativeId".
+      // We use the scores to re-rank search results from Yandex/SoundCloud/YouTube.
       const searchResults = await searchTracksMulti(keyword, ['yandex', 'soundcloud', 'youtube']).catch(() => [] as TrackResult[])
 
-      // Re-rank search results by vector similarity score if available
-      const scoreMap = new Map(result.tracks.map(t => [t.mbid, t.score]))
+      // Build score map from vector recommendations
+      // Try to match by track_id (file path) or by artist::title key
+      const scoreMap = new Map(result.tracks.map(t => [t.track_id, t.score]))
       const scored = searchResults
         .filter(t => isUsable(t))
         .map(t => ({
           track: t,
-          score: scoreMap.get(`${t.artists[0]?.toLowerCase()}::${t.title.toLowerCase()}`) ?? 0
+          // Try to find score by artist::title key (for local files) or by ID
+          score: scoreMap.get(`${t.artists[0]?.toLowerCase()}::${t.title.toLowerCase()}`)
+            ?? scoreMap.get(t.id)
+            ?? 0
         }))
 
       // Sort: scored tracks first (by score), then unscored tracks

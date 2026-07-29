@@ -92,7 +92,8 @@ export function searchPlaylists(query: string): Promise<PlaylistResult[]> {
 // ---------------------------------------------------------------------------
 
 export interface RecommendResult {
-  mbid: string
+  /** Track ID — file path for local analysis, or "source:nativeId" for streaming */
+  track_id: string
   score: number
 }
 
