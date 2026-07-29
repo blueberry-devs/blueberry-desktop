@@ -342,6 +342,18 @@ export async function pollCommentsFromServer(trackId: string): Promise<void> {
   // Merge with replace so deleted comments are purged, but keep existing
   // replyMeta intact — expanded replies stay expanded.
   mergeFromServer(trackId, result.comments, true)
+
+  // Also re-fetch first page of replies for any expanded root comments
+  for (const rootId of Object.keys(replyMeta)) {
+    const rmeta = replyMeta[rootId]
+    if (!rmeta?.fetched) continue
+
+    const replyResult = await apiFetchReplies(rootId)
+    if (!replyResult) continue
+
+    rmeta.nextCursor = replyResult.nextCursor
+    mergeFromServer(trackId, replyResult.comments, false, rootId)
+  }
 }
 
 /**
