@@ -29,6 +29,7 @@ export interface Comment {
   replyCount: number
   likeCount: number
   isLikedByMe: boolean
+  isDeleted: boolean
 }
 
 /* ========== State ========== */
@@ -85,6 +86,7 @@ function loadFromDisk(): CommentsData {
         replyCount: c.replyCount ?? 0,
         likeCount: c.likeCount ?? (Array.isArray(c.likes) ? c.likes.length : 0),
         isLikedByMe: c.isLikedByMe ?? false,
+        isDeleted: c.isDeleted ?? false,
       }))
     }
     return migrated
@@ -136,9 +138,10 @@ function bumpRev(trackId: string): void {
 
 /**
  * Get all top-level comments for a track (no replies).
+ * Filters out server-deleted comments.
  */
 export function getComments(trackId: string): Comment[] {
-  return (cache[trackId] ?? []).filter((c) => !c.parentId)
+  return (cache[trackId] ?? []).filter((c) => !c.parentId && !c.isDeleted)
 }
 
 /**
@@ -165,9 +168,10 @@ export function getCommentsPage(
 
 /**
  * Get replies for a specific parent comment.
+ * Filters out server-deleted comments.
  */
 export function getReplies(trackId: string, parentId: string): Comment[] {
-  return (cache[trackId] ?? []).filter((c) => c.parentId === parentId)
+  return (cache[trackId] ?? []).filter((c) => c.parentId === parentId && !c.isDeleted)
 }
 
 /**
@@ -222,16 +226,17 @@ function dtoToLocal(dto: CommentDto): Comment {
     replyCount: dto.replyCount,
     likeCount: dto.likeCount,
     isLikedByMe: dto.isLikedByMe,
+    isDeleted: dto.isDeleted,
   }
 }
 
 /**
  * Merge/replace server comments into local cache.
+ * Server-deleted comments (isDeleted: true) are skipped entirely.
  *
- * @param replace - When true (initial load), replace the entire cache for
- *   this track with server data. Local-only comments (optimistic adds that
- *   the server hasn't returned yet) are preserved. When false (pagination),
- *   merge server data into existing cache.
+ * @param replace - When true, replaces the entire cache for this track
+ *   with server data. When false (pagination), merges server data into
+ *   existing cache.
  * @param replaceRootId - When set, replaces only replies belonging to this
  *   root comment ID. Top-level comments and replies of other roots are
  *   preserved. Takes precedence over `replace` when both are set.
@@ -259,20 +264,10 @@ function mergeFromServer(
   }
 
   for (const dto of dtos) {
+    // Skip server-deleted comments — don't add them to local cache
+    if (dto.isDeleted) continue
     const local = dtoToLocal(dto)
     existing.set(local.id, local)
-  }
-
-  // On full replace: re-add local-only comments that aren't in the server
-  // response. These are optimistically-added comments that haven't been
-  // confirmed yet (server call still in-flight or failed).
-  if (replace && !replaceRootId) {
-    const serverIds = new Set(dtos.map((d) => d.id))
-    for (const c of cache[trackId] ?? []) {
-      if (!serverIds.has(c.id) && c.authorId === getAuth().user?.id) {
-        existing.set(c.id, c)
-      }
-    }
   }
 
   const merged = [...existing.values()]
@@ -436,6 +431,7 @@ export async function addComment(
     replyCount: 0,
     likeCount: 0,
     isLikedByMe: false,
+    isDeleted: false,
   }
 
   // Optimistic local save — show immediately
@@ -579,9 +575,9 @@ export function useComments(trackId: string): Comment[] {
       listeners.add(cb)
       return () => listeners.delete(cb)
     },
-    () => (cache[trackId] ?? []).filter((c) => !c.parentId),
+    () => (cache[trackId] ?? []).filter((c) => !c.parentId && !c.isDeleted),
   )
-  return (cache[trackId] ?? []).filter((c) => !c.parentId)
+  return (cache[trackId] ?? []).filter((c) => !c.parentId && !c.isDeleted)
 }
 
 /**
