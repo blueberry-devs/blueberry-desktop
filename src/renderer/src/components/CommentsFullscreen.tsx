@@ -71,6 +71,7 @@ function CommentsFullscreen(): JSX.Element | null {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set())
+  const [commentError, setCommentError] = useState('')
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const vlistRef = useRef<VListHandle>(null)
@@ -181,6 +182,11 @@ function CommentsFullscreen(): JSX.Element | null {
   const handleSend = useCallback(async (): Promise<void> => {
     const text = input.trim()
     if (!text || !trackId || sending) return
+    if (text.length > 1000) {
+      setCommentError(t('comments.textTooLong'))
+      return
+    }
+    setCommentError('')
     const localId = crypto.randomUUID()
     setSyncingIds((prev) => new Set(prev).add(localId))
     setSending(true)
@@ -367,15 +373,22 @@ function CommentsFullscreen(): JSX.Element | null {
                 </div>
               )}
               <div className="comments-fullscreen__form">
+                {commentError && (
+                  <div className="comments-fullscreen__form-error">{commentError}</div>
+                )}
                 <textarea
                   ref={inputRef}
                   className="comments-fullscreen__input"
                   placeholder={replyTo ? `${t('comments.reply')} @${replyTo.author}` : t('comments.placeholder')}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => {
+                    setInput(e.target.value)
+                    if (commentError) setCommentError('')
+                  }}
                   onKeyDown={handleKeyDown}
                   rows={1}
                   disabled={sending}
+                  maxLength={1000}
                 />
                 <button
                   className="comments-fullscreen__send-btn"

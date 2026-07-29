@@ -250,8 +250,12 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
         setError(t('auth.passwordMismatch'))
         return
       }
-      if (mode === 'register' && password.length < 6) {
+      if (mode === 'register' && password.length < 8) {
         setError(t('auth.passwordMinLength'))
+        return
+      }
+      if (password.length > 128) {
+        setError(t('auth.passwordMaxLength'))
         return
       }
 
@@ -427,6 +431,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
+                maxLength={255}
               />
             </div>
           </div>
@@ -442,6 +447,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                maxLength={128}
               />
               <button
                 type="button"
@@ -467,6 +473,7 @@ export default function AuthView({ closing, onClose }: AuthViewProps) {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   autoComplete="new-password"
+                  maxLength={128}
                 />
                 <button
                   type="button"
