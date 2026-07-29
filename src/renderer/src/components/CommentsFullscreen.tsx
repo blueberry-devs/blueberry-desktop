@@ -457,6 +457,8 @@ function CommentRow({
   onLike,
   deletingIds,
   syncingIds,
+  expandedReplies,
+  onToggleReplies,
   t,
 }: {
   comment: Comment
