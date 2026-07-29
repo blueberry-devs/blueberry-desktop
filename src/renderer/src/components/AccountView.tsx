@@ -1,18 +1,85 @@
-import { useEffect } from 'react'
-import { useAuth, logout, openAuth, refreshProfile } from '../store/auth'
+import { useEffect, useState, useCallback } from 'react'
+import { useAuth, logout, openAuth, refreshProfile, updateAuthUser } from '../store/auth'
 import { useTranslation } from '../utils/useTranslation'
 import { getVerificationTier, getVerificationTooltip, getBadges } from '../utils/badges'
 import { getProfile } from '../store/profile'
+import { updateProfile as apiUpdateProfile } from '../services/profiles'
 import Tooltip from './Tooltip'
 import './AccountView.css'
+
+const USERNAME_RE = /^[a-zA-Z0-9_-]+$/
 
 export default function AccountView(): JSX.Element {
   const auth = useAuth()
   const { t } = useTranslation()
+  const [editing, setEditing] = useState(false)
+  const [editUsername, setEditUsername] = useState('')
+  const [editAvatar, setEditAvatar] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [editError, setEditError] = useState('')
+  const [editSuccess, setEditSuccess] = useState(false)
 
   useEffect(() => {
     refreshProfile()
   }, [])
+
+  // Reset editing state when user data changes or editing opens
+  const startEditing = useCallback(() => {
+    setEditUsername(auth.user?.username ?? '')
+    setEditAvatar(auth.user?.avatarUrl ?? '')
+    setEditError('')
+    setEditSuccess(false)
+    setEditing(true)
+  }, [auth.user])
+
+  const cancelEditing = useCallback(() => {
+    setEditing(false)
+    setEditError('')
+    setEditSuccess(false)
+  }, [])
+
+  const handleSave = useCallback(async () => {
+    setEditError('')
+    setEditSuccess(false)
+
+    const username = editUsername.trim()
+    const avatarUrl = editAvatar.trim() || null
+
+    // Validate username
+    if (username.length > 0 && (username.length < 3 || username.length > 30)) {
+      setEditError(t('profile.usernameInvalid'))
+      return
+    }
+    if (username.length > 0 && !USERNAME_RE.test(username)) {
+      setEditError(t('profile.usernameInvalid'))
+      return
+    }
+
+    // Validate avatarUrl
+    if (avatarUrl && !avatarUrl.startsWith('http://') && !avatarUrl.startsWith('https://')) {
+      setEditError(t('profile.saveError'))
+      return
+    }
+
+    setSaving(true)
+    try {
+      const result = await apiUpdateProfile({
+        username: username || null,
+        avatarUrl,
+      })
+      if (result) {
+        updateAuthUser(result)
+        setEditSuccess(true)
+        setTimeout(() => setEditSuccess(false), 2000)
+      } else {
+        setEditError(t('profile.saveError'))
+      }
+    } catch {
+      setEditError(t('profile.saveError'))
+    } finally {
+      setSaving(false)
+    }
+  }, [editUsername, editAvatar, t])
 
   return (
     <div className="account-view view-enter">
@@ -50,14 +117,63 @@ export default function AccountView(): JSX.Element {
                 </div>
               )}
             </div>
-            <button className="account-view__logout" onClick={logout} title={t('account.logout')}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-            </button>
+            <div className="account-view__profile-actions">
+              <button className="account-view__edit-btn" onClick={startEditing} title={t('profile.editProfile')}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M11.5 1.5a2.1 2.1 0 0 1 3 3L5 14H2v-3l9.5-9.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              <button className="account-view__logout" onClick={logout} title={t('account.logout')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </button>
+            </div>
           </div>
+
+          {/* Inline profile editor */}
+          {editing && (
+            <div className="account-view__edit-section">
+              <div className="account-view__edit-fields">
+                <label className="account-view__edit-label">{t('profile.usernameLabel')}</label>
+                <input
+                  className="account-view__edit-input"
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value)}
+                  placeholder={t('profile.usernameLabel')}
+                  maxLength={30}
+                  autoFocus
+                />
+                <p className="account-view__edit-hint">{t('profile.usernameHint')}</p>
+              </div>
+              <div className="account-view__edit-fields">
+                <label className="account-view__edit-label">{t('profile.avatarUrlLabel')}</label>
+                <input
+                  className="account-view__edit-input"
+                  value={editAvatar}
+                  onChange={(e) => setEditAvatar(e.target.value)}
+                  placeholder="https://example.com/avatar.jpg"
+                  maxLength={2048}
+                />
+              </div>
+              {editError && <div className="account-view__edit-error">{editError}</div>}
+              {editSuccess && <div className="account-view__edit-success">{t('profile.saveSuccess')}</div>}
+              <div className="account-view__edit-actions">
+                <button className="account-view__edit-cancel" onClick={cancelEditing} disabled={saving}>
+                  {t('common.cancel')}
+                </button>
+                <button className="account-view__edit-save" onClick={handleSave} disabled={saving}>
+                  {saving ? (
+                    <span className="account-view__edit-spinner" />
+                  ) : (
+                    t('common.save')
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="account-view__section">
             <h2 className="account-view__section-title">{t('account.profileData')}</h2>

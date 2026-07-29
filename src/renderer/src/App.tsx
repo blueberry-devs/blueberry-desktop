@@ -15,6 +15,8 @@ import AuthView from './components/AuthView'
 import { PlayerProvider, usePlayer } from './player/PlayerContext'
 import { usePendingSearch } from './store/searchQuery'
 import { useProfile } from './store/profile'
+import { useProfileState, openProfile, closeProfile } from './store/profiles'
+import ProfileView from './components/ProfileView'
 import { toggleLike } from './store/likes'
 import { isAuthenticated, subscribeAuthDialog, closeAuthDialog } from './store/auth'
 import './App.css'
@@ -54,6 +56,7 @@ function AppInner(): JSX.Element {
   const { isPlaying, isLyricsOpen, isCommentsOpen, currentTrack, getFrequencyBands, togglePlay, next, previous, closeLyrics, closeComments } = usePlayer()
   const pendingSearch = usePendingSearch()
   const profile = useProfile()
+  const { viewing: profileViewing } = useProfileState()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', profile.theme)
@@ -178,20 +181,28 @@ function AppInner(): JSX.Element {
         {profile.navbarPosition === 'left' && <Sidebar activeTab={activeTab} onSelectTab={selectTab} />}
 
         <div className={`app__content${showMiniPlayer && currentTrack ? ' app__content--with-player' : ''}`}>
-          {activeTab === 'wave' && (
+          {profileViewing ? (
+            <ProfileView />
+          ) : activeTab === 'wave' ? (
             <Suspense fallback={null}>
               <div className="wave-content">
                 <MoodList />
                 <NowPlayingPanel />
               </div>
             </Suspense>
-          )}
-          {activeTab === 'search' && <Suspense fallback={null}><SearchView /></Suspense>}
-          {activeTab === 'trends' && <Suspense fallback={null}><TrendsView /></Suspense>}
-          {activeTab === 'collection' && <Suspense fallback={null}><CollectionView /></Suspense>}
-          {activeTab === 'history' && <Suspense fallback={null}><HistoryView /></Suspense>}
-          {activeTab === 'settings' && <Suspense fallback={null}><SettingsView /></Suspense>}
-          {activeTab === 'account' && <Suspense fallback={null}><AccountView /></Suspense>}
+          ) : activeTab === 'search' ? (
+            <Suspense fallback={null}><SearchView /></Suspense>
+          ) : activeTab === 'trends' ? (
+            <Suspense fallback={null}><TrendsView /></Suspense>
+          ) : activeTab === 'collection' ? (
+            <Suspense fallback={null}><CollectionView /></Suspense>
+          ) : activeTab === 'history' ? (
+            <Suspense fallback={null}><HistoryView /></Suspense>
+          ) : activeTab === 'settings' ? (
+            <Suspense fallback={null}><SettingsView /></Suspense>
+          ) : activeTab === 'account' ? (
+            <Suspense fallback={null}><AccountView /></Suspense>
+          ) : null}
         </div>
       </div>
       {profile.navbarPosition === 'bottom' && (

@@ -1,0 +1,237 @@
+.profile-view {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+  padding: clamp(20px, 4vh, 40px) clamp(24px, 5vw, 60px) 60px;
+  background: var(--settings-bg);
+}
+
+.profile-view__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.profile-view__back:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+/* ========== Profile header card ========== */
+
+.profile-view__card {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.profile-view__avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.profile-view__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-view__avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  background: var(--surface-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.profile-view__username-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.profile-view__username {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.profile-view__verification-badge {
+  display: inline-flex;
+  align-items: center;
+}
+
+.profile-view__verification-badge svg {
+  display: block;
+}
+
+.profile-view__id {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  opacity: 0.5;
+  font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+}
+
+/* ========== Stats row ========== */
+
+.profile-view__stats {
+  display: flex;
+  gap: 32px;
+  margin-top: 20px;
+}
+
+.profile-view__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.profile-view__stat-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.profile-view__stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ========== Follow button ========== */
+
+.profile-view__follow-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 28px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.profile-view__follow-btn--follow {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+}
+
+.profile-view__follow-btn--follow:hover {
+  opacity: 0.9;
+}
+
+.profile-view__follow-btn--following {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.profile-view__follow-btn--following:hover {
+  border-color: rgba(255, 70, 70, 0.3);
+  color: #ff6b6b;
+}
+
+.profile-view__follow-btn--following:hover .profile-view__follow-label {
+  display: none;
+}
+
+.profile-view__follow-btn--following:hover .profile-view__unfollow-label {
+  display: inline;
+}
+
+.profile-view__follow-label,
+.profile-view__unfollow-label {
+  display: inline;
+}
+
+.profile-view__unfollow-label {
+  display: none;
+}
+
+.profile-view__follow-btn--loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ========== Badges ========== */
+
+.profile-view__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.profile-view__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--surface-hover);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.profile-view__badge-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ========== Loading / Error ========== */
+
+.profile-view__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+}
+
+.profile-view__spinner {
+  width: 24px;
+  height: 24px;
+  border: 2.5px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: profile-spin 0.6s linear infinite;
+}
+
+@keyframes profile-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.profile-view__error {
+  text-align: center;
+  padding: 40px 24px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}

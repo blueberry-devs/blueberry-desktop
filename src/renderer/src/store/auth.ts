@@ -57,6 +57,7 @@ export function setAuth(state: AuthState): void {
   emit()
   if (state.accessToken) {
     startTokenRefresh()
+    startProfileRefresh()
     startBackgroundSync()
   }
 }
@@ -65,6 +66,12 @@ export function clearAuth(): void {
   cache = { accessToken: null, refreshToken: null, user: null }
   clearPlaylistCache()
   clearLikedTracks()
+  emit()
+}
+
+/** Update just the user field in the auth cache (e.g. after profile edit). */
+export function updateAuthUser(user: AuthUser): void {
+  cache = { ...cache, user }
   emit()
 }
 
@@ -218,6 +225,10 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 const REFRESH_INTERVAL_MS = 50 * 60 * 1000 // refresh 10 min before 1-hour expiry
 let isRefreshing = false
 
+// ---------- Periodic profile refresh (/me) ----------
+let profileRefreshInterval: ReturnType<typeof setInterval> | null = null
+const PROFILE_REFRESH_INTERVAL_MS = 5 * 60 * 1000 // every 5 minutes
+
 export async function doRefresh(): Promise<boolean> {
   if (isRefreshing) return false
   isRefreshing = true
@@ -259,10 +270,27 @@ function startTokenRefresh(): void {
   }, REFRESH_INTERVAL_MS)
 }
 
-// Patch clearAuth to stop refresh and background sync on logout
+function stopProfileRefresh(): void {
+  if (profileRefreshInterval !== null) {
+    clearInterval(profileRefreshInterval)
+    profileRefreshInterval = null
+  }
+}
+
+function startProfileRefresh(): void {
+  stopProfileRefresh()
+  // First call after a short delay so we don't race with initial auth
+  setTimeout(() => refreshProfile(), 10_000)
+  profileRefreshInterval = setInterval(() => {
+    refreshProfile()
+  }, PROFILE_REFRESH_INTERVAL_MS)
+}
+
+// Patch clearAuth to stop refresh, profile refresh, and background sync on logout
 const origClearAuth = clearAuth
 clearAuth = (): void => {
   stopTokenRefresh()
+  stopProfileRefresh()
   stopBackgroundSync()
   origClearAuth()
 }
@@ -270,6 +298,7 @@ clearAuth = (): void => {
 // Start refresh on init if already logged in
 if (cache.accessToken) {
   startTokenRefresh()
+  startProfileRefresh()
   startBackgroundSync()
 }
 
