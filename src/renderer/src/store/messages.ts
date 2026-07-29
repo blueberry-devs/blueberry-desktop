@@ -443,42 +443,48 @@ export async function addComment(
 
   // Try server with client-supplied UUID for idempotency
   if (auth.accessToken) {
-    try {
-      const created = await apiCreateComment({
-        id,
-        entityType: 'track',
-        entityId: trackId,
-        parentId: parentId ?? null,
-        text,
-      })
-      if (created) {
-        // Update with server data
-        cache = {
-          ...cache,
-          [trackId]: (cache[trackId] ?? []).map((c) =>
-            c.id === id
-              ? {
-                  ...c,
-                  id: created.id,
-                  timestamp: new Date(created.createdAt).getTime(),
-                  authorId: created.userId,
-                  author: created.userName ?? author,
-                  avatarUrl: created.userAvatarUrl ?? undefined,
-                  verificationLevel: created.verificationLevel,
-                  rootId: created.rootId ?? undefined,
-                  replyCount: created.replyCount,
-                  parentId: created.parentId ?? undefined,
-                  likeCount: created.likeCount,
-                  isLikedByMe: created.isLikedByMe,
-                }
-              : c,
-          ),
-        }
-        bumpRev(trackId)
-        emit()
+    const created = await apiCreateComment({
+      id,
+      entityType: 'track',
+      entityId: trackId,
+      parentId: parentId ?? null,
+      text,
+    })
+
+    if (created) {
+      // Update with server data
+      cache = {
+        ...cache,
+        [trackId]: (cache[trackId] ?? []).map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                id: created.id,
+                timestamp: new Date(created.createdAt).getTime(),
+                authorId: created.userId,
+                author: created.userName ?? author,
+                avatarUrl: created.userAvatarUrl ?? undefined,
+                verificationLevel: created.verificationLevel,
+                rootId: created.rootId ?? undefined,
+                replyCount: created.replyCount,
+                parentId: created.parentId ?? undefined,
+                likeCount: created.likeCount,
+                isLikedByMe: created.isLikedByMe,
+              }
+            : c,
+        ),
       }
-    } catch {
-      // Server failed — keep local version as-is (already in cache)
+      bumpRev(trackId)
+      emit()
+    } else {
+      // Server rejected — remove optimistic comment from cache
+      cache = {
+        ...cache,
+        [trackId]: (cache[trackId] ?? []).filter((c) => c.id !== id),
+      }
+      bumpRev(trackId)
+      emit()
+      throw new Error('Failed to send comment — server unavailable')
     }
   }
 

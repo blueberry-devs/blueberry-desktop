@@ -192,6 +192,8 @@ function CommentsFullscreen(): JSX.Element | null {
       setReplyTo(null)
       // Scroll to top to see new comment
       vlistRef.current?.scrollTo(0)
+    } catch (e) {
+      setCommentError(e instanceof Error ? e.message : 'Failed to send comment')
     } finally {
       setSending(false)
       setSyncingIds((prev) => {
