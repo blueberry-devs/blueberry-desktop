@@ -78,6 +78,17 @@ function CommentsFullscreen(): JSX.Element | null {
   const vlistRef = useRef<VListHandle>(null)
   const loadingMoreRef = useRef(false)
 
+  // Persist reply expansion state across VList recycles during polling
+  const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set())
+  const toggleReplies = useCallback((commentId: string) => {
+    setExpandedReplies((prev) => {
+      const next = new Set(prev)
+      if (next.has(commentId)) next.delete(commentId)
+      else next.add(commentId)
+      return next
+    })
+  }, [])
+
   const handleClose = useCallback((): void => {
     if (closing) return
     setClosing(true)
@@ -355,6 +366,8 @@ function CommentsFullscreen(): JSX.Element | null {
                     onLike={handleLike}
                     deletingIds={deletingIds}
                     syncingIds={syncingIds}
+                    expandedReplies={expandedReplies}
+                    onToggleReplies={toggleReplies}
                     t={t}
                   />
                 )}
@@ -455,11 +468,13 @@ function CommentRow({
   onLike: (id: string) => void
   deletingIds: Set<string>
   syncingIds: Set<string>
+  expandedReplies: Set<string>
+  onToggleReplies: (commentId: string) => void
   t: (k: string) => string
 }): JSX.Element {
   const isOwner = authed && currentUserId && (currentUserId === comment.authorId)
   const liked = authed && comment.isLikedByMe
-  const [showReplies, setShowReplies] = useState(false)
+  const showReplies = expandedReplies.has(comment.id)
   const [repliesLoading, setRepliesLoading] = useState(false)
   const repliesLoaded = areRepliesLoaded(comment.id)
   const hasMoreReplies = hasMoreReplyPages(comment.id)
@@ -483,8 +498,8 @@ function CommentRow({
         .catch(() => {})
         .finally(() => setRepliesLoading(false))
     }
-    setShowReplies((s) => !s)
-  }, [showReplies, repliesLoaded, trackId, comment.id])
+    onToggleReplies(comment.id)
+  }, [showReplies, repliesLoaded, trackId, comment.id, onToggleReplies])
 
   const handleLoadMoreReplies = useCallback(() => {
     if (!trackId) return
