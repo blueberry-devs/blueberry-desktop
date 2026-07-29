@@ -136,30 +136,65 @@ export default function AccountView(): JSX.Element {
           {/* Inline profile editor */}
           {editing && (
             <div className="account-view__edit-section">
-              <div className="account-view__edit-fields">
-                <label className="account-view__edit-label">{t('profile.usernameLabel')}</label>
-                <input
-                  className="account-view__edit-input"
-                  value={editUsername}
-                  onChange={(e) => setEditUsername(e.target.value)}
-                  placeholder={t('profile.usernameLabel')}
-                  maxLength={30}
-                  autoFocus
-                />
-                <p className="account-view__edit-hint">{t('profile.usernameHint')}</p>
+              <div className="account-view__edit-header">
+                <div className="account-view__edit-header-icon">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M11.5 1.5a2.1 2.1 0 0 1 3 3L5 14H2v-3l9.5-9.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <span className="account-view__edit-header-text">{t('profile.editProfile')}</span>
               </div>
-              <div className="account-view__edit-fields">
-                <label className="account-view__edit-label">{t('profile.avatarUrlLabel')}</label>
-                <input
-                  className="account-view__edit-input"
-                  value={editAvatar}
-                  onChange={(e) => setEditAvatar(e.target.value)}
-                  placeholder="https://example.com/avatar.jpg"
-                  maxLength={2048}
-                />
+
+              <div className="account-view__edit-body">
+                <div className="account-view__edit-avatar-col">
+                  <div className={`account-view__edit-avatar-preview${!editAvatar ? ' account-view__edit-avatar-preview--empty' : ''}`}>
+                    {editAvatar ? (
+                      <img src={editAvatar} alt="" />
+                    ) : (
+                      <svg width="28" height="28" viewBox="0 0 18 18" fill="none">
+                        <path d="M14 15.5v-1a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+                        <circle cx="9" cy="6" r="3" stroke="currentColor" strokeWidth="1" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="account-view__edit-avatar-label">{t('profile.avatarUrlLabel')}</span>
+                </div>
+
+                <div className="account-view__edit-fields">
+                  <div className="account-view__edit-field">
+                    <label className="account-view__edit-label">{t('profile.usernameLabel')}</label>
+                    <div className="account-view__edit-input-wrap">
+                      <input
+                        className={`account-view__edit-input${editUsername.length > 0 ? ' account-view__edit-input--has-count' : ''}`}
+                        value={editUsername}
+                        onChange={(e) => setEditUsername(e.target.value)}
+                        placeholder={t('profile.usernameLabel')}
+                        maxLength={30}
+                        autoFocus
+                      />
+                      {editUsername.length > 0 && (
+                        <span className="account-view__edit-char-count">{editUsername.length}/30</span>
+                      )}
+                    </div>
+                    <p className="account-view__edit-hint">{t('profile.usernameHint')}</p>
+                  </div>
+
+                  <div className="account-view__edit-field">
+                    <label className="account-view__edit-label">{t('profile.avatarUrlLabel')}</label>
+                    <input
+                      className="account-view__edit-input"
+                      value={editAvatar}
+                      onChange={(e) => setEditAvatar(e.target.value)}
+                      placeholder="https://example.com/avatar.jpg"
+                      maxLength={2048}
+                    />
+                  </div>
+
+                  {editError && <div className="account-view__edit-error">{editError}</div>}
+                  {editSuccess && <div className="account-view__edit-success">{t('profile.saveSuccess')}</div>}
+                </div>
               </div>
-              {editError && <div className="account-view__edit-error">{editError}</div>}
-              {editSuccess && <div className="account-view__edit-success">{t('profile.saveSuccess')}</div>}
+
               <div className="account-view__edit-actions">
                 <button className="account-view__edit-cancel" onClick={cancelEditing} disabled={saving}>
                   {t('common.cancel')}
