@@ -19,6 +19,7 @@ import {
   loadMoreCommentsFromServer,
   loadRepliesFromServer,
   loadMoreRepliesFromServer,
+  pollCommentsFromServer,
   areRepliesLoaded,
   hasMoreReplyPages,
   hasMoreServerPages,
@@ -157,6 +158,15 @@ function CommentsFullscreen(): JSX.Element | null {
       .finally(() => {
         setServerLoading(false)
       })
+  }, [trackId])
+
+  // Poll for new comments every 10 seconds while mounted
+  useEffect(() => {
+    if (!trackId) return
+    const id = setInterval(() => {
+      pollCommentsFromServer(trackId).catch(() => {})
+    }, 10_000)
+    return () => clearInterval(id)
   }, [trackId])
 
   const hasMoreServer = trackId ? hasMoreServerPages(trackId) : false

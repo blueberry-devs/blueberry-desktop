@@ -292,9 +292,7 @@ export async function loadCommentsFromServer(
 
   const meta = ensureMeta(trackId)
 
-  // Always fetch from server — without it, deleted comments stay in cache
-  // forever. The replace:true in mergeFromServer below purges stale data.
-  // Throttle: only re-fetch if the last fetch was more than 60s ago.
+  // Throttle: initial load only once per 60s. Polling uses dedicated function.
   if (meta.fetchedFromServer && Date.now() - meta.lastFetchedAt < 60_000) return
 
   const result = await apiFetchComments(trackId, 'track', undefined, PAGE_SIZE)
@@ -322,6 +320,28 @@ export async function loadCommentsFromServer(
       loadRepliesFromServer(trackId, root.id).catch(() => {})
     }
   }
+}
+
+/**
+ * Poll for new comments every 10s. Replaces the first page in cache so new
+ * comments appear and deleted ones disappear, but preserves UI state —
+ * reply expansions and scroll position are NOT reset.
+ */
+export async function pollCommentsFromServer(trackId: string): Promise<void> {
+  const auth = getAuth()
+  if (!auth.accessToken) return
+
+  const meta = ensureMeta(trackId)
+
+  const result = await apiFetchComments(trackId, 'track', undefined, PAGE_SIZE)
+  if (!result) return
+
+  meta.nextCursor = result.nextCursor
+  meta.lastFetchedAt = Date.now()
+
+  // Merge with replace so deleted comments are purged, but keep existing
+  // replyMeta intact — expanded replies stay expanded.
+  mergeFromServer(trackId, result.comments, true)
 }
 
 /**
