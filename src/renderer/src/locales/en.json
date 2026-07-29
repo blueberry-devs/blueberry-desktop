@@ -298,6 +298,8 @@
   "account.id": "ID",
   "account.loginTitle": "Sign in to your account",
   "account.loginHint": "To sync your collection, playlists, and history across devices",
+  "account.verification": "Verification",
+  "account.badges": "Badges",
 
   "trash.title": "Trash",
   "trash.empty": "Trash is empty",

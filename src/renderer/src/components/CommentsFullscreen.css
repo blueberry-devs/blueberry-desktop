@@ -286,7 +286,7 @@
   align-items: center;
 }
 
-.comments-fullscreen__verification-badge img {
+.comments-fullscreen__verification-badge svg {
   display: block;
 }
 

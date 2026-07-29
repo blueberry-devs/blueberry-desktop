@@ -14,6 +14,8 @@ export interface AuthUser {
   email: string
   username: string
   avatarUrl: string | null
+  verificationLevel?: number
+  badges?: number[]
 }
 
 export async function register(

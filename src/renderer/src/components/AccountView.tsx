@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useAuth, logout, openAuth, refreshProfile } from '../store/auth'
 import { useTranslation } from '../utils/useTranslation'
+import { getVerificationTier, getBadges } from '../utils/badges'
 import './AccountView.css'
 
 export default function AccountView(): JSX.Element {
@@ -33,7 +34,20 @@ export default function AccountView(): JSX.Element {
             <div className="account-view__profile-info">
               <div className="account-view__profile-email">{auth.user.email}</div>
               {auth.user.username && (
-                <div className="account-view__profile-username">@{auth.user.username}</div>
+                <div className="account-view__profile-username">
+                  @{auth.user.username}
+                  {(auth.user.verificationLevel ?? 0) >= 1 && (
+                    <span
+                      className="account-view__verification-badge"
+                      style={{ color: getVerificationTier(auth.user.verificationLevel!).color }}
+                      title={getVerificationTier(auth.user.verificationLevel!).label}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
             <button className="account-view__logout" onClick={logout} title={t('account.logout')}>
@@ -60,8 +74,35 @@ export default function AccountView(): JSX.Element {
                 <span className="account-view__detail-label">{t('account.id')}</span>
                 <span className="account-view__detail-value account-view__detail-value--mono">{auth.user.id}</span>
               </div>
+              {(auth.user.verificationLevel ?? 0) >= 1 && (
+                <div className="account-view__detail-row">
+                  <span className="account-view__detail-label">{t('account.verification')}</span>
+                  <span className="account-view__detail-value">
+                    <span className="account-view__detail-badge" style={{ color: getVerificationTier(auth.user.verificationLevel!).color }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+                      </svg>
+                      {getVerificationTier(auth.user.verificationLevel!).label}
+                    </span>
+                  </span>
+                </div>
+              )}
             </div>
           </div>
+
+          {auth.user.badges && auth.user.badges.length > 0 && (
+            <div className="account-view__section">
+              <h2 className="account-view__section-title">{t('account.badges')}</h2>
+              <div className="account-view__badges">
+                {getBadges(auth.user.badges).map((badge) => (
+                  <div key={badge.id} className="account-view__badge" title={badge.description}>
+                    <span className="account-view__badge-emoji">{badge.emoji}</span>
+                    <span className="account-view__badge-label">{badge.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="account-view__empty">

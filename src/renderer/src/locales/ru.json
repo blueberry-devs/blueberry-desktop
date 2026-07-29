@@ -298,6 +298,8 @@
   "account.id": "ID",
   "account.loginTitle": "Войдите в аккаунт",
   "account.loginHint": "Чтобы синхронизировать коллекцию, плейлисты и историю между устройствами",
+  "account.verification": "Верификация",
+  "account.badges": "Бейджи",
 
   "trash.title": "Корзина",
   "trash.empty": "Корзина пуста",
