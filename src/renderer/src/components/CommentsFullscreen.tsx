@@ -162,6 +162,7 @@ function CommentsFullscreen(): JSX.Element | null {
     if (!trackId) return
     setReplyTo(null)
     setInput('')
+    setExpandedReplies(new Set())
     setServerLoading(true)
 
     loadCommentsFromServer(trackId)
