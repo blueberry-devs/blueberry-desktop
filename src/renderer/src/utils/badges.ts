@@ -15,7 +15,7 @@ export const VERIFICATION_TIERS: VerificationTier[] = [
   { level: 1, label: 'Verified Artist', color: '#3b82f6' },
   { level: 2, label: 'Trusted Curator', color: '#10b981' },
   { level: 3, label: 'Brand/Official', color: '#f59e0b' },
-  { level: 4, label: 'Staff', color: '#a855f7' },
+  { level: 4, label: 'Staff', color: '#7a00b8' },
 ]
 
 export function getVerificationTier(level: number): VerificationTier {
