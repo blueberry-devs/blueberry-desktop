@@ -44,12 +44,12 @@
       "binaries/music-server"
     ],
     "resources": [
-      "resources/.env",
-      "resources/artists/*",
-      "resources/moods/*",
-      "resources/images/*",
-      "resources/fonts/*",
-      "resources/discord/*"
+      "../resources/.env",
+      "../resources/artists/*",
+      "../resources/moods/*",
+      "../resources/images/*",
+      "../resources/fonts/*",
+      "../resources/discord/*"
     ],
     "windows": {
       "nsis": {
