@@ -21,6 +21,7 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(DiscordState::default())
+        .manage(sidecar::SidecarChild::default())
         .invoke_handler(tauri::generate_handler![
             commands::store::store_get,
             commands::store::store_set,
@@ -77,6 +78,12 @@ fn main() {
                 let _ = window.hide();
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Blueberry Desktop");
+        .build(tauri::generate_context!())
+        .expect("error building Blueberry Desktop")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Kill the sidecar process when the app truly exits
+                sidecar::kill_stored_sidecar(app);
+            }
+        });
 }
