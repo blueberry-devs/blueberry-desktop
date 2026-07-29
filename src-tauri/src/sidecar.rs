@@ -59,11 +59,13 @@ fn parse_dotenv(path: &PathBuf) -> HashMap<String, String> {
 
 /// Find the .env file — check several locations in order.
 fn find_dotenv(app: &AppHandle) -> Option<PathBuf> {
-    // 1. Dev: CWD → server/.env
-    let dev_path = PathBuf::from("server/.env");
-    if dev_path.exists() {
-        tracing::info!("[sidecar] using env from {}", dev_path.display());
-        return Some(dev_path);
+    // 1. Dev: CWD → resources/.env or server/.env
+    for candidate in &["resources/.env", "server/.env"] {
+        let dev_path = PathBuf::from(candidate);
+        if dev_path.exists() {
+            tracing::info!("[sidecar] using env from {}", dev_path.display());
+            return Some(dev_path);
+        }
     }
 
     // 2. Production: Tauri resource dir (preserves directory structure from bundle config)
