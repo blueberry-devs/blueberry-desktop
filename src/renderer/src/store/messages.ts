@@ -344,7 +344,12 @@ export async function pollCommentsFromServer(trackId: string): Promise<void> {
   mergeFromServer(trackId, result.comments, true)
 
   // Also re-fetch first page of replies for any expanded root comments
+  // belonging to this track.
+  const trackHasRoot = (rootId: string): boolean =>
+    (cache[trackId] ?? []).some((c) => c.id === rootId || c.rootId === rootId)
+
   for (const rootId of Object.keys(replyMeta)) {
+    if (!trackHasRoot(rootId)) continue
     const rmeta = replyMeta[rootId]
     if (!rmeta?.fetched) continue
 
