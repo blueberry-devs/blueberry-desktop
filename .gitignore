@@ -23,7 +23,7 @@ venv/
 # Environment
 .env
 server/.env
-src-tauri/resources/.env
+resources/.env
 
 # OS
 .DS_Store
