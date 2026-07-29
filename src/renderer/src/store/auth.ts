@@ -28,9 +28,10 @@ function load(): AuthState {
 
 function persist(): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cache))
-  } catch {
-    /* ignore */
+    const data = JSON.stringify(cache)
+    localStorage.setItem(STORAGE_KEY, data)
+  } catch (e) {
+    console.error('[auth] persist failed:', e)
   }
 }
 
@@ -133,22 +134,18 @@ export async function tryRestoreSession(): Promise<boolean> {
     return true
   }
 
-  // Token likely expired (401) — try refresh
-  const result = await apiRefresh(state.refreshToken)
-  if (result.success && result.accessToken) {
-    cache = {
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken ?? state.refreshToken,
-      user: state.user,
-    }
+  // Token expired — use shared doRefresh (joins in-flight refresh if any)
+  const refreshed = await doRefresh()
+  if (!refreshed) return false
+
+  // Retry /me with new token
+  const { user: me, httpStatus: meStatus } = await getMe(cache.accessToken!)
+  if (me && meStatus !== 401) {
+    cache = { ...cache, user: me }
     emit()
     return true
   }
 
-  // Only clear auth on definitive auth error from refresh endpoint too
-  if (result.httpStatus === 401) {
-    clearAuth()
-  }
   return false
 }
 
@@ -224,36 +221,45 @@ export function logout(): void {
 let refreshInterval: ReturnType<typeof setInterval> | null = null
 const REFRESH_INTERVAL_MS = 50 * 60 * 1000 // refresh 10 min before 1-hour expiry
 let isRefreshing = false
+let refreshPromise: Promise<boolean> | null = null
 
 // ---------- Periodic profile refresh (/me) ----------
 let profileRefreshInterval: ReturnType<typeof setInterval> | null = null
 const PROFILE_REFRESH_INTERVAL_MS = 5 * 60 * 1000 // every 5 minutes
 
 export async function doRefresh(): Promise<boolean> {
-  if (isRefreshing) return false
+  // If a refresh is already in-flight, join it instead of returning false
+  if (isRefreshing && refreshPromise) return refreshPromise
   isRefreshing = true
-  try {
-    const state = getAuth()
-    if (!state.refreshToken) return false
-    const result = await apiRefresh(state.refreshToken)
-    if (result.success && result.accessToken) {
-      cache = {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken ?? state.refreshToken,
-        user: state.user,
+
+  const p = (async (): Promise<boolean> => {
+    try {
+      const state = getAuth()
+      if (!state.refreshToken) return false
+      const result = await apiRefresh(state.refreshToken)
+      if (result.success && result.accessToken) {
+        cache = {
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken ?? state.refreshToken,
+          user: state.user,
+        }
+        emit()
+        return true
       }
-      emit()
-      return true
+      // Refresh failed — only clear auth on definitive auth error (401).
+      // Server errors (502/5xx) or network errors are temporary; keep tokens.
+      if (result.httpStatus === 401) {
+        clearAuth()
+      }
+      return false
+    } finally {
+      isRefreshing = false
+      refreshPromise = null
     }
-    // Refresh failed — only clear auth on definitive auth error (401).
-    // Server errors (502/5xx) or network errors are temporary; keep tokens.
-    if (result.httpStatus === 401) {
-      clearAuth()
-    }
-    return false
-  } finally {
-    isRefreshing = false
-  }
+  })()
+
+  refreshPromise = p
+  return p
 }
 
 function stopTokenRefresh(): void {
