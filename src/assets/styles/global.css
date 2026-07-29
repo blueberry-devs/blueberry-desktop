@@ -7,12 +7,11 @@
 }
 
 @font-face {
-  font-family: 'Druk Wide';
+  font-family: 'Unbounded';
   src: url('/fonts/font2.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0400-04FF, U+0500-052F, U+1C80-1C8F, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
 }
 
 :root {
