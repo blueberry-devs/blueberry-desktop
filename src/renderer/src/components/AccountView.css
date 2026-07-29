@@ -17,19 +17,20 @@
 .account-view__profile-card {
   background: var(--surface);
   border-radius: 16px;
-  padding: 28px 24px;
+  padding: 24px;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   margin-bottom: 20px;
 }
 
 .account-view__avatar-wrap {
-  width: 60px;
-  height: 60px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   flex-shrink: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .account-view__avatar-img {
@@ -41,7 +42,7 @@
 .account-view__avatar-placeholder {
   width: 100%;
   height: 100%;
-  background: var(--surface-hover);
+  background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -54,7 +55,7 @@
 }
 
 .account-view__profile-email {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -62,22 +63,25 @@
 .account-view__profile-username {
   font-size: 13px;
   color: var(--text-secondary);
-  margin-top: 3px;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .account-view__logout {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.04);
   color: var(--text-secondary);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .account-view__logout:hover {
@@ -88,28 +92,28 @@
 
 .account-view__profile-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
 .account-view__edit-btn {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.04);
   color: var(--text-secondary);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .account-view__edit-btn:hover {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.25);
+  background: rgba(59,130,246,0.12);
+  border-color: rgba(59,130,246,0.25);
   color: #3b82f6;
 }
 
@@ -117,64 +121,186 @@
 
 .account-view__edit-section {
   background: var(--surface);
-  border-radius: 14px;
-  padding: 20px;
+  border-radius: 16px;
+  padding: 28px;
   margin-bottom: 20px;
+  border: 1px solid rgba(255,255,255,0.06);
+  animation: account-edit-fadeIn 0.2s ease;
+}
+
+@keyframes account-edit-fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.account-view__edit-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.account-view__edit-header-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(59,130,246,0.12);
+  color: #3b82f6;
+}
+
+.account-view__edit-header-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.account-view__edit-body {
+  display: flex;
+  gap: 24px;
+}
+
+.account-view__edit-avatar-col {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  width: 100px;
+}
+
+.account-view__edit-avatar-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.08));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.account-view__edit-avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-view__edit-avatar-preview--empty {
+  color: var(--text-secondary);
+  opacity: 0.4;
+}
+
+.account-view__edit-avatar-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .account-view__edit-fields {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 16px;
+  min-width: 0;
+}
+
+.account-view__edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .account-view__edit-label {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.account-view__edit-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .account-view__edit-input {
+  width: 100%;
   padding: 10px 14px;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.04);
   color: var(--text-primary);
   font-family: inherit;
   font-size: 14px;
   outline: none;
-  transition: border-color 0.12s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .account-view__edit-input:focus {
-  border-color: var(--accent);
+  border-color: rgba(59,130,246,0.4);
+  background: rgba(255,255,255,0.06);
+}
+
+.account-view__edit-input--has-count {
+  padding-right: 50px;
+}
+
+.account-view__edit-char-count {
+  position: absolute;
+  right: 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  pointer-events: none;
+  font-family: 'SF Mono', 'Consolas', monospace;
 }
 
 .account-view__edit-hint {
   font-size: 12px;
   color: var(--text-secondary);
-  opacity: 0.6;
+  opacity: 0.55;
+  line-height: 1.4;
 }
 
 .account-view__edit-error {
   font-size: 13px;
   color: #ff6b6b;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,70,70,0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
 }
 
 .account-view__edit-success {
   font-size: 13px;
   color: #10b981;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16,185,129,0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
 }
 
 .account-view__edit-actions {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  margin-top: 4px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255,255,255,0.04);
 }
 
 .account-view__edit-cancel {
@@ -183,7 +309,7 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
-  transition: background 0.12s ease;
+  transition: background 0.15s ease;
 }
 
 .account-view__edit-cancel:hover {
@@ -191,13 +317,13 @@
 }
 
 .account-view__edit-save {
-  padding: 8px 18px;
+  padding: 8px 20px;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 700;
   background: var(--accent);
   color: var(--accent-contrast);
-  transition: opacity 0.12s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -207,8 +333,12 @@
   opacity: 0.9;
 }
 
+.account-view__edit-save:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
 .account-view__edit-save:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: default;
 }
 
@@ -232,25 +362,27 @@
 }
 
 .account-view__section-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-secondary);
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+  padding: 0 4px;
 }
 
 .account-view__details {
   background: var(--surface);
   border-radius: 14px;
   overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.04);
 }
 
 .account-view__detail-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
+  padding: 13px 20px;
   gap: 16px;
 }
 
@@ -276,7 +408,19 @@
 .account-view__detail-value--mono {
   font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
   font-size: 12px;
-  opacity: 0.6;
+  opacity: 0.5;
+}
+
+.account-view__detail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.account-view__detail-badge svg {
+  display: block;
 }
 
 /* ---------- Empty / not logged in ---------- */
@@ -324,7 +468,7 @@
   background: var(--accent);
   color: var(--accent-contrast);
   margin-top: 8px;
-  transition: opacity 0.12s ease;
+  transition: opacity 0.15s ease;
 }
 
 .account-view__login-btn:hover {
@@ -341,18 +485,6 @@
 }
 
 .account-view__verification-badge svg {
-  display: block;
-}
-
-.account-view__detail-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.account-view__detail-badge svg {
   display: block;
 }
 
