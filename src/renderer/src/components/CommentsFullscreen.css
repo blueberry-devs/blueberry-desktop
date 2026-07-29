@@ -284,10 +284,9 @@
 .comments-fullscreen__verification-badge {
   display: inline-flex;
   align-items: center;
-  color: #3b82f6;
 }
 
-.comments-fullscreen__verification-badge svg {
+.comments-fullscreen__verification-badge img {
   display: block;
 }
 

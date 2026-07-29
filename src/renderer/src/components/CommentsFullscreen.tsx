@@ -19,6 +19,7 @@ import {
   useCommentsRev,
   type Comment,
 } from '../store/messages'
+import verificationIcon from '../assets/verification_blue.svg'
 import './CommentsFullscreen.css'
 
 /* ========== Helpers ========== */
@@ -440,9 +441,7 @@ function CommentRow({
               {comment.author}
               {comment.verificationLevel >= 1 && (
                 <span className="comments-fullscreen__verification-badge" title={`Verification level ${comment.verificationLevel}`}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
-                  </svg>
+                  <img src={verificationIcon} width="12" height="12" alt="" />
                 </span>
               )}
             </span>
@@ -581,9 +580,7 @@ function ReplyRow({
             {comment.author}
             {comment.verificationLevel >= 1 && (
               <span className="comments-fullscreen__verification-badge" title={`Verification level ${comment.verificationLevel}`}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
-                </svg>
+                <img src={verificationIcon} width="10" height="10" alt="" />
               </span>
             )}
           </span>
