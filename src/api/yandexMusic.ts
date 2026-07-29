@@ -1,6 +1,9 @@
 import { getProfile } from '../store/profile'
 
 const BASE_URL = 'http://localhost:8787'
+// The Tauri sidecar binds explicitly to IPv4 (127.0.0.1). Using this address
+// avoids Windows resolving `localhost` to IPv6 first in the WebView.
+const SIDECAR_URL = 'http://127.0.0.1:8787'
 
 export type TrackSource = 'yandex' | 'youtube' | 'soundcloud'
 
@@ -34,6 +37,8 @@ export interface PlaylistResult {
 export interface SyncedLyricsResponse {
   synced: string | null
   plain: string | null
+  /** Provider that produced the result: lrclib | netease | kugou | textyl | lyricsovh */
+  provider?: string | null
 }
 
 export interface PaginatedTracks {
@@ -142,8 +147,50 @@ export async function fetchVideoClip(title: string, artist: string): Promise<str
   return url
 }
 
-export function fetchSyncedLyrics(title: string, artist: string, duration?: number): Promise<SyncedLyricsResponse> {
+export async function fetchSyncedLyrics(
+  title: string,
+  artist: string,
+  duration?: number
+): Promise<SyncedLyricsResponse> {
   const params = new URLSearchParams({ title, artist })
   if (duration) params.set('duration', String(Math.round(duration)))
-  return getJson(`/api/lyrics/synced?${params.toString()}`)
+  const url = `${SIDECAR_URL}/api/lyrics/synced?${params.toString()}`
+  console.info('[lyrics] request started', { title, artist, duration, url })
+
+  // The sidecar is spawned asynchronously by Tauri. A track can start loading
+  // before it has bound its port, so retry only transient connection/server
+  // failures. A 404 is a valid, cacheable "not found" result.
+  let lastError: unknown
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const res = await fetch(url)
+      console.info('[lyrics] response received', { attempt: attempt + 1, status: res.status, ok: res.ok })
+      if (res.status === 404) {
+        console.info('[lyrics] not found')
+        return { synced: null, plain: null, provider: null }
+      }
+      if (res.ok) {
+        const data = await res.json() as SyncedLyricsResponse
+        console.info('[lyrics] response parsed', {
+          provider: data.provider,
+          syncedLength: data.synced?.length ?? 0,
+          plainLength: data.plain?.length ?? 0
+        })
+        if (!data.synced?.trim() && !data.plain?.trim()) {
+          console.warn('[lyrics] backend returned an empty success response')
+          return { synced: null, plain: null, provider: null }
+        }
+        return data
+      }
+      if (res.status < 500) throw new Error(`Lyrics request failed: ${res.status}`)
+      lastError = new Error(`Lyrics request failed: ${res.status}`)
+    } catch (error) {
+      lastError = error
+      console.warn('[lyrics] request attempt failed', { attempt: attempt + 1, error })
+    }
+    console.info('[lyrics] retry scheduled', { nextAttempt: attempt + 2 })
+    await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
+  }
+  console.error('[lyrics] request failed permanently', lastError)
+  throw lastError instanceof Error ? lastError : new Error('Lyrics request failed')
 }

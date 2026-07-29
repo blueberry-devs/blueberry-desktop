@@ -10,7 +10,7 @@ import {
 } from 'react'
 import type Hls from 'hls.js'
 import { resolveStream, TrackResult } from '../api/yandexMusic'
-import { parseLrc, LrcLine } from '../utils/lrc'
+import { parseLrc, parsePlain, LrcLine } from '../utils/lrc'
 import { getLyrics } from '../services/lyricsCache'
 import { pushHistory } from '../store/history'
 import { recordPlay } from '../store/playCount'
@@ -325,19 +325,39 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
   }, [currentTrack])
 
   const loadLyrics = useCallback((track: TrackResult, token: number) => {
+    console.info('[lyrics] load started', { trackId: track.id, title: track.title, token })
     setLyricsLoading(true)
     getLyrics(track, (res) => {
-      if (playTokenRef.current !== token) return
-      if (res.synced) {
-        setLyrics(parseLrc(res.synced))
-      } else if (res.plain) {
-        setLyricsPlain(res.plain.split('\n').filter((l) => l.trim().length > 0))
-      } else {
-        setLyricsPlain([])
+      if (playTokenRef.current !== token) {
+        console.info('[lyrics] result ignored for stale track', { trackId: track.id, token })
+        return
       }
+
+      // A provider can return a timestamped file that yields no usable cues
+      // (metadata only, or every line empty). Fall through to plain text in
+      // that case instead of showing an empty lyrics pane.
+      const synced = res.synced ? parseLrc(res.synced) : []
+      console.info('[lyrics] parsed result', {
+        trackId: track.id,
+        syncedLines: synced.length,
+        plainLines: parsePlain(res.plain ?? res.synced ?? '').length
+      })
+      if (synced.length > 0) {
+        setLyrics(synced)
+        setLyricsPlain([])
+        return
+      }
+
+      const plain = parsePlain(res.plain ?? res.synced ?? '')
+      setLyrics([])
+      setLyricsPlain(plain)
     })
-      .catch(() => {
-        if (playTokenRef.current === token) setLyricsPlain([])
+      .catch((error) => {
+        console.error('[lyrics] load failed', { trackId: track.id, error })
+        if (playTokenRef.current === token) {
+          setLyrics([])
+          setLyricsPlain([])
+        }
       })
       .finally(() => {
         if (playTokenRef.current === token) setLyricsLoading(false)
