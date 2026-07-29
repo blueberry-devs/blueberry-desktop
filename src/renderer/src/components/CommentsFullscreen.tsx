@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import toast from 'react-hot-toast'
 import { motion } from 'motion/react'
 import { VList, type VListHandle } from 'virtua'
 import { usePlayer } from '../player/PlayerContext'
@@ -71,7 +72,6 @@ function CommentsFullscreen(): JSX.Element | null {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set())
-  const [commentError, setCommentError] = useState('')
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const vlistRef = useRef<VListHandle>(null)
@@ -153,7 +153,7 @@ function CommentsFullscreen(): JSX.Element | null {
     setServerLoading(true)
 
     loadCommentsFromServer(trackId)
-      .catch(() => {})
+      .catch(() => toast.error('Failed to load comments'))
       .finally(() => {
         setServerLoading(false)
       })
@@ -179,10 +179,9 @@ function CommentsFullscreen(): JSX.Element | null {
     const text = input.trim()
     if (!text || !trackId || sending) return
     if (text.length > 1000) {
-      setCommentError(t('comments.textTooLong'))
+      toast.error(t('comments.textTooLong'))
       return
     }
-    setCommentError('')
     const localId = crypto.randomUUID()
     setSyncingIds((prev) => new Set(prev).add(localId))
     setSending(true)
@@ -193,7 +192,7 @@ function CommentsFullscreen(): JSX.Element | null {
       // Scroll to top to see new comment
       vlistRef.current?.scrollTo(0)
     } catch (e) {
-      setCommentError(e instanceof Error ? e.message : 'Failed to send comment')
+      toast.error(e instanceof Error ? e.message : 'Failed to send comment')
     } finally {
       setSending(false)
       setSyncingIds((prev) => {
@@ -240,6 +239,7 @@ function CommentsFullscreen(): JSX.Element | null {
       await deleteComment(trackId, id)
       // Comment removed from cache by store — component re-renders without it
     } catch {
+      toast.error('Failed to delete comment — server unavailable')
       // Server failed — remove deleting state, comment stays visible
       setDeletingIds((prev) => {
         const next = new Set(prev)
@@ -371,18 +371,12 @@ function CommentsFullscreen(): JSX.Element | null {
                 </div>
               )}
               <div className="comments-fullscreen__form">
-                {commentError && (
-                  <div className="comments-fullscreen__form-error">{commentError}</div>
-                )}
                 <textarea
                   ref={inputRef}
                   className="comments-fullscreen__input"
                   placeholder={replyTo ? `${t('comments.reply')} @${replyTo.author}` : t('comments.placeholder')}
                   value={input}
-                  onChange={(e) => {
-                    setInput(e.target.value)
-                    if (commentError) setCommentError('')
-                  }}
+                  onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   rows={1}
                   disabled={sending}

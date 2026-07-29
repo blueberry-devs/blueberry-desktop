@@ -17,6 +17,7 @@ import { usePendingSearch } from './store/searchQuery'
 import { useProfile } from './store/profile'
 import { useProfileState } from './store/profiles'
 import ProfileView from './components/ProfileView'
+import { Toaster } from 'react-hot-toast'
 import { toggleLike } from './store/likes'
 import { isAuthenticated, subscribeAuthDialog, closeAuthDialog } from './store/auth'
 import './App.css'
@@ -211,6 +212,30 @@ function AppInner(): JSX.Element {
 
       {showMiniPlayer && currentTrack && <DynamicIsland onExpand={() => setActiveTab('wave')} />}
       <ToastNotification />
+      <Toaster
+        position="bottom-center"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: 'rgba(30, 30, 30, 0.95)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '14px',
+            color: '#fff',
+            fontSize: '13px',
+            maxWidth: '480px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          },
+          error: {
+            icon: (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="#ff4d4d" strokeWidth="1.4" />
+                <path d="M8 5v4M8 11v.01" stroke="#ff4d4d" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+            ),
+          },
+        }}
+      />
       {showAuth && (
         <AuthView
           closing={authClosing}
