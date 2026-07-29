@@ -300,6 +300,8 @@ if (cache.accessToken) {
   startTokenRefresh()
   startProfileRefresh()
   startBackgroundSync()
+  // Fetch /me immediately on startup (not after the 10s delay from startProfileRefresh)
+  refreshProfile()
 }
 
 export function useAuth(): AuthState {

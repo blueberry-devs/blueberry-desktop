@@ -9,7 +9,7 @@ import {
   isFollowingPending,
 } from '../store/profiles'
 import { useAuth } from '../store/auth'
-import { getVerificationTier, getVerificationTooltip, decodeBadges, getBadges, type BadgeDef } from '../utils/badges'
+import { getVerificationTier, getVerificationTooltip, decodeBadges, getBadges } from '../utils/badges'
 import { getProfile } from '../store/profile'
 import Tooltip from './Tooltip'
 import './ProfileView.css'
@@ -130,16 +130,15 @@ function ProfileView(): JSX.Element {
           )}
 
           {profile.badgesMask > 0 && badges.length > 0 && (
-              <div className="profile-view__badges">
-                {badges.map((b) => (
-                  <div key={b.id} className="profile-view__badge" title={b.description}>
-                    <span className="profile-view__badge-emoji">{b.emoji}</span>
-                    {b.label}
-                  </div>
-                ))}
-              </div>
-            ) : null
-          })()}
+            <div className="profile-view__badges">
+              {badges.map((b) => (
+                <div key={b.id} className="profile-view__badge" title={b.description}>
+                  <span className="profile-view__badge-emoji">{b.emoji}</span>
+                  {b.label}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
