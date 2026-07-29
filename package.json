@@ -6,7 +6,7 @@
   "license": "GPL-3.0",
   "type": "module",
   "scripts": {
-    "dev": "tauri dev",
+    "dev": "taskkill /F /IM music-server.exe 2>nul & taskkill /F /IM music-server-x86_64-pc-windows-msvc.exe 2>nul & tauri dev",
     "build": "tauri build",
     "dev:server": "scripts\\dev-watch.bat",
     "build:server": "scripts\\build-server.bat",
