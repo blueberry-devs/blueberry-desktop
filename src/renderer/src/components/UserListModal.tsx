@@ -27,9 +27,14 @@ export default function UserListModal({ username, type, onClose }: UserListModal
   const [allItems, setAllItems] = useState<FollowEntryDto[]>([])
   const [pendingFollows, setPendingFollows] = useState<Set<string>>(new Set())
 
+  const fetchFn = useCallback(
+    (uname: string, pageNum: number, pageSize: number) =>
+      type === 'followers' ? fetchFollowers(uname, pageNum, pageSize) : fetchFollowing(uname, pageNum, pageSize),
+    [type],
+  )
+
   const fetchPage = useCallback(async (pageNum: number) => {
     setLoading(true)
-    const fetchFn = type === 'followers' ? fetchFollowers : fetchFollowing
     const result = await fetchFn(username, pageNum, 30)
     if (result) {
       setData(result)
@@ -40,7 +45,7 @@ export default function UserListModal({ username, type, onClose }: UserListModal
       }
     }
     setLoading(false)
-  }, [username, type])
+  }, [fetchFn, username])
 
   useEffect(() => {
     fetchPage(1)
@@ -84,6 +89,22 @@ export default function UserListModal({ username, type, onClose }: UserListModal
       next.delete(entry.username)
       return next
     })
+
+    // Re-fetch from server to get updated mutual flags and counts
+    const result = await fetchFn(username, 1, page * 30)
+    if (result) {
+      setData(result)
+      if (page === 1) {
+        setAllItems(result.items)
+      } else {
+        // Keep later pages, just update first page
+        setAllItems((prev) => {
+          const updated = [...result.items]
+          const existing = prev.slice(result.items.length)
+          return [...updated, ...existing]
+        })
+      }
+    }
   }
 
   const handleUserClick = (entry: FollowEntryDto): void => {
