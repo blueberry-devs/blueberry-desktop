@@ -1,5 +1,5 @@
 import ReactDOM from 'react-dom/client'
-import 'tauri-bridge'
+import './lib/tauri-bridge'
 import App from './App'
 import './assets/styles/global.css'
 
