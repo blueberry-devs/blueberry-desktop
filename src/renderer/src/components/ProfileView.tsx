@@ -139,6 +139,15 @@ function ProfileView(): JSX.Element {
             )}
           </div>
           <div className="profile-view__header-id">{profile?.id ?? '…'}</div>
+          {badges.length > 0 && (
+            <div className="profile-view__header-badges">
+              {badges.map((b) => (
+                <Tooltip key={b.id} text={`${b.label} — ${b.description}`}>
+                  <span className="profile-view__badge-icon">{b.emoji}</span>
+                </Tooltip>
+              ))}
+            </div>
+          )}
           {profile?.bio && (
             <p className="profile-view__header-bio">{profile.bio}</p>
           )}
@@ -247,27 +256,6 @@ function ProfileView(): JSX.Element {
                 <>{t('profile.follow')}</>
               )}
             </button>
-          </div>
-        )}
-
-        {/* Badges */}
-        {badges.length > 0 && (
-          <div className="profile-view__section">
-            <div className="profile-view__section-header">
-              <span className="profile-view__section-title">{t('profile.badges')}</span>
-              <span className="profile-view__section-line" />
-            </div>
-            <div className="profile-view__badges">
-              {badges.map((b) => (
-                <div key={b.id} className="profile-view__badge" title={b.description}>
-                  <span className="profile-view__badge-emoji">{b.emoji}</span>
-                  <div className="profile-view__badge-body">
-                    <span className="profile-view__badge-label">{b.label}</span>
-                    <span className="profile-view__badge-desc">{b.description}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 

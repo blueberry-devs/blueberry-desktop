@@ -253,6 +253,15 @@ export default function AccountView(): JSX.Element {
             )}
             {auth.user.email}
           </div>
+          {badges.length > 0 && (
+            <div className="account-view__header-badges">
+              {badges.map((badge) => (
+                <Tooltip key={badge.id} text={`${badge.label} — ${badge.description}`}>
+                  <span className="account-view__badge-icon">{badge.emoji}</span>
+                </Tooltip>
+              ))}
+            </div>
+          )}
           {displayData.bio && (
             <p className="account-view__header-bio">{displayData.bio}</p>
           )}
@@ -470,27 +479,6 @@ export default function AccountView(): JSX.Element {
                   )}
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Badges */}
-        {badges.length > 0 && (
-          <div className="account-view__section">
-            <div className="account-view__section-header">
-              <span className="account-view__section-title">{t('account.badges')}</span>
-              <span className="account-view__section-line" />
-            </div>
-            <div className="account-view__badges">
-              {badges.map((badge) => (
-                <div key={badge.id} className="account-view__badge" title={badge.description}>
-                  <span className="account-view__badge-emoji">{badge.emoji}</span>
-                  <div className="account-view__badge-body">
-                    <span className="account-view__badge-label">{badge.label}</span>
-                    <span className="account-view__badge-desc">{badge.description}</span>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         )}
