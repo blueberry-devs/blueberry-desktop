@@ -15,18 +15,27 @@ function emit(): void {
 }
 
 function persist(): void {
-  window.api.storeSet(STORE_KEY, JSON.stringify(cache)).catch(() => {})
+  window.api?.storeSet(STORE_KEY, JSON.stringify(cache)).catch(() => {})
 }
 
-window.api
-  .storeGet(STORE_KEY)
-  .then((raw) => {
-    if (raw) {
-      cache = JSON.parse(raw) as Record<string, DownloadedTrack>
-      emit()
-    }
-  })
-  .catch(() => {})
+// Defer storeGet until window.api is available (set by tauri-bridge)
+function initStore(): void {
+  window.api?.storeGet(STORE_KEY)
+    .then((raw) => {
+      if (raw) {
+        cache = JSON.parse(raw) as Record<string, DownloadedTrack>
+        emit()
+      }
+    })
+    .catch(() => {})
+}
+if (typeof window !== 'undefined') {
+  if (window.api) {
+    initStore()
+  } else {
+    window.addEventListener('DOMContentLoaded', initStore)
+  }
+}
 
 export function subscribe(listener: () => void): () => void {
   listeners.add(listener)

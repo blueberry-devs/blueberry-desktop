@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { searchTracksMulti, searchArtistTracks, recommendTracks, TrackResult } from '../api/yandexMusic'
+import { searchTracksMulti, searchArtistTracks, TrackResult } from '../api/yandexMusic'
 import { getLikedTracks } from '../store/likes'
 import { getHistory } from '../store/history'
 import { pickCategoryForQuery } from '../data/wavePhrases'
-import { phraseToKeyword, phraseToCategory } from '../data/moodPhrases'
+import { phraseToKeyword } from '../data/moodPhrases'
 import { usePlayer } from './PlayerContext'
 
 
@@ -86,7 +86,6 @@ async function fetchCandidates(genre: string): Promise<TrackResult[]> {
   // Convert mood phrase to search keyword (e.g. "Энергичный рок" → "rock music")
   const keyword = phraseToKeyword(genre) ?? genre
 
-  // For artist-specific queries, keep the old search-based approach
   if (isArtistQuery(keyword)) {
     console.log(`[Wave] Analysing favourites... searching artist "${keyword}"`)
     const [artistResults, genreResults] = await Promise.all([
@@ -112,64 +111,6 @@ async function fetchCandidates(genre: string): Promise<TrackResult[]> {
     return []
   }
 
-  // --- Vector-based recommendations (80/20 split) ---
-  try {
-    const likedTracks = getLikedTracks()
-    const likedIds = likedTracks.map(t => t.id)
-    const category = phraseToCategory(genre)
-    const mood = category ?? undefined
-
-    console.log(`[Wave] Trying vector recommendations... mood=${mood ?? 'none'}, liked=${likedIds.length}`)
-    const result = await recommendTracks(likedIds, mood, 30)
-
-    if (result.tracks.length > 0) {
-      // The vector API returns mbid+score pairs. We need to resolve them to
-      // full TrackResult objects. For now, we use the mbid as an ID and
-      // search for the actual tracks. In a future iteration, the server
-      // could return full TrackResult objects.
-      console.log(`[Wave] Vector recommendations returned ${result.tracks.length} candidates in ${Date.now() - start}ms`)
-
-      // Vector API returns track_id + score pairs.
-      // For local files, track_id is the file path; for streaming, it's "source:nativeId".
-      // We use the scores to re-rank search results from Yandex/SoundCloud/YouTube.
-      const searchResults = await searchTracksMulti(keyword, ['yandex', 'soundcloud', 'youtube']).catch(() => [] as TrackResult[])
-
-      // Build score map from vector recommendations
-      // Try to match by track_id (file path) or by artist::title key
-      const scoreMap = new Map(result.tracks.map(t => [t.track_id, t.score]))
-      const scored = searchResults
-        .filter(t => isUsable(t))
-        .map(t => ({
-          track: t,
-          // Try to find score by artist::title key (for local files) or by ID
-          score: scoreMap.get(`${t.artists[0]?.toLowerCase()}::${t.title.toLowerCase()}`)
-            ?? scoreMap.get(t.id)
-            ?? 0
-        }))
-
-      // Sort: scored tracks first (by score), then unscored tracks
-      scored.sort((a, b) => b.score - a.score)
-
-      const merged: TrackResult[] = []
-      const seen = new Set<string>()
-      for (const { track: t } of scored) {
-        const sig = trackSignature(t)
-        if (seen.has(sig)) continue
-        seen.add(sig)
-        merged.push(t)
-        if (merged.length >= 10) break
-      }
-
-      if (merged.length > 0) {
-        console.log(`[Wave] Got ${merged.length} vector-ranked candidates in ${Date.now() - start}ms`)
-        return shuffle(merged)
-      }
-    }
-  } catch (e) {
-    console.log(`[Wave] Vector recommendations failed, falling back to search: ${e}`)
-  }
-
-  // --- Fallback: keyword-based search ---
   const queries = buildQueries(keyword)
   console.log(`[Wave] Analysing favourites... ${queries.length} queries for "${genre}" → "${keyword}"`)
   queries.forEach((q) => console.log(`  query: ${q}`))

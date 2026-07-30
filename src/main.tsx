@@ -1,7 +1,5 @@
-// Initialize Tauri bridge before anything else — sets up window.api
-import './lib/tauri-bridge'
-
 import ReactDOM from 'react-dom/client'
+import 'tauri-bridge'
 import App from './App'
 import './assets/styles/global.css'
 

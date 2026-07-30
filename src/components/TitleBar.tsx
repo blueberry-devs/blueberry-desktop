@@ -3,19 +3,19 @@ import { useAppVersion } from '../hooks/useAppVersion'
 import './TitleBar.css'
 
 function handleMinimize(): void {
-  window.api.minimize()
+  window.api?.minimize()
 }
 function handleMaximize(): void {
-  window.api.maximize()
+  window.api?.maximize()
 }
 function handleClose(): void {
-  window.api.close()
-}
-function handleDrag(): void {
-  window.api.startDragging()
+  window.api?.close()
 }
 
 interface Props {
+  // When the navbar position setting is 'top', App renders TopBottomNav
+  // here instead of as its own bar below — same 40px transparent row, no
+  // separate opaque strip stacked under the window controls.
   centerNav?: ReactNode
 }
 
@@ -23,7 +23,7 @@ function TitleBar({ centerNav }: Props): JSX.Element {
   const version = useAppVersion()
   return (
     <div className="titlebar">
-      <div className="titlebar__drag" data-tauri-drag-region onMouseDown={handleDrag} />
+      <div className="titlebar__drag" />
       <div className="titlebar__version">{version}</div>
       {centerNav && <div className="titlebar__center-nav">{centerNav}</div>}
       <div className="titlebar__controls">
