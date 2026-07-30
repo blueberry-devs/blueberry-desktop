@@ -4,11 +4,15 @@ export interface ProfileDto {
   id: string
   username: string
   avatarUrl: string | null
+  bio: string | null
   verificationLevel: number
   badgesMask: number
   followersCount: number
   followingCount: number
+  publicPlaylistsCount: number
+  libraryTracksCount: number
   isFollowing: boolean
+  isMutual: boolean
 }
 
 export interface FollowResult {
@@ -18,6 +22,11 @@ export interface FollowResult {
 
 /** Fetch a public profile by username. */
 export async function fetchProfile(username: string): Promise<ProfileDto | null> {
+  return apiFetchJson<ProfileDto>(`/api/profiles/${encodeURIComponent(username)}`)
+}
+
+/** Fetch own profile by username (same endpoint, richer DTO). */
+export async function fetchOwnProfile(username: string): Promise<ProfileDto | null> {
   return apiFetchJson<ProfileDto>(`/api/profiles/${encodeURIComponent(username)}`)
 }
 
@@ -38,6 +47,7 @@ export async function unfollowUser(username: string): Promise<FollowResult | nul
 export interface UpdateProfileRequest {
   username: string | null
   avatarUrl: string | null
+  bio: string | null
 }
 
 import type { AuthUser } from './auth'

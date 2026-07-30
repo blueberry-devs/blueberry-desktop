@@ -182,9 +182,7 @@ function AppInner(): JSX.Element {
         {profile.navbarPosition === 'left' && <Sidebar activeTab={activeTab} onSelectTab={selectTab} />}
 
         <div className={`app__content${showMiniPlayer && currentTrack ? ' app__content--with-player' : ''}`}>
-          {profileViewing ? (
-            <ProfileView />
-          ) : activeTab === 'wave' ? (
+          {activeTab === 'wave' ? (
             <Suspense fallback={null}>
               <div className="wave-content">
                 <MoodList />
@@ -254,6 +252,8 @@ function AppInner(): JSX.Element {
         {isLyricsOpen && <NowPlayingFullscreen />}
         {isCommentsOpen && <CommentsFullscreen />}
       </AnimatePresenceLazy>
+
+      {profileViewing && <ProfileView />}
     </div>
   )
 }

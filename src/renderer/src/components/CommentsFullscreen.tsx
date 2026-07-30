@@ -746,7 +746,10 @@ function TreeRow({
       </div>
       <div className="comments-fullscreen__comment-body">
         <div className="comments-fullscreen__comment-header">
-          <span className="comments-fullscreen__comment-author">
+          <span
+            className="comments-fullscreen__comment-author comments-fullscreen__comment-author--clickable"
+            onClick={() => openProfile(comment.author)}
+          >
             {comment.author}
             {comment.verificationLevel >= 1 && (
               <Tooltip text={getVerificationTooltip(comment.verificationLevel, getProfile().language)}>
