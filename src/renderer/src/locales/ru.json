@@ -181,7 +181,7 @@
 
   "profile.notFound": "Пользователь не найден",
   "profile.followers": "подписчиков",
-  "profile.following": "подписки",
+  "profile.following": "Вы подписаны",
   "profile.follow": "Подписаться",
   "profile.unfollow": "Отписаться",
   "profile.editProfile": "Редактировать профиль",
@@ -325,6 +325,13 @@
   "account.following": "Подписки",
   "account.publicPlaylists": "Плейлисты",
   "account.libraryTracks": "Треков в библиотеке",
+  "account.playlistsSection": "Публичные плейлисты",
+  "account.noPlaylists": "Нет публичных плейлистов",
+  "account.tracksLabel": "треков",
+  "account.followersList": "Подписчики",
+  "account.followingList": "Подписки",
+  "account.mutual": "Взаимно",
+  "account.userListEmpty": "Пока нет пользователей",
 
   "trash.title": "Корзина",
   "trash.empty": "Корзина пуста",

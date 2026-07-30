@@ -325,6 +325,13 @@
   "account.following": "Following",
   "account.publicPlaylists": "Playlists",
   "account.libraryTracks": "Library tracks",
+  "account.playlistsSection": "Public Playlists",
+  "account.noPlaylists": "No public playlists yet",
+  "account.tracksLabel": "tracks",
+  "account.followersList": "Followers",
+  "account.followingList": "Following",
+  "account.mutual": "Mutual",
+  "account.userListEmpty": "No users yet",
 
   "trash.title": "Trash",
   "trash.empty": "Trash is empty",

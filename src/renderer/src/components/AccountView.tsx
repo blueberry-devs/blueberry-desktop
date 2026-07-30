@@ -3,9 +3,10 @@ import { useAuth, logout, openAuth, refreshProfile, updateAuthUser } from '../st
 import { useTranslation } from '../utils/useTranslation'
 import { getVerificationTier, getVerificationTooltip, getBadges, decodeBadges } from '../utils/badges'
 import { getProfile } from '../store/profile'
-import { updateProfile as apiUpdateProfile, fetchOwnProfile } from '../services/profiles'
-import type { ProfileDto } from '../services/profiles'
+import { updateProfile as apiUpdateProfile, fetchOwnProfile, fetchUserPlaylists } from '../services/profiles'
+import type { ProfileDto, PlaylistSummaryDto } from '../services/profiles'
 import Tooltip from './Tooltip'
+import UserListModal from './UserListModal'
 import './AccountView.css'
 
 const USERNAME_RE = /^[a-zA-Z0-9_-]+$/
@@ -37,6 +38,13 @@ export default function AccountView(): JSX.Element {
   const [fullProfile, setFullProfile] = useState<ProfileDto | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
 
+  // Public playlists
+  const [playlists, setPlaylists] = useState<PlaylistSummaryDto[]>([])
+  const [playlistsLoading, setPlaylistsLoading] = useState(false)
+
+  // User list modal (followers / following)
+  const [userListType, setUserListType] = useState<'followers' | 'following' | null>(null)
+
   useEffect(() => {
     refreshProfile()
   }, [])
@@ -53,6 +61,19 @@ export default function AccountView(): JSX.Element {
       .then((p) => setFullProfile(p))
       .catch(() => { /* ignore */ })
       .finally(() => setProfileLoading(false))
+  }, [username])
+
+  // Fetch public playlists
+  useEffect(() => {
+    if (!username) {
+      setPlaylists([])
+      return
+    }
+    setPlaylistsLoading(true)
+    fetchUserPlaylists(username)
+      .then((r) => setPlaylists(r?.items ?? []))
+      .catch(() => setPlaylists([]))
+      .finally(() => setPlaylistsLoading(false))
   }, [username])
 
   const bannerGradient = useMemo(() => {
@@ -264,7 +285,11 @@ export default function AccountView(): JSX.Element {
       <div className="account-view__content">
         {/* Stat cards from full profile */}
         <div className="account-view__cards">
-          <div className="account-view__card" style={{ animationDelay: '0.02s' }}>
+          <div
+            className="account-view__card account-view__card--clickable"
+            style={{ animationDelay: '0.02s' }}
+            onClick={() => setUserListType('followers')}
+          >
             <div className="account-view__card-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -276,7 +301,11 @@ export default function AccountView(): JSX.Element {
               {profileLoading ? '…' : displayData.followersCount.toLocaleString()}
             </span>
           </div>
-          <div className="account-view__card" style={{ animationDelay: '0.06s' }}>
+          <div
+            className="account-view__card account-view__card--clickable"
+            style={{ animationDelay: '0.06s' }}
+            onClick={() => setUserListType('following')}
+          >
             <div className="account-view__card-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -465,7 +494,59 @@ export default function AccountView(): JSX.Element {
             </div>
           </div>
         )}
+
+        {/* Public playlists */}
+        <div className="account-view__section">
+          <div className="account-view__section-header">
+            <span className="account-view__section-title">{t('account.playlistsSection')}</span>
+            <span className="account-view__section-line" />
+          </div>
+          {playlistsLoading ? (
+            <div className="account-view__section-loading">
+              <div className="account-view__spinner-mini" />
+            </div>
+          ) : playlists.length === 0 ? (
+            <div className="account-view__section-empty">{t('account.noPlaylists')}</div>
+          ) : (
+            <div className="account-view__playlist-grid">
+              {playlists.map((pl) => (
+                <div key={pl.id} className="account-view__playlist-card">
+                  <div
+                    className="account-view__playlist-cover"
+                    style={pl.imageUrl ? { backgroundImage: `url(${pl.imageUrl})` } : undefined}
+                  >
+                    {!pl.imageUrl && (
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="16" r="3" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="account-view__playlist-body">
+                    <span className="account-view__playlist-title">{pl.title}</span>
+                    <span className="account-view__playlist-meta">
+                      {pl.trackCount} {t('account.tracksLabel')}
+                      {pl.isPublic === false && (
+                        <span className="account-view__playlist-visibility">Private</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* User list modal */}
+      {userListType && (
+        <UserListModal
+          username={username!}
+          type={userListType}
+          onClose={() => setUserListType(null)}
+        />
+      )}
     </div>
   )
 }

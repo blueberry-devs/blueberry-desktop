@@ -240,6 +240,15 @@
   opacity: 0.55;
 }
 
+.account-view__card--clickable {
+  cursor: pointer;
+}
+
+.account-view__card--clickable:hover {
+  background: var(--surface-hover);
+  border-color: rgba(255,255,255,0.1);
+}
+
 /* ---------- Section ---------- */
 
 .account-view__section {
@@ -321,6 +330,120 @@
   font-size: 11px;
   color: var(--text-secondary);
   opacity: 0.6;
+}
+
+/* ---------- Section utilities ---------- */
+
+.account-view__section-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.account-view__section-empty {
+  font-size: 14px;
+  color: var(--text-secondary);
+  opacity: 0.4;
+  padding: 12px 0;
+}
+
+.account-view__spinner-mini {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: var(--text-secondary);
+  border-radius: 50%;
+  animation: av-spin 0.6s linear infinite;
+}
+
+@keyframes av-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Playlist grid ---------- */
+
+.account-view__playlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.account-view__playlist-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.account-view__playlist-card:hover {
+  background: var(--surface-hover);
+  border-color: rgba(255,255,255,0.1);
+  transform: translateY(-1px);
+}
+
+.account-view__playlist-cover {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.12));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  background-size: cover;
+  background-position: center;
+}
+
+.account-view__playlist-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.account-view__playlist-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.account-view__playlist-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-view__playlist-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.account-view__playlist-visibility {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
 }
 
 /* ---------- Inline editor slide ---------- */
