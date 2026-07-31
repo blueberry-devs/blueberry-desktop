@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
 import { motion } from 'motion/react'
 import { VList, type VListHandle } from 'virtua'
@@ -57,6 +58,147 @@ function formatTime(ts: number, t: (k: string) => string): string {
   const days = Math.floor(hours / 24)
   if (days < 7) return t('comments.daysAgo').replace('{n}', String(days))
   return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(ts)
+}
+
+/* ========== Comment context menu ========== */
+
+interface CtxMenuState {
+  comment: Comment
+  x: number
+  y: number
+}
+
+function useCommentCtxMenu() {
+  const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null)
+  const [ctxClosing, setCtxClosing] = useState(false)
+  const ctxTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const CTX_ANIM_MS = 120
+
+  const closeCtx = useCallback(() => {
+    if (ctxClosing || !ctxMenu) return
+    setCtxClosing(true)
+    ctxTimerRef.current = setTimeout(() => {
+      setCtxClosing(false)
+      setCtxMenu(null)
+    }, CTX_ANIM_MS)
+  }, [ctxClosing, ctxMenu])
+
+  // Close context menu on outside click, right-click elsewhere, scroll, or Escape
+  useEffect(() => {
+    if (!ctxMenu) return
+    const close = (): void => closeCtx()
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') close() }
+    document.addEventListener('click', close)
+    document.addEventListener('contextmenu', close, true)
+    document.addEventListener('scroll', close, true)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('click', close)
+      document.removeEventListener('contextmenu', close, true)
+      document.removeEventListener('scroll', close, true)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [ctxMenu, closeCtx])
+
+  // Cleanup ctx timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(ctxTimerRef.current)
+  }, [])
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, comment: Comment, height: number): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    const pad = 8
+    const menuWidth = 200
+    let x = e.clientX
+    let y = e.clientY
+    if (x + menuWidth + pad > window.innerWidth) x = window.innerWidth - menuWidth - pad
+    if (y + height + pad > window.innerHeight) y = window.innerHeight - height - pad
+    if (y < pad) y = pad
+    setCtxMenu({ comment, x, y })
+  }, [])
+
+  return { ctxMenu, ctxClosing, closeCtx, handleContextMenu }
+}
+
+function CommentCtxMenu({
+  state,
+  closing,
+  comment,
+  isOwner,
+  authed,
+  onCopy,
+  onReply,
+  onLike,
+  onDelete,
+  onOpenProfile,
+  t,
+}: {
+  state: CtxMenuState
+  closing: boolean
+  comment: Comment
+  isOwner: boolean
+  authed: boolean
+  onCopy: () => void
+  onReply: () => void
+  onLike: () => void
+  onDelete: () => void
+  onOpenProfile: () => void
+  t: (k: string) => string
+}): JSX.Element {
+  const liked = authed && comment.isLikedByMe
+
+  return createPortal(
+    <div
+      className={`comments-fullscreen__ctx${closing ? ' comments-fullscreen__ctx--closing' : ''}`}
+      style={{ position: 'fixed', left: state.x, top: state.y, zIndex: 9999 }}
+    >
+      <button className="comments-fullscreen__ctx-item" onClick={onCopy}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <rect x="4" y="2" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
+          <path d="M12 4V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h1" stroke="currentColor" strokeWidth="1.4" fill="none" />
+        </svg>
+        {t('contextMenu.copy')}
+      </button>
+      <button className="comments-fullscreen__ctx-item" onClick={onOpenProfile}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4" fill="none" />
+          <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" strokeWidth="1.4" fill="none" />
+        </svg>
+        {t('comments.openProfile')}
+      </button>
+      <div className="comments-fullscreen__ctx-sep" />
+      {authed && (
+        <button className="comments-fullscreen__ctx-item" onClick={onReply}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 9 9 15 15 21" />
+          </svg>
+          {t('comments.reply')}
+        </button>
+      )}
+      {authed && (
+        <button className="comments-fullscreen__ctx-item" onClick={onLike}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14Z" />
+          </svg>
+          {liked ? t('comments.dislike') : t('comments.like')}
+        </button>
+      )}
+      {isOwner && (
+        <>
+          <div className="comments-fullscreen__ctx-sep" />
+          <button className="comments-fullscreen__ctx-item comments-fullscreen__ctx-item--danger" onClick={onDelete}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            {t('comments.delete')}
+          </button>
+        </>
+      )}
+    </div>,
+    document.body,
+  )
 }
 
 /* ========== Component ========== */
@@ -485,6 +627,43 @@ function CommentRow({
   const syncing = syncingIds.has(comment.id)
   const deletingOrSyncing = deleting || syncing
   const hasReplies = replyNodes.length > 0
+  const { ctxMenu, ctxClosing, closeCtx, handleContextMenu } = useCommentCtxMenu()
+
+  const ctxMenuOpen = ctxMenu?.comment.id === comment.id
+
+  const handleCtxCopy = useCallback((): void => {
+    navigator.clipboard.writeText(`@${comment.author} ${comment.text}`).catch(() => {})
+    closeCtx()
+  }, [comment.author, comment.text, closeCtx])
+
+  const handleCtxOpenProfile = useCallback((): void => {
+    closeCtx()
+    openProfile(comment.author)
+  }, [closeCtx, comment.author])
+
+  const handleCtxReply = useCallback((): void => {
+    closeCtx()
+    onReply(comment.id, comment.author)
+  }, [closeCtx, comment.id, comment.author, onReply])
+
+  const handleCtxLike = useCallback((): void => {
+    closeCtx()
+    onLike(comment.id)
+  }, [closeCtx, comment.id, onLike])
+
+  const handleCtxDelete = useCallback((): void => {
+    closeCtx()
+    onDelete(comment.id)
+  }, [closeCtx, comment.id, onDelete])
+
+  const handleRowContextMenu = useCallback((e: React.MouseEvent): void => {
+    const ITEM_H = 36
+    const SEP_H = 9
+    let h = ITEM_H * 2 + SEP_H // copy + open profile + sep
+    if (authed) h += ITEM_H * 2 // reply + like
+    if (isOwner) h += SEP_H + ITEM_H // sep + delete
+    handleContextMenu(e, comment, h)
+  }, [authed, isOwner, handleContextMenu, comment])
 
   // Total reply count including all descendants
   function countNodes(nodes: ReplyNode[]): number {
@@ -516,6 +695,7 @@ function CommentRow({
     <div className="comments-fullscreen__comment-wrap">
       <div
         className={`comments-fullscreen__comment${deleting ? ' comments-fullscreen__comment--deleting' : ''}${syncing ? ' comments-fullscreen__comment--syncing' : ''}`}
+        onContextMenu={handleRowContextMenu}
       >
         {deleting && <div className="comments-fullscreen__comment-overlay"><span className="comments-fullscreen__sending-spinner" /></div>}
         <div
@@ -635,6 +815,22 @@ function CommentRow({
           )}
         </div>
       )}
+
+      {ctxMenuOpen && ctxMenu && (
+        <CommentCtxMenu
+          state={ctxMenu}
+          closing={ctxClosing}
+          comment={comment}
+          isOwner={!!isOwner}
+          authed={authed}
+          onCopy={handleCtxCopy}
+          onReply={handleCtxReply}
+          onLike={handleCtxLike}
+          onDelete={handleCtxDelete}
+          onOpenProfile={handleCtxOpenProfile}
+          t={t}
+        />
+      )}
     </div>
   )
 }
@@ -727,10 +923,48 @@ function TreeRow({
   const deleting = deletingIds.has(comment.id)
   const syncing = syncingIds.has(comment.id)
   const deletingOrSyncing = deleting || syncing
+  const { ctxMenu, ctxClosing, closeCtx, handleContextMenu } = useCommentCtxMenu()
+
+  const ctxMenuOpen = ctxMenu?.comment.id === comment.id
+
+  const handleCtxCopy = useCallback((): void => {
+    navigator.clipboard.writeText(`@${comment.author} ${comment.text}`).catch(() => {})
+    closeCtx()
+  }, [comment.author, comment.text, closeCtx])
+
+  const handleCtxOpenProfile = useCallback((): void => {
+    closeCtx()
+    openProfile(comment.author)
+  }, [closeCtx, comment.author])
+
+  const handleCtxReply = useCallback((): void => {
+    closeCtx()
+    onReply(comment.id, comment.author)
+  }, [closeCtx, comment.id, comment.author, onReply])
+
+  const handleCtxLike = useCallback((): void => {
+    closeCtx()
+    onLike(comment.id)
+  }, [closeCtx, comment.id, onLike])
+
+  const handleCtxDelete = useCallback((): void => {
+    closeCtx()
+    onDelete(comment.id)
+  }, [closeCtx, comment.id, onDelete])
+
+  const handleRowContextMenu = useCallback((e: React.MouseEvent): void => {
+    const ITEM_H = 36
+    const SEP_H = 9
+    let h = ITEM_H * 2 + SEP_H // copy + open profile + sep
+    if (authed) h += ITEM_H * 2 // reply + like
+    if (isOwner) h += SEP_H + ITEM_H // sep + delete
+    handleContextMenu(e, comment, h)
+  }, [authed, isOwner, handleContextMenu, comment])
 
   return (
     <div
       className={`comments-fullscreen__tree-row comments-fullscreen__tree-row--depth-${indentLevel}${deleting ? ' comments-fullscreen__comment--deleting' : ''}${syncing ? ' comments-fullscreen__comment--syncing' : ''}`}
+      onContextMenu={handleRowContextMenu}
     >
       {deleting && <div className="comments-fullscreen__comment-overlay"><span className="comments-fullscreen__sending-spinner" /></div>}
       {indentLevel >= 1 && <div className="comments-fullscreen__tree-line" />}
@@ -806,6 +1040,22 @@ function TreeRow({
           </div>
         )}
       </div>
+
+      {ctxMenuOpen && ctxMenu && (
+        <CommentCtxMenu
+          state={ctxMenu}
+          closing={ctxClosing}
+          comment={comment}
+          isOwner={!!isOwner}
+          authed={authed}
+          onCopy={handleCtxCopy}
+          onReply={handleCtxReply}
+          onLike={handleCtxLike}
+          onDelete={handleCtxDelete}
+          onOpenProfile={handleCtxOpenProfile}
+          t={t}
+        />
+      )}
     </div>
   )
 }

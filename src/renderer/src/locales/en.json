@@ -404,6 +404,7 @@
   "comments.placeholder": "Write a comment…",
   "comments.send": "Send",
   "comments.close": "Close",
+  "comments.openProfile": "Open profile",
   "comments.loginRequired": "Sign in to write comments",
   "comments.empty": "No comments yet",
   "comments.commentOne": "comment",
