@@ -133,6 +133,7 @@
   display: inline-flex;
   align-items: center;
   vertical-align: middle;
+  transform: translateY(1px);
 }
 
 .profile-view__header-badge svg {

@@ -114,6 +114,7 @@
   align-items: center;
   vertical-align: middle;
   margin-left: 2px;
+  transform: translateY(1px);
 }
 
 .account-view__header-badge svg {
