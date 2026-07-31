@@ -151,6 +151,16 @@ The renderer communicates with the Rust sidecar over `localhost:8787`. In produc
 | Icons | Inline SVG |
 | Updates | electron-updater (GitHub Releases) |
 
+## Disclaimer
+
+**Blueberry Desktop** is an open-source **local client** — a lightweight shell that offers an alternative interface to publicly available streaming data.
+
+- It does **not** host, store, cache, or redistribute any music content — neither on its own servers nor on third-party ones.
+- All requests to streaming services (SoundCloud, YouTube, etc.) are made **locally from your device**, just as a standard web browser would make them.
+- The app acts solely as an interface for displaying publicly accessible data.
+
+All content, trademarks, and APIs referenced by this project belong to their respective owners. This project is **not affiliated with or endorsed by** any of the mentioned services.
+
 ## License
 
 Licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE) for the full text. This covers this project's own source code only; it does not grant any rights to any third-party trademarks, logos, or branding mentioned above.
