@@ -122,7 +122,7 @@
   flex-wrap: wrap;
 }
 
-.profile-view__header-username {
+.profile-view__header-name {
   font-size: 22px;
   font-weight: 800;
   color: var(--text-primary);
@@ -140,11 +140,10 @@
   display: block;
 }
 
-.profile-view__header-id {
-  font-size: 12px;
+.profile-view__header-handle {
+  font-size: 13px;
   color: var(--text-secondary);
-  opacity: 0.45;
-  font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+  opacity: 0.65;
   margin-top: 2px;
 }
 

@@ -59,8 +59,7 @@ export default function UserListModal({ username, type, onClose }: UserListModal
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
 
-  const totalPages = data?.totalPages ?? 1
-  const hasMore = page < totalPages
+  const hasMore = allItems.length < (data?.totalCount ?? 0)
 
   const handleLoadMore = (): void => {
     const next = page + 1

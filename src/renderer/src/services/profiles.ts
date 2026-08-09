@@ -1,11 +1,13 @@
 import { apiFetchJson } from './apiClient'
 import type { PlaylistSummaryDto } from './playlists'
+import type { AuthUser } from './auth'
 
 export type { PlaylistSummaryDto }
 
 export interface ProfileDto {
   id: string
   username: string
+  displayName: string | null
   avatarUrl: string | null
   bio: string | null
   verificationLevel: number
@@ -74,11 +76,10 @@ export interface UpdateProfileRequest {
   username: string | null
   avatarUrl: string | null
   bio: string | null
+  displayName?: string | null
 }
 
-import type { AuthUser } from './auth'
-
-/** Update own profile (username and/or avatarUrl). */
+/** Update own profile (username, displayName, avatarUrl, bio). */
 export async function updateProfile(data: UpdateProfileRequest): Promise<AuthUser | null> {
   return apiFetchJson<AuthUser>('/api/auth/profile', {
     method: 'PATCH',

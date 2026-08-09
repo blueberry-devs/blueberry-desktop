@@ -33,7 +33,6 @@ function ProfileView(): JSX.Element {
   const { t } = useTranslation()
   const { viewing, cache } = useProfileState()
   const auth = useAuth()
-  const [loading, setLoading] = useState(false)
 
   // Public playlists
   const [playlists, setPlaylists] = useState<PlaylistSummaryDto[]>([])
@@ -49,8 +48,7 @@ function ProfileView(): JSX.Element {
   useEffect(() => {
     if (!viewing) return
     if (cache[viewing]) return
-    setLoading(true)
-    fetchProfileStore(viewing).finally(() => setLoading(false))
+    fetchProfileStore(viewing)
   }, [viewing])
 
   // Fetch public playlists when profile is available
@@ -74,7 +72,7 @@ function ProfileView(): JSX.Element {
 
   const avatarInitial = useMemo(() => {
     if (profile?.avatarUrl) return null
-    const name = profile?.username || viewing || '?'
+    const name = profile?.displayName || profile?.username || viewing || '?'
     return name.charAt(0).toUpperCase()
   }, [profile, viewing])
 
@@ -125,8 +123,8 @@ function ProfileView(): JSX.Element {
 
         <div className="profile-view__header-info">
           <div className="profile-view__header-name-row">
-            <span className="profile-view__header-username">
-              @{profile?.username ?? viewing ?? '…'}
+            <span className="profile-view__header-name">
+              {profile?.displayName || profile?.username || '…'}
             </span>
             {tier && profile && (
               <Tooltip text={getVerificationTooltip(profile.verificationLevel, getProfile().language)}>
@@ -138,7 +136,9 @@ function ProfileView(): JSX.Element {
               </Tooltip>
             )}
           </div>
-          <div className="profile-view__header-id">{profile?.id ?? '…'}</div>
+          <div className="profile-view__header-handle">
+            @{profile?.username ?? viewing ?? '…'}
+          </div>
           {badges.length > 0 && (
             <div className="profile-view__header-badges">
               {badges.map((b) => (

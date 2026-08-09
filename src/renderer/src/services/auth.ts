@@ -15,6 +15,7 @@ export interface AuthUser {
   username: string
   avatarUrl: string | null
   bio: string | null
+  displayName: string | null
   verificationLevel: number
   badgesMask: number
 }

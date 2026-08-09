@@ -1,15 +1,14 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useAuth, logout, openAuth, refreshProfile, updateAuthUser } from '../store/auth'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useAuth, logout, openAuth, refreshProfile } from '../store/auth'
 import { useTranslation } from '../utils/useTranslation'
 import { getVerificationTier, getVerificationTooltip, getBadges, decodeBadges } from '../utils/badges'
 import { getProfile } from '../store/profile'
-import { updateProfile as apiUpdateProfile, fetchOwnProfile, fetchUserPlaylists } from '../services/profiles'
+import { fetchOwnProfile, fetchUserPlaylists } from '../services/profiles'
 import type { ProfileDto, PlaylistSummaryDto } from '../services/profiles'
 import Tooltip from './Tooltip'
 import UserListModal from './UserListModal'
+import EditProfileView from './EditProfileView'
 import './AccountView.css'
-
-const USERNAME_RE = /^[a-zA-Z0-9_-]+$/
 
 /* Deterministic pastel gradient from a string (user ID). */
 function hashGradient(id: string): string {
@@ -27,12 +26,6 @@ export default function AccountView(): JSX.Element {
   const auth = useAuth()
   const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
-  const [editUsername, setEditUsername] = useState('')
-  const [editAvatar, setEditAvatar] = useState('')
-  const [editBio, setEditBio] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [editError, setEditError] = useState('')
-  const [editSuccess, setEditSuccess] = useState(false)
 
   // Full profile from /api/profiles/{username}
   const [fullProfile, setFullProfile] = useState<ProfileDto | null>(null)
@@ -51,7 +44,7 @@ export default function AccountView(): JSX.Element {
 
   // Fetch own full profile when username is available
   const username = auth.user?.username
-  useEffect(() => {
+  const loadFullProfile = useCallback(() => {
     if (!username) {
       setFullProfile(null)
       return
@@ -62,6 +55,9 @@ export default function AccountView(): JSX.Element {
       .catch(() => { /* ignore */ })
       .finally(() => setProfileLoading(false))
   }, [username])
+  useEffect(() => {
+    loadFullProfile()
+  }, [loadFullProfile])
 
   // Fetch public playlists
   useEffect(() => {
@@ -80,77 +76,10 @@ export default function AccountView(): JSX.Element {
     return auth.user ? hashGradient(auth.user.id) : 'linear-gradient(135deg, #1a1a2e, #16213e)'
   }, [auth.user])
 
-  // Reset editing state when user data changes or editing opens
-  const startEditing = useCallback(() => {
-    setEditUsername(auth.user?.username ?? '')
-    setEditAvatar(auth.user?.avatarUrl ?? '')
-    setEditBio(auth.user?.bio ?? '')
-    setEditError('')
-    setEditSuccess(false)
-    setEditing(true)
-  }, [auth.user])
-
-  const cancelEditing = useCallback(() => {
-    setEditing(false)
-    setEditError('')
-    setEditSuccess(false)
-  }, [])
-
-  const handleSave = useCallback(async () => {
-    setEditError('')
-    setEditSuccess(false)
-
-    const username = editUsername.trim()
-    const avatarUrl = editAvatar.trim() || null
-    const bio = editBio.trim() || null
-
-    // Validate username
-    if (username.length > 0 && (username.length < 3 || username.length > 30)) {
-      setEditError(t('profile.usernameInvalid'))
-      return
-    }
-    if (username.length > 0 && !USERNAME_RE.test(username)) {
-      setEditError(t('profile.usernameInvalid'))
-      return
-    }
-
-    // Validate avatarUrl
-    if (avatarUrl && !avatarUrl.startsWith('http://') && !avatarUrl.startsWith('https://')) {
-      setEditError(t('profile.saveError'))
-      return
-    }
-
-    setSaving(true)
-    try {
-      const result = await apiUpdateProfile({
-        username: username || null,
-        avatarUrl,
-        bio,
-      })
-      if (result) {
-        updateAuthUser(result)
-        // Refresh full profile too
-        if (username) {
-          fetchOwnProfile(username).then((p) => {
-            if (p) setFullProfile(p)
-          }).catch(() => {})
-        }
-        setEditSuccess(true)
-        setTimeout(() => setEditSuccess(false), 2000)
-      } else {
-        setEditError(t('profile.saveError'))
-      }
-    } catch {
-      setEditError(t('profile.saveError'))
-    } finally {
-      setSaving(false)
-    }
-  }, [editUsername, editAvatar, editBio, t])
-
   // Avatar initial
   const avatarInitial = useMemo(() => {
     if (auth.user?.avatarUrl) return null
-    const name = auth.user?.username || auth.user?.email || '?'
+    const name = auth.user?.displayName || auth.user?.username || auth.user?.email || '?'
     return name.charAt(0).toUpperCase()
   }, [auth.user])
 
@@ -232,7 +161,7 @@ export default function AccountView(): JSX.Element {
         <div className="account-view__header-info">
           <div className="account-view__header-name-row">
             <span className="account-view__header-email">
-              {auth.user.username || auth.user.email}
+              {auth.user.displayName || auth.user.username || auth.user.email}
             </span>
             {tier && (
               <Tooltip text={getVerificationTooltip(auth.user.verificationLevel, getProfile().language)}>
@@ -248,10 +177,13 @@ export default function AccountView(): JSX.Element {
             )}
           </div>
           <div className="account-view__header-username">
-            {auth.user.username && (
-              <>@{auth.user.username} &middot; </>
+            {auth.user.username && <>@{auth.user.username}</>}
+            {!auth.user.displayName && (
+              <>
+                {auth.user.username && <>&nbsp;&middot;&nbsp;</>}
+                {auth.user.email}
+              </>
             )}
-            {auth.user.email}
           </div>
           {badges.length > 0 && (
             <div className="account-view__header-badges">
@@ -270,7 +202,7 @@ export default function AccountView(): JSX.Element {
         <div className="account-view__header-actions">
           <button
             className="account-view__header-btn"
-            onClick={startEditing}
+            onClick={() => setEditing(true)}
             title={t('profile.editProfile')}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -371,118 +303,6 @@ export default function AccountView(): JSX.Element {
           )}
         </div>
 
-        {/* Inline profile editor */}
-        {editing && (
-          <div className="account-view__edit">
-            <div className="account-view__edit-inner">
-              <div className="account-view__edit-header">
-                <div className="account-view__edit-header-icon">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M11.5 1.5a2.1 2.1 0 0 1 3 3L5 14H2v-3l9.5-9.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <span className="account-view__edit-header-text">{t('profile.editProfile')}</span>
-              </div>
-
-              <div className="account-view__edit-grid">
-                <div className="account-view__edit-avatar-col">
-                  <div className={`account-view__edit-avatar-preview${!editAvatar ? ' account-view__edit-avatar-preview--empty' : ''}`}>
-                    {editAvatar ? (
-                      <img src={editAvatar} alt="" />
-                    ) : (
-                      <svg width="28" height="28" viewBox="0 0 18 18" fill="none">
-                        <path d="M14 15.5v-1a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-                        <circle cx="9" cy="6" r="3" stroke="currentColor" strokeWidth="1" />
-                      </svg>
-                    )}
-                  </div>
-                  <span className="account-view__edit-avatar-label">{t('profile.avatarUrlLabel')}</span>
-                </div>
-
-                <div className="account-view__edit-fields">
-                  <div className="account-view__edit-field">
-                    <label className="account-view__edit-label">{t('profile.usernameLabel')}</label>
-                    <div className="account-view__edit-input-wrap">
-                      <input
-                        className={`account-view__edit-input${editUsername.length > 0 ? ' account-view__edit-input--has-count' : ''}`}
-                        value={editUsername}
-                        onChange={(e) => setEditUsername(e.target.value)}
-                        placeholder={t('profile.usernameLabel')}
-                        maxLength={30}
-                        autoFocus
-                      />
-                      {editUsername.length > 0 && (
-                        <span className="account-view__edit-char-count">{editUsername.length}/30</span>
-                      )}
-                    </div>
-                    <p className="account-view__edit-hint">{t('profile.usernameHint')}</p>
-                  </div>
-
-                  <div className="account-view__edit-field">
-                    <label className="account-view__edit-label">{t('profile.avatarUrlLabel')}</label>
-                    <input
-                      className="account-view__edit-input"
-                      value={editAvatar}
-                      onChange={(e) => setEditAvatar(e.target.value)}
-                      placeholder="https://example.com/avatar.jpg"
-                      maxLength={2048}
-                    />
-                  </div>
-
-                  <div className="account-view__edit-field">
-                    <label className="account-view__edit-label">{t('account.bio')}</label>
-                    <div className="account-view__edit-input-wrap">
-                      <input
-                        className={`account-view__edit-input${editBio.length > 0 ? ' account-view__edit-input--has-count' : ''}`}
-                        value={editBio}
-                        onChange={(e) => setEditBio(e.target.value)}
-                        placeholder={t('account.bio')}
-                        maxLength={160}
-                      />
-                      {editBio.length > 0 && (
-                        <span className="account-view__edit-char-count">{editBio.length}/160</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {editError && (
-                    <div className="account-view__edit-message account-view__edit-message--error">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="15" y1="9" x2="9" y2="15" />
-                        <line x1="9" y1="9" x2="15" y2="15" />
-                      </svg>
-                      {editError}
-                    </div>
-                  )}
-                  {editSuccess && (
-                    <div className="account-view__edit-message account-view__edit-message--success">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                        <polyline points="22 4 12 14.01 9 11.01" />
-                      </svg>
-                      {t('profile.saveSuccess')}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="account-view__edit-actions">
-                <button className="account-view__edit-cancel" onClick={cancelEditing} disabled={saving}>
-                  {t('common.cancel')}
-                </button>
-                <button className="account-view__edit-save" onClick={handleSave} disabled={saving}>
-                  {saving ? (
-                    <span className="account-view__edit-spinner" />
-                  ) : (
-                    t('common.save')
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Public playlists */}
         <div className="account-view__section">
           <div className="account-view__section-header">
@@ -534,6 +354,11 @@ export default function AccountView(): JSX.Element {
           type={userListType}
           onClose={() => setUserListType(null)}
         />
+      )}
+
+      {/* Edit profile page */}
+      {editing && (
+        <EditProfileView onClose={() => setEditing(false)} onSaved={loadFullProfile} />
       )}
     </div>
   )
