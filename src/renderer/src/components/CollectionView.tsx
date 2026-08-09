@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from '../utils/useTranslation'
-import { useLikedTracks, setLikedTracks } from '../store/likes'
+import { useLikedTracks, addLikedTracksFromServer } from '../store/likes'
 import { usePlaylists, deletePlaylist, renamePlaylist, createPlaylist, addTrackToPlaylist } from '../store/playlists'
 import { useDeletedPlaylists } from '../store/deletedPlaylists'
 import { useFavoritePlaylists } from '../store/favoritePlaylists'
@@ -95,12 +95,15 @@ function CollectionView(): JSX.Element {
     })()
   }, [])
 
-  // Fetch likes from server when opening the likes page
+  // Refresh likes from server when opening the likes page.
+  // Only merge when the backend answered — a failed fetch (offline/server
+  // error) must not wipe local likes.
   useEffect(() => {
     if (!showLiked) return
     if (!isAuthenticated()) return
     ;(async () => {
       const serverLikes = await fetchUserLikes('track')
+      if (serverLikes === null) return
       const tracks = serverLikes
         .filter((l) => l.track?.externalId)
         .map((l) => ({
@@ -113,7 +116,7 @@ function CollectionView(): JSX.Element {
           cover: l.track!.albumImageUrl,
           duration: l.track!.duration ?? undefined,
         }))
-      setLikedTracks(tracks)
+      addLikedTracksFromServer(tracks)
     })()
   }, [showLiked])
 

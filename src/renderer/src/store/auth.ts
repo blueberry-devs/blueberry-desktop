@@ -3,6 +3,8 @@ import { login as apiLogin, register as apiRegister, refresh as apiRefresh, getM
 import { startBackgroundSync, stopBackgroundSync } from './backgroundSync'
 import { clearPlaylistCache } from '../services/playlists'
 import { clearLikedTracks } from './likes'
+import { clearTracks } from './tracks'
+import { clearTrackSync } from './trackSync'
 
 const STORAGE_KEY = 'ym-clone:auth'
 
@@ -67,6 +69,8 @@ export function clearAuth(): void {
   cache = { accessToken: null, refreshToken: null, user: null }
   clearPlaylistCache()
   clearLikedTracks()
+  clearTracks()
+  clearTrackSync()
   emit()
 }
 

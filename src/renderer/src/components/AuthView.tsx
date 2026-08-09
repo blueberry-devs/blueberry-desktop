@@ -11,7 +11,7 @@ import {
   fetchUserLikes,
   type SyncChoice,
 } from '../services/playlists'
-import { setLikedTracks } from '../store/likes'
+import { addLikedTracksFromServer } from '../store/likes'
 import { useTranslation } from '../utils/useTranslation'
 import './AuthView.css'
 
@@ -90,26 +90,23 @@ interface AuthViewProps {
   onClose: () => void
 }
 
-/** Fetch server-side liked tracks and replace local store after login. */
+/** Merge server-side liked tracks into the local store after login. */
 async function syncLikesAfterLogin(): Promise<void> {
-  try {
-    const serverLikes = await fetchUserLikes('track')
-    const tracks = serverLikes
-      .filter((l) => l.track?.externalId)
-      .map((l) => ({
-        id: l.track!.externalId,
-        source: (l.track!.externalSource === 'YouTubeMusic' ? 'youtube'
-          : l.track!.externalSource === 'SoundCloud' ? 'soundcloud'
-          : 'yandex') as 'youtube' | 'soundcloud' | 'yandex',
-        title: l.track!.title,
-        artists: l.track!.artist ? [l.track!.artist] : [],
-        cover: l.track!.albumImageUrl,
-        duration: l.track!.duration ?? undefined,
-      }))
-    setLikedTracks(tracks)
-  } catch {
-    // Non-critical — background sync will catch up next cycle
-  }
+  const serverLikes = await fetchUserLikes('track')
+  if (serverLikes === null) return // backend unreachable — keep local likes
+  const tracks = serverLikes
+    .filter((l) => l.track?.externalId)
+    .map((l) => ({
+      id: l.track!.externalId,
+      source: (l.track!.externalSource === 'YouTubeMusic' ? 'youtube'
+        : l.track!.externalSource === 'SoundCloud' ? 'soundcloud'
+        : 'yandex') as 'youtube' | 'soundcloud' | 'yandex',
+      title: l.track!.title,
+      artists: l.track!.artist ? [l.track!.artist] : [],
+      cover: l.track!.albumImageUrl,
+      duration: l.track!.duration ?? undefined,
+    }))
+  addLikedTracksFromServer(tracks)
 }
 
 export default function AuthView({ closing, onClose }: AuthViewProps) {

@@ -9,10 +9,13 @@ import {
   fetchAllCloudPlaylistTracks,
   syncPlaylist,
   fetchUserLikes,
+  addTrackToLibrary,
 } from '../services/playlists'
 import type { TrackResult } from '../api/yandexMusic'
 import type { TrackUploadDto } from '../services/playlists'
 import { getLikedTracks, toggleLike as toggleLikeLocal } from './likes'
+import { addServerTracks, getUnsyncedTracks } from './tracks'
+import { markTrackSynced } from './trackSync'
 
 const POLL_INTERVAL_MS = 60_000 // check every 60s
 
@@ -108,10 +111,11 @@ function ensureAllUuids(): void {
  * Safe to call manually on critical desync.
  */
 export async function syncLikes(): Promise<void> {
+  const serverLikes = await fetchUserLikes('track')
+  if (serverLikes === null) return // backend unreachable — keep local likes
   try {
     const currentLikes = getLikedTracks()
     const localIds = new Set(currentLikes.map((t) => t.id))
-    const serverLikes = await fetchUserLikes('track')
     const newTracks: TrackResult[] = []
 
     for (const like of serverLikes) {
@@ -137,8 +141,30 @@ export async function syncLikes(): Promise<void> {
     for (const track of newTracks) {
       toggleLikeLocal(track)
     }
+    // Populate the local track registry from server likes too
+    addServerTracks(newTracks)
   } catch {
     // Next cycle will retry
+  }
+}
+
+let isSyncingTracks = false
+
+/** Upload locally-known tracks that aren't on the backend yet. */
+async function syncLocalTracks(): Promise<void> {
+  if (isSyncingTracks) return
+  isSyncingTracks = true
+  try {
+    const unsynced = getUnsyncedTracks()
+    if (unsynced.length === 0) return
+    for (const track of unsynced) {
+      const ok = await addTrackToLibrary(track)
+      if (ok) {
+        markTrackSynced(track.id)
+      }
+    }
+  } finally {
+    isSyncingTracks = false
   }
 }
 
@@ -321,6 +347,9 @@ async function runSync(): Promise<void> {
 
 function tick(): void {
   if (!isAuthenticated()) return
+  // Upload locally-known tracks to the backend library even when playlists are
+  // already in sync — this runs every tick until the local registry is drained.
+  void syncLocalTracks()
   if (!isSynced()) {
     runSync()
   }

@@ -2,6 +2,7 @@ import { TrackResult } from '../api/yandexMusic'
 import { createStore } from '../services/store'
 import { resolveTracks, likeEntity, unlikeEntity } from '../services/playlists'
 import type { TrackUploadDto } from '../services/playlists'
+import { addServerTracks, addTrack } from './tracks'
 
 const store = createStore<TrackResult[]>('likes', [])
 
@@ -37,6 +38,7 @@ export function toggleLike(track: TrackResult): void {
     } else {
       // Like: add to local store, fire POST in background
       likeTrackOnServer(track)
+      addTrack(track)
 
       return [track, ...prev]
     }
@@ -57,6 +59,8 @@ export function useIsLiked(id: string | undefined): boolean {
  * Used during initial sync after login to load server-side likes.
  */
 export function addLikedTracksFromServer(tracks: TrackResult[]): void {
+  // Keep a memory/local copy of server-side likes in the track registry.
+  addServerTracks(tracks)
   store.update((prev) => {
     const existing = new Set(prev.map((t) => t.id))
     const newOnes = tracks.filter((t) => !existing.has(t.id))

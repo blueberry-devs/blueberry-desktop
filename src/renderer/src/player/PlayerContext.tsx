@@ -13,6 +13,7 @@ import { resolveStream, TrackResult } from '../api/yandexMusic'
 import { parseLrc, LrcLine } from '../utils/lrc'
 import { getLyrics } from '../services/lyricsCache'
 import { pushHistory } from '../store/history'
+import { addTrack } from '../store/tracks'
 import { recordPlay } from '../store/playCount'
 import { getDownloadPath } from '../store/downloads'
 import { type AudioQuality, getProfile, setAudioQuality as setProfileAudioQuality, setAdaptiveEQ as setProfileAdaptiveEQ } from '../store/profile'
@@ -452,6 +453,7 @@ export function PlayerProvider({ children }: { children: ReactNode }): JSX.Eleme
 
       const token = ++playTokenRef.current
       pushHistory(track)
+      addTrack(track)
       recordPlay(track.id)
       setCurrentTrack(track)
       setPlayingSource(null)

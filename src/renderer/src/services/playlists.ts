@@ -646,26 +646,26 @@ export async function fetchUserLikesPage(
 /**
  * Fetch ALL liked entities, optionally filtered by type.
  * Iterates over all pages and merges results into a flat array.
+ *
+ * Returns `null` when the backend is unreachable or any page fails, so
+ * callers can tell a genuine "no likes" (`[]`) from "couldn't check"
+ * (`null`) and avoid wiping local state with a failed response.
  */
 export async function fetchUserLikes(
   entityType?: string,
-): Promise<UserLikeDto[]> {
-  try {
-    const first = await fetchUserLikesPage(1, 30, entityType)
-    if (!first) return []
+): Promise<UserLikeDto[] | null> {
+  const first = await fetchUserLikesPage(1, 30, entityType)
+  if (!first) return null
 
-    const allItems = [...first.items]
+  const allItems = [...first.items]
 
-    for (let p = 2; p <= first.totalPages; p++) {
-      const page = await fetchUserLikesPage(p, 30, entityType)
-      if (!page) break
-      allItems.push(...page.items)
-    }
-
-    return allItems
-  } catch {
-    return []
+  for (let p = 2; p <= first.totalPages; p++) {
+    const page = await fetchUserLikesPage(p, 30, entityType)
+    if (!page) return null
+    allItems.push(...page.items)
   }
+
+  return allItems
 }
 
 /**
@@ -746,6 +746,23 @@ export async function fetchLibraryDiff(
     return (await res.json()) as LibraryDiffResponse
   } catch {
     return null
+  }
+}
+
+/**
+ * Add a track to the user's backend library (POST /api/library).
+ * Idempotent — the server dedupes by ExternalId + ExternalSource.
+ */
+export async function addTrackToLibrary(track: TrackResult): Promise<boolean> {
+  try {
+    const res = await apiFetch('/api/library', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mapTrackToDto(track)),
+    })
+    return res.ok
+  } catch {
+    return false
   }
 }
 
