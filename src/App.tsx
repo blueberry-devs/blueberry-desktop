@@ -29,7 +29,6 @@ const SearchView = lazy(() => import('./components/SearchView'))
 const TrendsView = lazy(() => import('./components/TrendsView'))
 const CollectionView = lazy(() => import('./components/CollectionView'))
 const SettingsView = lazy(() => import('./components/SettingsView'))
-const HistoryView = lazy(() => import('./components/HistoryView'))
 const AccountView = lazy(() => import('./components/AccountView'))
 
 function AnimatePresenceLazy({ children }: { children: React.ReactNode }) {
@@ -47,7 +46,7 @@ function AnimatePresenceLazy({ children }: { children: React.ReactNode }) {
   return AP ? <AP>{children}</AP> : <>{children}</>
 }
 
-export type Tab = 'wave' | 'search' | 'trends' | 'collection' | 'history' | 'settings' | 'account'
+export type Tab = 'wave' | 'search' | 'trends' | 'collection' | 'settings' | 'account'
 
 function AppInner(): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('wave')
@@ -195,8 +194,6 @@ function AppInner(): JSX.Element {
             <Suspense fallback={null}><TrendsView /></Suspense>
           ) : activeTab === 'collection' ? (
             <Suspense fallback={null}><CollectionView /></Suspense>
-          ) : activeTab === 'history' ? (
-            <Suspense fallback={null}><HistoryView /></Suspense>
           ) : activeTab === 'settings' ? (
             <Suspense fallback={null}><SettingsView /></Suspense>
           ) : activeTab === 'account' ? (

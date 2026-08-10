@@ -1,4 +1,5 @@
 import ReactDOM from 'react-dom/client'
+// Initialise window.api before App and its store modules are evaluated.
 import './lib/tauri-bridge'
 import App from './App'
 import './assets/styles/global.css'

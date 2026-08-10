@@ -39,6 +39,31 @@
   flex-shrink: 0;
 }
 
+.playlist-detail__cover--mosaic {
+  position: relative;
+  overflow: hidden;
+}
+
+.playlist-detail__cover-strips {
+  position: absolute;
+  inset: 0;
+  display: grid;
+}
+
+.playlist-detail__cover-strip {
+  min-width: 0;
+  background-position: center;
+  background-size: cover;
+}
+
+.playlist-detail__cover--mosaic::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+
 .playlist-detail__label {
   font-size: 12px;
   font-weight: 700;

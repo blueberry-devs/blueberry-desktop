@@ -44,26 +44,30 @@
 .history-view__hero-card {
   margin-top: 24px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 18px;
-  width: 100%;
-  max-width: 560px;
-  background: linear-gradient(120deg, #4a4a58, #2c2c34, #5a5a6c, #232329);
-  border-radius: 16px;
-  padding: 20px 28px 20px 20px;
+  justify-content: center;
+  gap: 10px;
+  width: 150px;
+  aspect-ratio: 1;
+  border: 1.5px dashed var(--border, rgba(255, 255, 255, 0.2));
+  border-radius: 12px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.55));
   cursor: pointer;
-  transition: transform 0.12s ease;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
 .history-view__hero-card:hover {
-  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.48);
+  color: var(--text-primary, #fff);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .history-view__hero-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.2);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -71,14 +75,15 @@
 }
 
 .history-view__hero-title {
-  font-size: 20px;
-  font-weight: 800;
-  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
 }
 
 .history-view__hero-sub {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.5));
+  text-align: center;
   margin-top: 4px;
 }
 

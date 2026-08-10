@@ -111,12 +111,22 @@ export function getPlaylistTracks(playlistId: string, offset = 0, limit = 50): P
   return getJson(`/api/playlist/tracks?${params.toString()}`)
 }
 
+function trendLocation(): { language: string; country: string } {
+  const language = navigator.language || 'ru-RU'
+  const country = new Intl.Locale(language).region ?? (language.toLowerCase().startsWith('ru') ? 'RU' : 'US')
+  return { language, country }
+}
+
 export function fetchTrends(): Promise<TrackResult[]> {
-  return getTrackList('/api/trends')
+  const { language, country } = trendLocation()
+  console.debug('[Search] loading Yandex popular tracks', { language, country })
+  return getTrackList(`/api/trends?language=${encodeURIComponent(language)}&country=${encodeURIComponent(country)}`)
 }
 
 export function fetchTrendsMonthly(): Promise<TrackResult[]> {
-  return getTrackList('/api/trends/monthly')
+  const { language, country } = trendLocation()
+  console.debug('[Search] loading Yandex latest hits', { language, country })
+  return getTrackList(`/api/trends/monthly?language=${encodeURIComponent(language)}&country=${encodeURIComponent(country)}`)
 }
 
 function parseNativeId(trackId: string): { source: TrackSource; nativeId: string } {

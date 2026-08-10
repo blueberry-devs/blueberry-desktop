@@ -183,6 +183,10 @@ function PlaylistDetailView({ playlist, onBack, onDelete, readonly = false }: Pr
   const dragIndexRef = useRef<number | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
+  const likedCovers = playlist.id === '__liked__'
+    ? playlist.tracks.filter((track) => track.cover).slice(0, 4)
+    : []
+  const likedStripCount = Math.max(1, likedCovers.length)
 
   const handleDeleteConfirmed = async (): Promise<void> => {
     setShowDeleteConfirm(false)
@@ -230,8 +234,14 @@ function PlaylistDetailView({ playlist, onBack, onDelete, readonly = false }: Pr
       </button>
 
       <div className="playlist-detail__header">
-        <div className="playlist-detail__cover" style={playlist.cover ? { backgroundImage: `url(${playlist.cover})` } : undefined}>
-          {!playlist.cover && playlist.id === '__liked__' ? (
+        <div className={`playlist-detail__cover${playlist.id === '__liked__' && likedCovers.length > 0 ? ' playlist-detail__cover--mosaic' : ''}`} style={playlist.cover ? { backgroundImage: `url(${playlist.cover})` } : undefined}>
+          {playlist.id === '__liked__' && likedCovers.length > 0 ? (
+            <div className="playlist-detail__cover-strips" style={{ gridTemplateColumns: `repeat(${likedStripCount}, 1fr)` }} aria-hidden="true">
+              {likedCovers.map((track, index) => (
+                <div key={`${track.id}-${index}`} className="playlist-detail__cover-strip" style={{ backgroundImage: `url(${track.cover})` }} />
+              ))}
+            </div>
+          ) : !playlist.cover && playlist.id === '__liked__' ? (
             <svg width="40" height="40" viewBox="0 0 18 18" fill="none">
               <path d="M9 15.5S2 11.2 2 6.8C2 4.4 3.9 2.8 6 2.8c1.4 0 2.6.7 3 1.8.4-1.1 1.6-1.8 3-1.8 2.1 0 4 1.6 4 4 0 4.4-7 8.7-7 8.7Z" fill="#ff4d6d" />
             </svg>

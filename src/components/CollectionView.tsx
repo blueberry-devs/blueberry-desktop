@@ -4,6 +4,7 @@ import { useLikedTracks, addLikedTracksFromServer } from '../store/likes'
 import { usePlaylists, deletePlaylist, renamePlaylist, createPlaylist, addTrackToPlaylist } from '../store/playlists'
 import { useDeletedPlaylists } from '../store/deletedPlaylists'
 import { useFavoritePlaylists } from '../store/favoritePlaylists'
+import { useFavoriteArtists } from '../store/favoriteArtists'
 import { useDownloads } from '../store/downloads'
 import { isAuthenticated } from '../store/auth'
 import { fetchCloudPlaylists, fetchAllCloudPlaylistTracks, fetchUserLikes, deleteCloudPlaylist, type CloudPlaylistSummary } from '../services/playlists'
@@ -28,6 +29,7 @@ function CollectionView(): JSX.Element {
   const downloads = useDownloads()
   const downloadedTracks = useMemo(() => Object.values(downloads), [downloads])
   const favoritePlaylists = useFavoritePlaylists()
+  const favoriteArtists = useFavoriteArtists()
   const cloudPlaylists = useCloudPlaylists()
   const localCloudIds = useMemo(() => new Set(playlists.filter((p) => /^[0-9a-f-]{36}$/i.test(p.id)).map((p) => p.id)), [playlists])
   const cloudOnlyPlaylists = useMemo(() => cloudPlaylists.filter((pl) => {
@@ -147,19 +149,19 @@ function CollectionView(): JSX.Element {
   }
 
   const artistTracks = useMemo(() => {
-    const map = new Map<string, { name: string; cover: string | null; trackTitle: string }>()
-    for (const t of liked) {
-      const name = t.artists[0]
-      if (name && !map.has(name)) map.set(name, { name, cover: t.artistCover ?? null, trackTitle: t.title })
-    }
-    return Array.from(map.values()).slice(0, 12)
-  }, [liked])
+    return favoriteArtists.slice(0, 12)
+  }, [favoriteArtists])
 
   const resolvedCovers = useArtistCovers(
     artistTracks.filter((a) => !a.cover).map((a) => ({ name: a.name, trackTitle: a.trackTitle }))
   )
 
-  const artists = artistTracks.map((a) => ({ name: a.name, cover: a.cover ?? resolvedCovers.get(a.name) ?? null }))
+  const artists = artistTracks.map((a) => ({
+    ...a,
+    cover: a.cover ?? resolvedCovers.get(a.name) ?? null,
+  }))
+  const likedCovers = liked.filter((track) => track.cover).slice(0, 4)
+  const likedStripCount = Math.max(1, likedCovers.length)
 
   const indexed = liked.map((t, i) => ({ track: t, index: i }))
   const left = indexed.filter((_, i) => i % 2 === 0)
@@ -258,26 +260,6 @@ function CollectionView(): JSX.Element {
         {t('collection.subtitle')}<span className="collection-view__accent">{t('collection.subtitleAccent')}</span>
       </p>
 
-      <div className="collection-view__hero-card hero-card--animated" onClick={() => liked.length > 0 && setShowLiked(true)}>
-        <div className="collection-view__hero-icon">
-          <svg width="26" height="26" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M9 15.5S2 11.2 2 6.8C2 4.4 3.9 2.8 6 2.8c1.4 0 2.6.7 3 1.8.4-1.1 1.6-1.8 3-1.8 2.1 0 4 1.6 4 4 0 4.4-7 8.7-7 8.7Z"
-              fill="#fff"
-            />
-          </svg>
-        </div>
-        <div className="collection-view__hero-meta">
-          <div className="collection-view__hero-title">
-            {t('collection.likedTitle')}
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div className="collection-view__hero-sub">{t('collection.trackCount').replace('{n}', String(liked.length))}</div>
-        </div>
-      </div>
-
       <section className="collection-view__section">
         <h2 className="collection-view__artists-title">
           {t('collection.playlists')}
@@ -292,6 +274,32 @@ function CollectionView(): JSX.Element {
           </button>
         </h2>
         <div className="collection-view__playlist-grid">
+          <div
+            className="collection-view__hero-card"
+            onClick={() => liked.length > 0 && setShowLiked(true)}
+            role="button"
+            tabIndex={liked.length > 0 ? 0 : -1}
+            onKeyDown={(event) => {
+              if (liked.length > 0 && (event.key === 'Enter' || event.key === ' ')) setShowLiked(true)
+            }}
+          >
+            <div className="collection-view__hero-strips" style={{ gridTemplateColumns: `repeat(${likedStripCount}, 1fr)` }} aria-hidden="true">
+              {likedCovers.length > 0 ? likedCovers.map((track, index) => (
+                <div key={`${track.id}-${index}`} className="collection-view__hero-strip" style={{ backgroundImage: `url(${track.cover})` }} />
+              )) : <div className="collection-view__hero-strip collection-view__hero-strip--empty" />}
+            </div>
+            <div className="collection-view__hero-overlay" />
+            <div className="collection-view__hero-icon">
+              <svg width="22" height="22" viewBox="0 0 18 18" fill="none"><path d="M9 15.5S2 11.2 2 6.8C2 4.4 3.9 2.8 6 2.8c1.4 0 2.6.7 3 1.8.4-1.1 1.6-1.8 3-1.8 2.1 0 4 1.6 4 4 0 4.4-7 8.7-7 8.7Z" fill="#fff" /></svg>
+            </div>
+            <div className="collection-view__hero-meta">
+              <div className="collection-view__hero-title">
+                {t('collection.likedTitle')}
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </div>
+              <div className="collection-view__hero-sub">{t('collection.trackCount').replace('{n}', String(liked.length))}</div>
+            </div>
+          </div>
           <CreatePlaylistCard />
           {playlists.map((p) => (
             <button
@@ -378,24 +386,26 @@ function CollectionView(): JSX.Element {
         </section>
       )}
 
-      {liked.length === 0 ? (
+      {liked.length === 0 && artists.length === 0 ? (
         <div className="collection-view__empty">
           {t('collection.empty')}
         </div>
       ) : (
         <>
-          <div className="collection-view__columns">
-            <div className="collection-view__column">
-              {left.map(({ track, index }) => (
-                <TrackRow key={track.id} track={track} queue={liked} index={index} onArtistClick={requestArtistSearch} />
-              ))}
+          {liked.length > 0 && (
+            <div className="collection-view__columns">
+              <div className="collection-view__column">
+                {left.map(({ track, index }) => (
+                  <TrackRow key={track.id} track={track} queue={liked} index={index} onArtistClick={requestArtistSearch} />
+                ))}
+              </div>
+              <div className="collection-view__column">
+                {right.map(({ track, index }) => (
+                  <TrackRow key={track.id} track={track} queue={liked} index={index} onArtistClick={requestArtistSearch} />
+                ))}
+              </div>
             </div>
-            <div className="collection-view__column">
-              {right.map(({ track, index }) => (
-                <TrackRow key={track.id} track={track} queue={liked} index={index} onArtistClick={requestArtistSearch} />
-              ))}
-            </div>
-          </div>
+          )}
 
           {artists.length > 0 && (
             <section className="collection-view__artists">
@@ -407,10 +417,15 @@ function CollectionView(): JSX.Element {
               </h2>
               <div className="collection-view__artists-row">
                 {artists.map((a) => (
-                  <button
+                  <div
                     key={a.name}
                     className="collection-view__artist"
                     onClick={() => requestArtistSearch(a.name)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') requestArtistSearch(a.name)
+                    }}
                   >
                     <div className="collection-view__artist-avatar">
                       {a.cover ? (
@@ -423,7 +438,7 @@ function CollectionView(): JSX.Element {
                       )}
                     </div>
                     <div className="collection-view__artist-name">{a.name}</div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </section>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { searchTracksSoundcloud, TrackResult } from '../api/yandexMusic'
 import { usePlayer } from '../player/PlayerContext'
 import { useTranslation } from '../utils/useTranslation'
+import { toggleFavoriteArtist, useIsFavoriteArtist } from '../store/favoriteArtists'
 import TrackRow from './TrackRow'
 import './ArtistView.css'
 
@@ -15,6 +16,7 @@ function ArtistView({ name, onBack }: Props): JSX.Element {
   const [loading, setLoading] = useState(true)
   const { t } = useTranslation()
   const { playQueue } = usePlayer()
+  const isFavorite = useIsFavoriteArtist(name)
 
   useEffect(() => {
     setLoading(true)
@@ -55,15 +57,29 @@ function ArtistView({ name, onBack }: Props): JSX.Element {
         </div>
         <div className="artist-view__meta">
           <div className="artist-view__label">{t('artist.label')}</div>
-          <h1 className="artist-view__name">{name}</h1>
-          {tracks.length > 0 && (
-            <button className="artist-view__play" onClick={() => playQueue(tracks, 0)}>
-              <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
-                <path d="M5.5 3.5l9 5.5-9 5.5Z" fill="#000" />
+          <div className="artist-view__name-row">
+            <h1 className="artist-view__name">{name}</h1>
+            <button
+              className={`artist-view__favorite${isFavorite ? ' artist-view__favorite--active' : ''}`}
+              onClick={() => toggleFavoriteArtist({ name, cover, trackTitle: tracks[0]?.title ?? '' })}
+              aria-label={isFavorite ? 'Убрать артиста из избранного' : 'Добавить артиста в избранное'}
+              title={isFavorite ? 'Убрать из любимых артистов' : 'Добавить в любимые артисты'}
+            >
+              <svg width="22" height="22" viewBox="0 0 18 18" fill="none">
+                <path d="M9 15.5S2 11.2 2 6.8C2 4.4 3.9 2.8 6 2.8c1.4 0 2.6.7 3 1.8.4-1.1 1.6-1.8 3-1.8 2.1 0 4 1.6 4 4 0 4.4-7 8.7-7 8.7Z" fill="currentColor" />
               </svg>
-              {t('artist.listenBtn')}
             </button>
-          )}
+          </div>
+          <div className="artist-view__actions">
+            {tracks.length > 0 && (
+              <button className="artist-view__play" onClick={() => playQueue(tracks, 0)}>
+                <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+                  <path d="M5.5 3.5l9 5.5-9 5.5Z" fill="#000" />
+                </svg>
+                {t('artist.listenBtn')}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

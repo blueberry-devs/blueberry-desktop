@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from '../utils/useTranslation'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
-import { searchTracksYandex, searchTracksSoundcloud, searchTracksYoutube, searchPlaylists, TrackResult, PlaylistResult, TrackSource } from '../api/yandexMusic'
+import { searchTracksYandex, searchTracksSoundcloud, searchTracksYoutube, searchPlaylists, fetchTrends, fetchTrendsMonthly, TrackResult, PlaylistResult, TrackSource } from '../api/yandexMusic'
 import { usePlayer } from '../player/PlayerContext'
-import { useHistory } from '../store/history'
 import { useArtistCovers } from '../hooks/useArtistCovers'
+import { useHistory } from '../store/history'
 import { consumePendingSearch } from '../store/searchQuery'
 import { toggleFavoritePlaylist, useIsFavoritePlaylist } from '../store/favoritePlaylists'
 import { sortByPlays } from '../store/playCount'
@@ -161,14 +161,36 @@ function SearchView(): JSX.Element {
   const [playlistResults, setPlaylistResults] = useState<PlaylistResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [emptyTab, setEmptyTab] = useState<'popular' | 'history'>('popular')
   const [resultsTab, setResultsTab] = useState<ResultsTab>('top')
+  const [emptyTab, setEmptyTab] = useState<'popular' | 'history'>('popular')
+  const [popularTracks, setPopularTracks] = useState<TrackResult[]>([])
+  const [latestHits, setLatestHits] = useState<TrackResult[]>([])
+  const [homeLoading, setHomeLoading] = useState(false)
   const [viewingArtist, setViewingArtist] = useState<string | null>(null)
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE)
   const [sourceFilter, setSourceFilter] = useState<TrackSource[]>(ALL_SOURCES)
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const searchRequestRef = useRef(0)
   const { playQueue } = usePlayer()
   const history = useHistory()
+
+  useEffect(() => {
+    if (query.trim()) return
+    let cancelled = false
+    setHomeLoading(true)
+    Promise.all([
+      fetchTrends().catch(() => []),
+      fetchTrendsMonthly().catch(() => []),
+    ]).then(([popular, latest]) => {
+      if (cancelled) return
+      console.debug('[Search] Yandex trend results', { popular: popular.length, latest: latest.length })
+      setPopularTracks(popular.slice(0, 10))
+      setLatestHits(latest.slice(0, 10))
+    }).finally(() => {
+      if (!cancelled) setHomeLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [query])
   const { t } = useTranslation()
 
   useEffect(() => {
@@ -203,9 +225,12 @@ function SearchView(): JSX.Element {
     clearTimeout(debounceTimer)
     if (!q.trim()) return
 
+    const requestId = ++searchRequestRef.current
+
     const seen = new Set<string>()
 
     const mergeBatch = (batch: TrackResult[]) => {
+      if (requestId !== searchRequestRef.current) return
       setResults(prev => {
         const next = [...prev]
         for (const t of batch) {
@@ -219,12 +244,15 @@ function SearchView(): JSX.Element {
     }
 
     searchPlaylists(q)
-      .then(pl => setPlaylistResults(pl))
+      .then(pl => {
+        if (requestId === searchRequestRef.current) setPlaylistResults(pl)
+      })
       .catch(() => {})
 
     const activeSources = sources.length
     let settled = 0
     const sourceDone = () => {
+      if (requestId !== searchRequestRef.current) return
       settled++
       if (settled >= activeSources) setLoading(false)
     }
@@ -260,11 +288,20 @@ function SearchView(): JSX.Element {
   useEffect(() => {
     clearTimeout(debounceTimer)
     if (!query.trim()) {
+      searchRequestRef.current++
       setResults([])
       setPlaylistResults([])
       setError(null)
+      setLoading(false)
       return
     }
+    searchRequestRef.current++
+    setResults([])
+    setPlaylistResults([])
+    setError(null)
+    setLoading(true)
+    setResultsTab('top')
+    setDisplayLimit(PAGE_SIZE)
     debounceTimer = setTimeout(() => {
       runSearch(query, sourceFilter)
     }, 600)
@@ -383,9 +420,8 @@ function SearchView(): JSX.Element {
             </button>
           </div>
 
-          {emptyTab === 'popular' && (
-            <>
-              <section className="search-view__section">
+          {emptyTab === 'popular' && <>
+          {false && (<section className="search-view__section">
                 <h2 className="search-view__section-title">{t('search.collectionsTitle')}</h2>
                 <div className="search-view__scroller">
                   {COLLECTIONS.map((c) => (
@@ -400,9 +436,9 @@ function SearchView(): JSX.Element {
                     </button>
                   ))}
                 </div>
-              </section>
+          </section>)}
 
-              <section className="search-view__section">
+          {false && (<section className="search-view__section">
                 <h2 className="search-view__section-title">{t('search.missedTitle')}</h2>
                 <div className="search-view__scroller">
                   {SKIP_CARDS.map((c) => (
@@ -417,16 +453,51 @@ function SearchView(): JSX.Element {
                     </button>
                   ))}
                 </div>
-              </section>
-            </>
+          </section>)}
+
+          {popularTracks.length > 0 && (
+            <section className="search-view__section search-view__home-section">
+              <h2 className="search-view__section-title">Популярные треки</h2>
+              <div className="search-view__track-scroller">
+                {popularTracks.map((track, index) => (
+                  <button key={track.id} className="search-view__track-card" onClick={() => playQueue(popularTracks, index)}>
+                    <span className="search-view__track-card-cover">
+                      {track.cover && <img src={track.cover} alt="" />}
+                    </span>
+                    <span className="search-view__track-card-title">{track.title}</span>
+                    <span className="search-view__track-card-artist">{track.artists.join(', ')}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
           )}
+
+          {latestHits.length > 0 && (
+            <section className="search-view__section search-view__home-section">
+              <h2 className="search-view__section-title">Последние хиты</h2>
+              <div className="search-view__track-scroller">
+                {latestHits.map((track, index) => (
+                  <button key={track.id} className="search-view__track-card" onClick={() => playQueue(latestHits, index)}>
+                    <span className="search-view__track-card-cover">
+                      {track.cover && <img src={track.cover} alt="" />}
+                    </span>
+                    <span className="search-view__track-card-title">{track.title}</span>
+                    <span className="search-view__track-card-artist">{track.artists.join(', ')}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+          </>}
 
           {emptyTab === 'history' && (
             <div className="search-view__results">
               {history.length === 0 ? (
                 <div className="search-view__status">{t('trends.historyEmpty')}</div>
               ) : (
-                history.map((t, i) => <TrackRow key={t.id} track={t} queue={history} index={i} onArtistClick={setViewingArtist} />)
+                history.map((track, index) => (
+                  <TrackRow key={track.id} track={track} queue={history} index={index} onArtistClick={setViewingArtist} />
+                ))
               )}
             </div>
           )}

@@ -12,7 +12,6 @@ export const navItems: { icon: string; label: string; tab: Tab }[] = [
   { icon: 'wave', label: 'Моя волна', tab: 'wave' },
   { icon: 'note', label: 'Для вас и Тренды', tab: 'trends' },
   { icon: 'heart', label: 'Коллекция', tab: 'collection' },
-  { icon: 'history', label: 'История', tab: 'history' }
 ]
 
 export function NavIcon({ type }: { type: string }): JSX.Element {
@@ -95,7 +94,6 @@ function Sidebar({ activeTab, onSelectTab }: Props): JSX.Element {
     'Моя волна': t('sidebar.wave'),
     'Для вас и Тренды': t('sidebar.trends'),
     'Коллекция': t('sidebar.collection'),
-    'История': t('sidebar.history'),
   }
 
   return (

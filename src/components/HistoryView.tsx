@@ -45,7 +45,9 @@ function HistoryView(): JSX.Element {
         </div>
       ) : (
         <>
-          <div className="history-view__hero-card hero-card--animated" onClick={() => playQueue(history, 0)}>
+          <div className="history-view__hero-card" onClick={() => playQueue(history, 0)} role="button" tabIndex={0} onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') playQueue(history, 0)
+          }}>
             <div className="history-view__hero-icon">
               <svg width="22" height="22" viewBox="0 0 18 18" fill="none">
                 <circle cx="9" cy="9" r="7" stroke="#fff" strokeWidth="1.4" />
