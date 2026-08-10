@@ -6,10 +6,12 @@
   "license": "GPL-3.0",
   "type": "module",
   "scripts": {
-    "dev": "taskkill /F /IM music-server.exe 2>nul & taskkill /F /IM music-server-x86_64-pc-windows-msvc.exe 2>nul & tauri dev",
+    "dev": "node scripts/dev.mjs",
     "build": "tauri build",
+    "build:android": "node scripts/build-android.mjs",
     "dev:server": "scripts\\dev-watch.bat",
     "build:server": "scripts\\build-server.bat",
+    "build:server:android": "scripts\\build-server-android.bat",
     "vite:dev": "vite dev",
     "vite:build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.web.json"

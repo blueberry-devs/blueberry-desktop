@@ -244,6 +244,7 @@ function NowPlayingFullscreen(): JSX.Element | null {
             className="np-fullscreen__cover"
             onMouseEnter={() => setHoveringCover(true)}
             onMouseLeave={() => setHoveringCover(false)}
+            onClick={() => setHoveringCover((visible) => !visible)}
           >
             {currentTrack.cover ? (
               <img src={currentTrack.cover} alt="" />

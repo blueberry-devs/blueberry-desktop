@@ -12,6 +12,7 @@ pub struct TrayUpdateData {
 #[tauri::command]
 pub async fn tray_update(app: AppHandle, data: TrayUpdateData) -> Result<(), String> {
     // Update tray tooltip
+    #[cfg(desktop)]
     if let Some(tray) = app.tray_by_id("main") {
         let tooltip = if data.track.is_empty() {
             "Blueberry Desktop".to_string()

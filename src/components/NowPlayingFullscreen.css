@@ -161,6 +161,18 @@
   pointer-events: auto;
 }
 
+@media (hover: none), (pointer: coarse) {
+  .np-fullscreen__cover {
+    touch-action: manipulation;
+  }
+
+  .np-fullscreen__overlay {
+    opacity: 1;
+    pointer-events: auto;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.4), transparent 45%, rgba(0, 0, 0, 0.4));
+  }
+}
+
 .np-fullscreen__icon-btn {
   position: relative;
   width: 40px;

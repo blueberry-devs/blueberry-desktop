@@ -5,10 +5,21 @@ node_modules/
 dist/
 out/
 build/
+*.tsbuildinfo
 
 # Rust
-server/target/
 src-tauri/target/
+server/target/
+
+# Tauri generated projects (regenerate with `tauri android init`)
+src-tauri/gen/android/
+
+# Android signing secrets
+*.keystore
+*.jks
+keystore.properties
+*keystore-password.txt
+local.properties
 
 # Python
 __pycache__/
@@ -17,25 +28,26 @@ server/.venv/
 venv/
 .venv/
 
-# TypeScript
-*.tsbuildinfo
-
 # Environment
 .env
 server/.env
 resources/.env
-
-# OS
-.DS_Store
-Thumbs.db
 
 # API spec
 v1.yaml
 
 # Logs
 *.log
-
-# Temp
-tmp/
-temp/
+logs/
 server_tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo

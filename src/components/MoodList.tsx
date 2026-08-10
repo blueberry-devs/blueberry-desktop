@@ -51,15 +51,22 @@ const WHEEL_RADIUS = 720
 const MAX_ANGLE = 0.65
 
 function applyParens(scrollEl: HTMLElement): void {
-  const centerY = window.innerHeight / 2
+  const isMobile = window.innerWidth <= 700 || document.querySelector('.app--mobile') !== null
+  const centerY = isMobile ? scrollEl.getBoundingClientRect().top + scrollEl.clientHeight * 0.86 : window.innerHeight / 2
+  const centerX = scrollEl.getBoundingClientRect().left + scrollEl.clientWidth / 2
+  const radius = isMobile ? Math.max(260, scrollEl.clientHeight * 1.35) : WHEEL_RADIUS
   const rows = scrollEl.querySelectorAll<HTMLElement>('[data-wave-index]')
   rows.forEach((row) => {
     const rowRect = row.getBoundingClientRect()
     const rowCenter = rowRect.top + rowRect.height / 2
-    const dist = rowCenter - centerY
-    const angle = Math.max(-MAX_ANGLE, Math.min(MAX_ANGLE, dist / WHEEL_RADIUS))
-    const recede = WHEEL_RADIUS * (1 - Math.cos(angle))
-    row.style.transform = `translateX(${recede}px)`
+    const dist = isMobile
+      ? rowRect.left + rowRect.width / 2 - centerX
+      : rowCenter - centerY
+    const angle = Math.max(-MAX_ANGLE, Math.min(MAX_ANGLE, dist / radius))
+    const recede = radius * (1 - Math.cos(angle))
+    // Mobile follows the upper 9-to-3 clock arc: the center item sits higher
+    // and the outer items fall away symmetrically on both sides.
+    row.style.transform = isMobile ? `translateY(${-recede}px)` : `translateX(${recede}px)`
     row.style.opacity = ''
   })
 }

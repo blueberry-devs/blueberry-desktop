@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import './lib/tauri-bridge'
 import App from './App'
 import './assets/styles/global.css'
+import { applyMaterialYou } from './utils/materialYou'
+
+applyMaterialYou()
 
 // No StrictMode: its dev-only double mount/unmount of effects is a known
 // source of visible flicker with AnimatePresence exit animations (e.g. the

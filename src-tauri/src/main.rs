@@ -1,12 +1,12 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
 mod commands;
 mod sidecar;
+#[cfg(desktop)]
 mod tray;
 
 use commands::discord::DiscordState;
 
-fn main() {
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
     // Initialize tracing so sidecar/backend logs are visible in terminal
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -37,10 +37,9 @@ fn main() {
             commands::tray::tray_update,
         ])
         .setup(|app| {
-            // Setup system tray
+            #[cfg(desktop)]
             tray::create_tray(app)?;
 
-            // Start sidecar
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 sidecar::start_sidecar(handle).await;
@@ -72,7 +71,10 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            #[cfg(not(desktop))]
+            let _ = window;
             // Hide instead of close (app stays in tray)
+            #[cfg(desktop)]
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
@@ -86,4 +88,9 @@ fn main() {
                 sidecar::kill_stored_sidecar(app);
             }
         });
+}
+
+#[cfg(not(mobile))]
+fn main() {
+    run();
 }

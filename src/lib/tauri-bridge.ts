@@ -37,7 +37,7 @@ export const api = {
   },
 
   updateTray: (data: { isPlaying: boolean; track: string; artist: string }) =>
-    invoke('tray_update', { data }),
+    import.meta.env.VITE_MOBILE === 'true' ? Promise.resolve() : invoke('tray_update', { data }),
 
   cacheGetLyrics: (trackId: string): Promise<CacheEntry | null> =>
     invoke('cache_get_lyrics', { trackId }),

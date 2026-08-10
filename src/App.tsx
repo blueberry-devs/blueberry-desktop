@@ -161,7 +161,7 @@ function AppInner(): JSX.Element {
   const showMiniPlayer = activeTab !== 'wave'
 
   return (
-    <div className="app">
+    <div className={`app${import.meta.env.VITE_MOBILE === 'true' ? ' app--mobile' : ''}`}>
       <SplashScreen visible={!appReady} onEnded={() => setAppReady(true)} />
 
       <Suspense fallback={null}>
@@ -204,6 +204,9 @@ function AppInner(): JSX.Element {
       {profile.navbarPosition === 'bottom' && (
         <TopBottomNav activeTab={activeTab} onSelectTab={selectTab} position="bottom" />
       )}
+      <div className="app__mobile-nav">
+        <TopBottomNav activeTab={activeTab} onSelectTab={selectTab} position="bottom" />
+      </div>
 
       {showMiniPlayer && currentTrack && <DynamicIsland onExpand={() => setActiveTab('wave')} />}
       <ToastNotification />
