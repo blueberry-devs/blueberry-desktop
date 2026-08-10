@@ -24,8 +24,8 @@ importers:
         specifier: ^2
         version: 2.10.1
       hls.js:
-        specifier: ^1.6.16
-        version: 1.6.16
+        specifier: ^1.6.17
+        version: 1.6.17
       lucide-react:
         specifier: 1.27.0
         version: 1.27.0(react@19.2.8)
@@ -460,8 +460,8 @@ packages:
     peerDependencies:
       csstype: ^3.0.10
 
-  hls.js@1.6.16:
-    resolution: {integrity: sha512-VSIRpLfRwlAAdGL4wiTucx2ScRipo0ed1FBatWkyt832jC4CReKstga6yIhYVwGu9LOBjuX9wzmRMeQdBJtzEA==}
+  hls.js@1.6.17:
+    resolution: {integrity: sha512-NUplVGVuc1hSPwdB/9/cbRkUmLrYi75/hqiXKdA+l300pJNxDu96R7jRb2imDzWJqIUF4I5ThmAdp9GvOCXsuQ==}
 
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
@@ -944,7 +944,7 @@ snapshots:
     dependencies:
       csstype: 3.2.3
 
-  hls.js@1.6.16: {}
+  hls.js@1.6.17: {}
 
   jiti@2.7.0:
     optional: true
